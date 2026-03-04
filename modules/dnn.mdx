@@ -1,0 +1,331 @@
+---
+title: "DNN Module"
+description: "Deep Neural Networks inference with OpenCV's DNN module"
+---
+
+## Overview
+
+The DNN (Deep Neural Networks) module provides:
+- Loading models from popular frameworks (TensorFlow, PyTorch, ONNX, Caffe, Darknet)
+- Forward inference (no training)
+- Multiple backend support (CPU, OpenCL, CUDA)
+- Pre-trained model zoo
+
+<Note>
+The DNN module is for **inference only**. For training, use frameworks like TensorFlow or PyTorch.
+</Note>
+
+## Quick Start
+
+```cpp
+#include <opencv2/dnn.hpp>
+
+using namespace cv::dnn;
+
+// Load model
+Net net = readNet("model.onnx");
+
+// Prepare input
+Mat blob = blobFromImage(img, 1.0/255, Size(224, 224), 
+                         Scalar(), true, false);
+
+// Set input
+net.setInput(blob);
+
+// Forward pass
+Mat output = net.forward();
+```
+
+## Net Class
+
+### Loading Models
+
+```cpp
+// From ONNX
+Net net = readNetFromONNX("model.onnx");
+
+// From TensorFlow
+Net net = readNetFromTensorflow("model.pb", "config.pbtxt");
+
+// From Caffe  
+Net net = readNetFromCaffe("deploy.prototxt", "model.caffemodel");
+
+// From Darknet (YOLO)
+Net net = readNetFromDarknet("yolov4.cfg", "yolov4.weights");
+
+// From PyTorch (via ONNX)
+Net net = readNetFromONNX("model.onnx");
+
+// Auto-detect format
+Net net = readNet("model.onnx");  // Detects format automatically
+```
+
+### Setting Backend and Target
+
+```cpp
+// CPU backend
+net.setPreferableBackend(DNN_BACKEND_OPENCV);
+net.setPreferableTarget(DNN_TARGET_CPU);
+
+// OpenCL (GPU)
+net.setPreferableBackend(DNN_BACKEND_OPENCV);
+net.setPreferableTarget(DNN_TARGET_OPENCL);
+
+// CUDA (NVIDIA GPU)
+net.setPreferableBackend(DNN_BACKEND_CUDA);
+net.setPreferableTarget(DNN_TARGET_CUDA);
+
+// Intel OpenVINO
+net.setPreferableBackend(DNN_BACKEND_INFERENCE_ENGINE);
+net.setPreferableTarget(DNN_TARGET_CPU);
+```
+
+### Inference
+
+```cpp
+// Single output
+net.setInput(blob, "input_name");
+Mat output = net.forward("output_name");
+
+// Multiple outputs
+std::vector<String> outNames = {"output1", "output2"};
+std::vector<Mat> outputs;
+net.forward(outputs, outNames);
+
+// All outputs
+std::vector<String> outNames = net.getUnconnectedOutLayersNames();
+std::vector<Mat> outputs;
+net.forward(outputs, outNames);
+```
+
+## Blob Preparation
+
+### blobFromImage
+
+```cpp
+Mat blob = blobFromImage(
+    image,              // Input image
+    1.0/255.0,         // Scale factor
+    Size(224, 224),    // Target size
+    Scalar(0, 0, 0),   // Mean subtraction
+    true,              // swapRB (BGR to RGB)
+    false,             // crop
+    CV_32F             // Output type
+);
+```
+
+### blobFromImages (Batch)
+
+```cpp
+std::vector<Mat> images = {img1, img2, img3};
+Mat blob = blobFromImages(images, 1.0/255.0, 
+                          Size(224, 224), Scalar(), true);
+```
+
+### Blob Format
+
+Blobs use **NCHW** format:
+- **N**: Batch size
+- **C**: Channels
+- **H**: Height
+- **W**: Width
+
+```cpp
+// Blob shape: [1, 3, 224, 224]
+// 1 image, 3 channels (RGB), 224x224 pixels
+```
+
+## Common Tasks
+
+### Image Classification
+
+```cpp
+// Load model
+Net net = readNet("mobilenet_v2.onnx");
+net.setPreferableBackend(DNN_BACKEND_OPENCV);
+net.setPreferableTarget(DNN_TARGET_CPU);
+
+// Prepare input
+Mat img = imread("image.jpg");
+Mat blob = blobFromImage(img, 1.0/255, Size(224, 224), 
+                         Scalar(), true, false);
+
+// Inference
+net.setInput(blob);
+Mat prob = net.forward();
+
+// Get top class
+Point classIdPoint;
+minMaxLoc(prob.reshape(1, 1), 0, 0, 0, &classIdPoint);
+int classId = classIdPoint.x;
+```
+
+### Object Detection (YOLO)
+
+```cpp
+// Load YOLO
+Net net = readNetFromDarknet("yolov4.cfg", "yolov4.weights");
+
+// Prepare input
+Mat blob = blobFromImage(img, 1/255.0, Size(416, 416), 
+                         Scalar(), true, false);
+
+// Forward
+net.setInput(blob);
+std::vector<Mat> outputs;
+net.forward(outputs, net.getUnconnectedOutLayersNames());
+
+// Process detections
+for(Mat& output : outputs) {
+    for(int i = 0; i < output.rows; i++) {
+        float* data = output.ptr<float>(i);
+        float confidence = data[4];
+        
+        if(confidence > 0.5) {
+            int classId = max_element(data+5, data+output.cols) - (data+5);
+            float x = data[0] * img.cols;
+            float y = data[1] * img.rows;
+            float w = data[2] * img.cols;
+            float h = data[3] * img.rows;
+            // Draw bounding box
+        }
+    }
+}
+```
+
+### Semantic Segmentation
+
+```cpp
+Net net = readNet("fcn-resnet50.onnx");
+
+Mat blob = blobFromImage(img, 1.0, Size(500, 500));
+net.setInput(blob);
+Mat score = net.forward();
+
+// score shape: [1, num_classes, H, W]
+// Get class per pixel
+Mat classMap;
+for(int h = 0; h < score.size[2]; h++) {
+    for(int w = 0; w < score.size[3]; w++) {
+        // Get class with max score
+        // ...
+    }
+}
+```
+
+## Model Zoo
+
+OpenCV provides pre-trained models:
+
+```cpp
+// Face detection
+Net faceNet = readNet("opencv_face_detector.caffemodel",
+                      "opencv_face_detector.prototxt");
+
+// Age/Gender
+Net ageNet = readNet("age_net.caffemodel", "age_deploy.prototxt");
+Net genderNet = readNet("gender_net.caffemodel", "gender_deploy.prototxt");
+
+// OpenPose (pose estimation)
+Net poseNet = readNet("pose_iter_440000.caffemodel",
+                      "pose_deploy_linevec.prototxt");
+```
+
+## Performance Optimization
+
+### Backend Selection
+
+<CodeGroup>
+```cpp CPU
+net.setPreferableBackend(DNN_BACKEND_OPENCV);
+net.setPreferableTarget(DNN_TARGET_CPU);
+```
+
+```cpp CUDA
+net.setPreferableBackend(DNN_BACKEND_CUDA);
+net.setPreferableTarget(DNN_TARGET_CUDA);
+```
+
+```cpp OpenCL
+net.setPreferableBackend(DNN_BACKEND_OPENCV);
+net.setPreferableTarget(DNN_TARGET_OPENCL);
+```
+</CodeGroup>
+
+### Input Size
+
+```cpp
+// Smaller input = faster inference
+Mat blob = blobFromImage(img, 1.0/255, 
+                         Size(320, 320),  // Reduce from 640x640
+                         Scalar(), true);
+```
+
+### Batch Processing
+
+```cpp
+// Process multiple images at once
+std::vector<Mat> images;
+for(int i = 0; i < 4; i++) {
+    images.push_back(imread(files[i]));
+}
+
+Mat blob = blobFromImages(images, 1.0/255, Size(224, 224));
+net.setInput(blob);
+Mat output = net.forward();  // Batch inference
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+<Card title="Use ONNX Format" icon="file-code">
+ONNX provides best compatibility across frameworks
+</Card>
+
+<Card title="Enable GPU" icon="microchip">
+Use CUDA backend for 5-10x speedup on NVIDIA GPUs
+</Card>
+
+<Card title="Optimize Input Size" icon="compress">
+Smaller inputs trade accuracy for speed
+</Card>
+
+<Card title="Batch When Possible" icon="layer-group">
+Batch processing improves GPU utilization
+</Card>
+</CardGroup>
+
+## Troubleshooting
+
+### Model Loading Issues
+
+```cpp
+if(net.empty()) {
+    std::cerr << "Failed to load model\n";
+    return -1;
+}
+```
+
+### Check Backend Support
+
+```cpp
+auto backends = getAvailableBackends();
+for(auto& backend : backends) {
+    std::cout << "Backend: " << backend.first 
+              << ", Target: " << backend.second << "\n";
+}
+```
+
+### Enable Diagnostic Mode
+
+```cpp
+enableModelDiagnostics(true);
+Net net = readNet("model.onnx");  // Verbose loading
+```
+
+## See Also
+
+- [DNN Network API](/api/dnn/network) - Detailed Net class reference
+- [DNN Layers](/api/dnn/layers) - Layer types and custom layers  
+- [DNN Inference](/api/dnn/inference) - Advanced inference techniques
+- [Object Detection Module](/modules/objdetect) - Classic detection methods

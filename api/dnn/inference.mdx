@@ -1,0 +1,459 @@
+---
+title: "DNN Inference Utilities"
+description: "Helper functions and utilities for neural network inference"
+---
+
+## Overview
+
+OpenCV DNN provides utility functions for preparing inputs, processing outputs, and managing inference workflows.
+
+## Blob Creation
+
+### blobFromImage
+
+Convert single image to 4D blob:
+
+```cpp
+Mat blobFromImage(
+    InputArray image,
+    double scalefactor = 1.0,
+    const Size& size = Size(),
+    const Scalar& mean = Scalar(),
+    bool swapRB = false,
+    bool crop = false,
+    int ddepth = CV_32F
+);
+```
+
+**Parameters**:
+- `image`: Input image (any size, any channels)
+- `scalefactor`: Multiplier for pixel values
+- `size`: Target spatial dimensions
+- `mean`: Values to subtract from channels
+- `swapRB`: Swap red and blue channels (BGR to RGB)
+- `crop`: Crop image after resize
+- `ddepth`: Output depth (typically CV_32F)
+
+**Example**:
+
+```cpp
+Mat img = imread("image.jpg");
+
+// Basic usage
+Mat blob = blobFromImage(img, 1.0/255, Size(224, 224));
+
+// With mean subtraction
+Mat blob = blobFromImage(
+    img,
+    1.0,
+    Size(224, 224),
+    Scalar(104, 117, 123),  // ImageNet mean
+    true,   // BGR to RGB
+    false   // No crop
+);
+
+// Output shape: [1, 3, 224, 224]
+```
+
+### blobFromImages
+
+Convert multiple images to single blob (batching):
+
+```cpp
+Mat blobFromImages(
+    InputArrayOfArrays images,
+    double scalefactor = 1.0,
+    Size size = Size(),
+    const Scalar& mean = Scalar(),
+    bool swapRB = false,
+    bool crop = false,
+    int ddepth = CV_32F
+);
+```
+
+**Example**:
+
+```cpp
+std::vector<Mat> images;
+images.push_back(imread("img1.jpg"));
+images.push_back(imread("img2.jpg"));
+images.push_back(imread("img3.jpg"));
+
+Mat blob = blobFromImages(
+    images,
+    1.0/255,
+    Size(224, 224),
+    Scalar(),
+    true
+);
+
+// Output shape: [3, 3, 224, 224]
+// batch_size=3, channels=3, height=224, width=224
+```
+
+### imagesFromBlob
+
+Convert blob back to images:
+
+```cpp
+void imagesFromBlob(
+    const Mat& blob,
+    OutputArrayOfArrays images
+);
+```
+
+**Example**:
+
+```cpp
+std::vector<Mat> images;
+imagesFromBlob(blob, images);
+
+for(const Mat& img : images) {
+    imshow("Image", img);
+    waitKey(0);
+}
+```
+
+## Blob Utilities
+
+### getPlane
+
+Extract single plane from blob:
+
+```cpp
+Mat getPlane(const Mat& m, int n, int cn);
+```
+
+**Parameters**:
+- `m`: 4D blob [N, C, H, W]
+- `n`: Batch index
+- `cn`: Channel index
+
+**Example**:
+
+```cpp
+// Extract first channel of first image
+Mat plane = getPlane(blob, 0, 0);
+```
+
+### getMatFromNet
+
+Get layer activations:
+
+```cpp
+Mat net.getParam(const String& layer, int paramId);
+```
+
+## NMS (Non-Maximum Suppression)
+
+### NMSBoxes
+
+Filter overlapping bounding boxes:
+
+```cpp
+void NMSBoxes(
+    const std::vector<Rect>& bboxes,
+    const std::vector<float>& scores,
+    const float score_threshold,
+    const float nms_threshold,
+    std::vector<int>& indices,
+    const float eta = 1.f,
+    const int top_k = 0
+);
+```
+
+**Parameters**:
+- `bboxes`: Bounding boxes
+- `scores`: Confidence scores
+- `score_threshold`: Minimum score to keep
+- `nms_threshold`: IoU threshold (typically 0.4-0.5)
+- `indices`: Output indices of kept boxes
+- `eta`: Adaptive NMS parameter
+- `top_k`: Keep top K boxes (0 = all)
+
+**Example**:
+
+```cpp
+std::vector<Rect> boxes = {/* detected boxes */};
+std::vector<float> confidences = {/* scores */};
+
+std::vector<int> indices;
+NMSBoxes(
+    boxes,
+    confidences,
+    0.5,   // score_threshold
+    0.4,   // nms_threshold
+    indices
+);
+
+// Draw kept boxes
+for(int idx : indices) {
+    rectangle(img, boxes[idx], Scalar(0, 255, 0), 2);
+}
+```
+
+### NMSBoxesBatched
+
+NMS for batched detections:
+
+```cpp
+void NMSBoxesBatched(
+    const std::vector<Rect2d>& bboxes,
+    const std::vector<float>& scores,
+    const std::vector<int>& class_ids,
+    const std::vector<int>& batch_ids,
+    const float score_threshold,
+    const float nms_threshold,
+    std::vector<int>& indices,
+    const float eta = 1.f,
+    const int top_k = 0
+);
+```
+
+## Softmax
+
+### softmax
+
+Apply softmax activation:
+
+```cpp
+Mat softmax(const Mat& src);
+
+void softmax(
+    InputArray src,
+    OutputArray dst,
+    int axis = 1
+);
+```
+
+**Example**:
+
+```cpp
+Mat logits = net.forward();
+Mat probs;
+softmax(logits, probs, 1);
+
+// Get top class
+Point classIdPoint;
+minMaxLoc(probs.reshape(1, 1), 0, 0, 0, &classIdPoint);
+int classId = classIdPoint.x;
+```
+
+## Backend Queries
+
+### getAvailableBackends
+
+Query available backends:
+
+```cpp
+std::vector<std::pair<Backend, Target>> getAvailableBackends();
+```
+
+**Example**:
+
+```cpp
+auto backends = getAvailableBackends();
+for(auto& pair : backends) {
+    std::cout << "Backend: " << pair.first 
+              << ", Target: " << pair.second << std::endl;
+}
+```
+
+### getAvailableTargets
+
+Query targets for backend:
+
+```cpp
+std::vector<Target> getAvailableTargets(Backend be);
+```
+
+**Example**:
+
+```cpp
+auto targets = getAvailableTargets(DNN_BACKEND_CUDA);
+for(Target t : targets) {
+    std::cout << "Target: " << t << std::endl;
+}
+```
+
+## Model Diagnostics
+
+### enableModelDiagnostics
+
+Enable verbose model loading:
+
+```cpp
+void enableModelDiagnostics(bool isDiagnosticsMode);
+```
+
+**Example**:
+
+```cpp
+enableModelDiagnostics(true);
+Net net = readNet("model.onnx");  // Prints detailed info
+```
+
+## Complete Examples
+
+### Image Classification
+
+```cpp
+#include <opencv2/dnn.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
+
+using namespace cv;
+using namespace cv::dnn;
+
+int main() {
+    // Load model
+    Net net = readNet("model.onnx");
+    net.setPreferableBackend(DNN_BACKEND_CUDA);
+    net.setPreferableTarget(DNN_TARGET_CUDA);
+    
+    // Load image
+    Mat img = imread("image.jpg");
+    
+    // Create blob
+    Mat blob = blobFromImage(
+        img,
+        1.0/255.0,
+        Size(224, 224),
+        Scalar(0.485, 0.456, 0.406) * 255,  // ImageNet mean
+        true,  // swapRB
+        false  // crop
+    );
+    
+    // Inference
+    net.setInput(blob);
+    Mat output = net.forward();
+    
+    // Softmax
+    Mat probs;
+    softmax(output, probs, 1);
+    
+    // Get top-5 predictions
+    Mat flat = probs.reshape(1, 1);
+    Mat sorted;
+    sortIdx(flat, sorted, SORT_EVERY_ROW | SORT_DESCENDING);
+    
+    std::cout << "Top 5 predictions:\n";
+    for(int i = 0; i < 5; i++) {
+        int classId = sorted.at<int>(i);
+        float prob = flat.at<float>(classId);
+        std::cout << i+1 << ". Class " << classId 
+                  << ": " << prob*100 << "%\n";
+    }
+    
+    return 0;
+}
+```
+
+### Object Detection (YOLO)
+
+```cpp
+#include <opencv2/dnn.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
+
+using namespace cv;
+using namespace cv::dnn;
+
+int main() {
+    // Load YOLO
+    Net net = readNetFromDarknet("yolov4.cfg", "yolov4.weights");
+    
+    // Load image
+    Mat img = imread("image.jpg");
+    
+    // Create blob
+    Mat blob = blobFromImage(img, 1/255.0, Size(416, 416), 
+                            Scalar(), true, false);
+    
+    // Inference
+    net.setInput(blob);
+    std::vector<Mat> outputs;
+    net.forward(outputs, net.getUnconnectedOutLayersNames());
+    
+    // Process detections
+    std::vector<Rect> boxes;
+    std::vector<float> confidences;
+    std::vector<int> classIds;
+    
+    for(const Mat& output : outputs) {
+        for(int i = 0; i < output.rows; i++) {
+            const float* data = output.ptr<float>(i);
+            float confidence = data[4];
+            
+            if(confidence > 0.5) {
+                Mat scores = output.row(i).colRange(5, output.cols);
+                Point classIdPoint;
+                double maxScore;
+                minMaxLoc(scores, 0, &maxScore, 0, &classIdPoint);
+                
+                if(maxScore > 0.5) {
+                    int centerX = data[0] * img.cols;
+                    int centerY = data[1] * img.rows;
+                    int width = data[2] * img.cols;
+                    int height = data[3] * img.rows;
+                    
+                    boxes.push_back(Rect(
+                        centerX - width/2,
+                        centerY - height/2,
+                        width, height
+                    ));
+                    confidences.push_back(confidence);
+                    classIds.push_back(classIdPoint.x);
+                }
+            }
+        }
+    }
+    
+    // NMS
+    std::vector<int> indices;
+    NMSBoxes(boxes, confidences, 0.5, 0.4, indices);
+    
+    // Draw detections
+    for(int idx : indices) {
+        Rect box = boxes[idx];
+        rectangle(img, box, Scalar(0, 255, 0), 2);
+        
+        String label = format("Class %d: %.2f", 
+                             classIds[idx], 
+                             confidences[idx]);
+        putText(img, label, Point(box.x, box.y-5),
+               FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0,255,0), 2);
+    }
+    
+    imshow("Detections", img);
+    waitKey(0);
+    
+    return 0;
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+<Card title="Normalize Inputs" icon="chart-line">
+Match preprocessing used during training
+</Card>
+
+<Card title="Batch Processing" icon="layer-group">
+Use blobFromImages for multiple images
+</Card>
+
+<Card title="Apply NMS" icon="filter">
+Remove overlapping detections
+</Card>
+
+<Card title="Check Backend Support" icon="microchip">
+Query available backends for optimization
+</Card>
+</CardGroup>
+
+## See Also
+
+- [Net Class](/api/dnn/network) - Network operations
+- [DNN Module](/modules/dnn) - Module overview
+- [DNN Layers](/api/dnn/layers) - Layer types

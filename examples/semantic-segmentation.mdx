@@ -1,0 +1,550 @@
+---
+title: Semantic Segmentation with DNN
+description: Perform pixel-wise classification using semantic segmentation models like FCN, ENet, and DeepLab with OpenCV DNN module
+---
+
+Semantic segmentation assigns a class label to every pixel in an image, enabling detailed scene understanding. OpenCV's DNN module supports various segmentation architectures trained on datasets like PASCAL VOC, Cityscapes, and COCO.
+
+## Supported Models
+
+- **FCN (Fully Convolutional Networks)** - FCN-8s, FCN-ResNet101
+- **ENet** - Efficient neural network for real-time segmentation
+- **DeepLab** - State-of-the-art segmentation with atrous convolution
+- **U-Net** - Popular architecture for medical image segmentation
+- **PSPNet** - Pyramid Scene Parsing Network
+
+## Python Implementation
+
+<Steps>
+  <Step title="Import Libraries">
+    ```python
+    import cv2 as cv
+    import numpy as np
+    ```
+  </Step>
+
+  <Step title="Load the Model">
+    ```python
+    # Load segmentation model (ENet example)
+    model = 'Enet-model-best.net'
+    net = cv.dnn.readNet(model)
+    net.setPreferableBackend(cv.dnn.DNN_BACKEND_OPENCV)
+    net.setPreferableTarget(cv.dnn.DNN_TARGET_CPU)
+    
+    # Load class names
+    classes = None
+    with open('enet-classes.txt', 'rt') as f:
+        classes = f.read().rstrip('\n').split('\n')
+    ```
+  </Step>
+
+  <Step title="Generate or Load Colors">
+    ```python
+    # Generate random colors for each class
+    np.random.seed(324)
+    colors = None
+    
+    # Option 1: Generate colors automatically
+    def generate_colors(num_classes):
+        colors = [np.array([0, 0, 0], np.uint8)]
+        for i in range(1, num_classes):
+            colors.append((colors[i - 1] + np.random.randint(0, 256, [3], np.uint8)) / 2)
+        return colors
+    
+    # Option 2: Load predefined colors from file
+    colors_file = 'colors.txt'
+    with open(colors_file, 'rt') as f:
+        colors = [np.array(color.split(' '), np.uint8) for color in f.read().rstrip('\n').split('\n')]
+    ```
+  </Step>
+
+  <Step title="Prepare Input Image">
+    ```python
+    # Read input image
+    frame = cv.imread('image.jpg')
+    frameHeight, frameWidth = frame.shape[:2]
+    
+    # Create blob from image
+    # ENet uses 512x256 input with scale 1/255
+    blob = cv.dnn.blobFromImage(frame, 1.0/255.0, (512, 256), [0, 0, 0], True, crop=False)
+    ```
+    
+    <Note>
+      Different segmentation models require different input sizes:
+      - ENet: 512x256
+      - FCN-8s: 500x500
+      - FCN-ResNet101: 500x500
+    </Note>
+  </Step>
+
+  <Step title="Run Inference">
+    ```python
+    # Set input blob
+    net.setInput(blob)
+    
+    # Forward pass to get score map
+    score = net.forward()
+    
+    # score shape: [1, num_classes, height, width]
+    numClasses = score.shape[1]
+    height = score.shape[2]
+    width = score.shape[3]
+    ```
+  </Step>
+
+  <Step title="Post-process Segmentation Map">
+    ```python
+    # Generate colors if not loaded
+    if not colors:
+        colors = [np.array([0, 0, 0], np.uint8)]
+        for i in range(1, numClasses):
+            colors.append((colors[i - 1] + np.random.randint(0, 256, [3], np.uint8)) / 2)
+    
+    # Get class ID for each pixel
+    classIds = np.argmax(score[0], axis=0)
+    
+    # Create colored segmentation mask
+    segm = np.stack([colors[idx] for idx in classIds.flatten()])
+    segm = segm.reshape(height, width, 3)
+    
+    # Resize to original frame size
+    segm = cv.resize(segm, (frameWidth, frameHeight), interpolation=cv.INTER_NEAREST)
+    ```
+  </Step>
+
+  <Step title="Overlay and Display">
+    ```python
+    # Blend segmentation with original image
+    frame = (0.1 * frame + 0.9 * segm).astype(np.uint8)
+    
+    # Add inference time
+    t, _ = net.getPerfProfile()
+    label = f'Inference time: {t * 1000.0 / cv.getTickFrequency():.2f} ms'
+    cv.putText(frame, label, (0, 15), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0))
+    
+    # Display result
+    cv.imshow('Semantic Segmentation', frame)
+    cv.waitKey(0)
+    ```
+  </Step>
+</Steps>
+
+## C++ Implementation
+
+<Tabs>
+  <Tab title="Complete Example">
+    ```cpp
+    #include <opencv2/dnn.hpp>
+    #include <opencv2/imgproc.hpp>
+    #include <opencv2/highgui.hpp>
+    #include <fstream>
+    #include <iostream>
+    
+    using namespace cv;
+    using namespace dnn;
+    
+    std::vector<std::string> classes;
+    std::vector<Vec3b> colors;
+    
+    void colorizeSegmentation(const Mat &score, Mat &segm) {
+        const int rows = score.size[2];
+        const int cols = score.size[3];
+        const int chns = score.size[1];
+        
+        if (colors.empty()) {
+            // Generate colors
+            colors.push_back(Vec3b());
+            for (int i = 1; i < chns; ++i) {
+                Vec3b color;
+                for (int j = 0; j < 3; ++j)
+                    color[j] = (colors[i - 1][j] + rand() % 256) / 2;
+                colors.push_back(color);
+            }
+        }
+        
+        // Find class with maximum score for each pixel
+        Mat maxCl = Mat::zeros(rows, cols, CV_8UC1);
+        Mat maxVal(rows, cols, CV_32FC1, score.data);
+        for (int ch = 1; ch < chns; ch++) {
+            for (int row = 0; row < rows; row++) {
+                const float *ptrScore = score.ptr<float>(0, ch, row);
+                uint8_t *ptrMaxCl = maxCl.ptr<uint8_t>(row);
+                float *ptrMaxVal = maxVal.ptr<float>(row);
+                for (int col = 0; col < cols; col++) {
+                    if (ptrScore[col] > ptrMaxVal[col]) {
+                        ptrMaxVal[col] = ptrScore[col];
+                        ptrMaxCl[col] = (uchar)ch;
+                    }
+                }
+            }
+        }
+        
+        // Create colored segmentation mask
+        segm.create(rows, cols, CV_8UC3);
+        for (int row = 0; row < rows; row++) {
+            const uchar *ptrMaxCl = maxCl.ptr<uchar>(row);
+            Vec3b *ptrSegm = segm.ptr<Vec3b>(row);
+            for (int col = 0; col < cols; col++) {
+                ptrSegm[col] = colors[ptrMaxCl[col]];
+            }
+        }
+    }
+    
+    int main(int argc, char** argv) {
+        // Load model
+        String model = "Enet-model-best.net";
+        Net net = readNet(model);
+        net.setPreferableBackend(DNN_BACKEND_OPENCV);
+        net.setPreferableTarget(DNN_TARGET_CPU);
+        
+        // Read input image
+        Mat frame = imread("image.jpg");
+        
+        // Create blob
+        Mat blob;
+        Scalar mean(0, 0, 0);
+        blobFromImage(frame, blob, 1.0/255.0, Size(512, 256), mean, true, false);
+        
+        // Set input and forward
+        net.setInput(blob);
+        Mat score = net.forward();
+        
+        // Colorize segmentation
+        Mat segm;
+        colorizeSegmentation(score, segm);
+        
+        // Resize to original size
+        resize(segm, segm, frame.size(), 0, 0, INTER_NEAREST);
+        
+        // Blend with original image
+        addWeighted(frame, 0.1, segm, 0.9, 0.0, frame);
+        
+        // Display
+        imshow("Semantic Segmentation", frame);
+        waitKey(0);
+        
+        return 0;
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Video Processing">
+    ```cpp
+    // Open video capture
+    VideoCapture cap;
+    cap.open(0); // or video file
+    
+    Mat frame, blob;
+    while (waitKey(1) < 0) {
+        cap >> frame;
+        if (frame.empty())
+            break;
+        
+        // Create blob
+        blobFromImage(frame, blob, scale, Size(inpWidth, inpHeight), 
+                     mean, swapRB, false);
+        
+        // Forward pass
+        net.setInput(blob);
+        Mat score = net.forward();
+        
+        // Colorize
+        Mat segm;
+        colorizeSegmentation(score, segm);
+        
+        // Resize and blend
+        resize(segm, segm, frame.size(), 0, 0, INTER_NEAREST);
+        addWeighted(frame, 0.1, segm, 0.9, 0.0, frame);
+        
+        // Display performance
+        std::vector<double> layersTimes;
+        double freq = getTickFrequency() / 1000;
+        double t = net.getPerfProfile(layersTimes) / freq;
+        std::string label = format("Inference time: %.2f ms", t);
+        putText(frame, label, Point(0, 15), FONT_HERSHEY_SIMPLEX, 
+               0.5, Scalar(0, 255, 0));
+        
+        imshow("Semantic Segmentation", frame);
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Creating a Legend
+
+Display a legend showing class names and colors:
+
+```python
+def showLegend(classes, colors):
+    if classes is None or len(classes) == 0:
+        return
+        
+    blockHeight = 30
+    legend = np.zeros((blockHeight * len(colors), 200, 3), np.uint8)
+    
+    for i in range(len(classes)):
+        block = legend[i * blockHeight:(i + 1) * blockHeight]
+        block[:, :] = colors[i]
+        cv.putText(block, classes[i], (0, blockHeight // 2), 
+                  cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255))
+    
+    cv.namedWindow('Legend', cv.WINDOW_NORMAL)
+    cv.imshow('Legend', legend)
+
+# Call in main loop
+showLegend(classes, colors)
+```
+
+C++ version:
+
+```cpp
+void showLegend() {
+    static const int kBlockHeight = 30;
+    static Mat legend;
+    if (legend.empty()) {
+        const int numClasses = (int)classes.size();
+        legend.create(kBlockHeight * numClasses, 200, CV_8UC3);
+        for (int i = 0; i < numClasses; i++) {
+            Mat block = legend.rowRange(i * kBlockHeight, (i + 1) * kBlockHeight);
+            block.setTo(colors[i]);
+            putText(block, classes[i], Point(0, kBlockHeight / 2), 
+                   FONT_HERSHEY_SIMPLEX, 0.5, Vec3b(255, 255, 255));
+        }
+        namedWindow("Legend", WINDOW_NORMAL);
+        imshow("Legend", legend);
+    }
+}
+```
+
+## Model Configurations
+
+### ENet (Torch)
+
+```yaml
+enet:
+  model: "Enet-model-best.net"
+  mean: [0, 0, 0]
+  scale: 0.00392  # 1/255
+  width: 512
+  height: 256
+  rgb: true
+  classes: "enet-classes.txt"
+```
+
+**Download:** https://github.com/e-lab/ENet-training
+
+**Classes:** 20 road scene classes (Cityscapes-style)
+
+### FCN-8s (Caffe)
+
+```yaml
+fcn8s:
+  model: "fcn8s-heavy-pascal.caffemodel"
+  config: "fcn8s-heavy-pascal.prototxt"
+  mean: [0, 0, 0]
+  scale: 1.0
+  width: 500
+  height: 500
+  rgb: false
+```
+
+**Download:** http://dl.caffe.berkeleyvision.org/fcn8s-heavy-pascal.caffemodel
+
+**Classes:** 21 PASCAL VOC classes
+
+### FCN-ResNet101 (ONNX)
+
+```yaml
+fcnresnet101:
+  model: "fcn-resnet101-11.onnx"
+  mean: [103.5, 116.2, 123.6]
+  scale: 0.019
+  width: 500
+  height: 500
+  rgb: false
+```
+
+**Download:** https://github.com/onnx/models (ONNX Model Zoo)
+
+## Common Segmentation Classes
+
+<Tabs>
+  <Tab title="Cityscapes (ENet)">
+    Road scene segmentation with 20 classes:
+    
+    - road
+    - sidewalk
+    - building
+    - wall
+    - fence
+    - pole
+    - traffic light
+    - traffic sign
+    - vegetation
+    - terrain
+    - sky
+    - person
+    - rider
+    - car
+    - truck
+    - bus
+    - train
+    - motorcycle
+    - bicycle
+  </Tab>
+  
+  <Tab title="PASCAL VOC (FCN)">
+    General object segmentation with 21 classes:
+    
+    - background
+    - aeroplane
+    - bicycle
+    - bird
+    - boat
+    - bottle
+    - bus
+    - car
+    - cat
+    - chair
+    - cow
+    - dining table
+    - dog
+    - horse
+    - motorbike
+    - person
+    - potted plant
+    - sheep
+    - sofa
+    - train
+    - tv/monitor
+  </Tab>
+</Tabs>
+
+## Performance Optimization
+
+<Steps>
+  <Step title="Use GPU Acceleration">
+    ```python
+    net.setPreferableBackend(cv.dnn.DNN_BACKEND_CUDA)
+    net.setPreferableTarget(cv.dnn.DNN_TARGET_CUDA)
+    ```
+  </Step>
+  
+  <Step title="Reduce Input Size">
+    Smaller input sizes process faster but may lose detail:
+    ```python
+    # Original: 512x256
+    blob = cv.dnn.blobFromImage(frame, 1.0/255.0, (512, 256), [0, 0, 0], True)
+    
+    # Faster: 256x128
+    blob = cv.dnn.blobFromImage(frame, 1.0/255.0, (256, 128), [0, 0, 0], True)
+    ```
+  </Step>
+  
+  <Step title="Use Efficient Models">
+    Choose models based on speed/accuracy tradeoff:
+    - **ENet**: Real-time, good for road scenes
+    - **FCN-8s**: Moderate speed, high accuracy
+    - **DeepLab**: Best accuracy, slower
+  </Step>
+</Steps>
+
+## Blending Segmentation with Original Image
+
+Adjust the blend ratio for different visualization effects:
+
+```python
+# Heavy segmentation overlay (90% segmentation, 10% original)
+frame = (0.1 * frame + 0.9 * segm).astype(np.uint8)
+
+# Balanced overlay (50% each)
+frame = (0.5 * frame + 0.5 * segm).astype(np.uint8)
+
+# Light segmentation overlay (30% segmentation, 70% original)
+frame = (0.7 * frame + 0.3 * segm).astype(np.uint8)
+
+# Using OpenCV addWeighted (C++/Python)
+output = cv.addWeighted(frame, 0.3, segm, 0.7, 0.0)
+```
+
+## Complete Example with Video
+
+```python
+import cv2 as cv
+import numpy as np
+
+def main():
+    # Load model
+    model = 'Enet-model-best.net'
+    net = cv.dnn.readNet(model)
+    net.setPreferableBackend(cv.dnn.DNN_BACKEND_OPENCV)
+    net.setPreferableTarget(cv.dnn.DNN_TARGET_CPU)
+    
+    # Load classes
+    with open('enet-classes.txt', 'rt') as f:
+        classes = f.read().rstrip('\n').split('\n')
+    
+    # Generate colors
+    np.random.seed(324)
+    colors = [np.array([0, 0, 0], np.uint8)]
+    for i in range(1, len(classes)):
+        colors.append((colors[i - 1] + np.random.randint(0, 256, [3], np.uint8)) / 2)
+    
+    # Open video
+    cap = cv.VideoCapture(0)  # or video file
+    
+    cv.namedWindow('Segmentation', cv.WINDOW_NORMAL)
+    
+    while cv.waitKey(1) < 0:
+        hasFrame, frame = cap.read()
+        if not hasFrame:
+            break
+        
+        frameHeight, frameWidth = frame.shape[:2]
+        
+        # Create blob
+        blob = cv.dnn.blobFromImage(frame, 1.0/255.0, (512, 256), 
+                                   [0, 0, 0], True, crop=False)
+        
+        # Run segmentation
+        net.setInput(blob)
+        score = net.forward()
+        
+        numClasses = score.shape[1]
+        height = score.shape[2]
+        width = score.shape[3]
+        
+        # Get class for each pixel
+        classIds = np.argmax(score[0], axis=0)
+        
+        # Create colored mask
+        segm = np.stack([colors[idx] for idx in classIds.flatten()])
+        segm = segm.reshape(height, width, 3)
+        segm = cv.resize(segm, (frameWidth, frameHeight), 
+                        interpolation=cv.INTER_NEAREST)
+        
+        # Blend
+        frame = (0.1 * frame + 0.9 * segm).astype(np.uint8)
+        
+        # Add timing info
+        t, _ = net.getPerfProfile()
+        label = f'Inference time: {t * 1000.0 / cv.getTickFrequency():.2f} ms'
+        cv.putText(frame, label, (0, 15), cv.FONT_HERSHEY_SIMPLEX, 
+                  0.5, (0, 255, 0))
+        
+        cv.imshow('Segmentation', frame)
+
+if __name__ == '__main__':
+    main()
+```
+
+<Warning>
+  Semantic segmentation is computationally expensive. For real-time applications on CPU, use lightweight models like ENet or reduce input resolution.
+</Warning>
+
+## Source Code
+
+Complete source code for semantic segmentation:
+
+- Python: `samples/dnn/segmentation.py`
+- C++: `samples/dnn/segmentation.cpp`

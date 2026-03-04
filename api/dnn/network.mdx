@@ -1,0 +1,521 @@
+---
+title: "Net Class"
+description: "The main class for loading and running deep neural network models"
+---
+
+## Overview
+
+The `Net` class is the core of OpenCV's DNN module. It represents a neural network loaded from various frameworks and provides methods for inference.
+
+## Loading Models
+
+### readNet (Auto-detect)
+
+```cpp
+Net readNet(const String& model, 
+            const String& config = "", 
+            const String& framework = "");
+```
+
+Automatically detects model format:
+
+```cpp
+// ONNX
+Net net = readNet("model.onnx");
+
+// TensorFlow
+Net net = readNet("model.pb", "config.pbtxt");
+
+// Caffe
+Net net = readNet("model.caffemodel", "deploy.prototxt");
+```
+
+### Framework-Specific Loaders
+
+#### ONNX
+
+```cpp
+Net readNetFromONNX(const String& onnxFile);
+
+// From buffer
+Net readNetFromONNX(const std::vector<uchar>& buffer);
+```
+
+#### TensorFlow
+
+```cpp
+Net readNetFromTensorflow(
+    const String& model,
+    const String& config = String()
+);
+
+// From buffers
+Net readNetFromTensorflow(
+    const std::vector<uchar>& bufferModel,
+    const std::vector<uchar>& bufferConfig = std::vector<uchar>()
+);
+```
+
+#### Caffe
+
+```cpp
+Net readNetFromCaffe(
+    const String& prototxt,
+    const String& caffeModel = String()
+);
+
+// From buffers
+Net readNetFromCaffe(
+    const std::vector<uchar>& bufferProto,
+    const std::vector<uchar>& bufferModel = std::vector<uchar>()
+);
+```
+
+#### Darknet (YOLO)
+
+```cpp
+Net readNetFromDarknet(
+    const String& cfgFile,
+    const String& darknetModel = String()
+);
+
+// From buffers
+Net readNetFromDarknet(
+    const std::vector<uchar>& bufferCfg,
+    const std::vector<uchar>& bufferModel = std::vector<uchar>()
+);
+```
+
+## Backend and Target
+
+### setPreferableBackend
+
+```cpp
+void Net::setPreferableBackend(int backendId);
+```
+
+**Available backends**:
+- `DNN_BACKEND_DEFAULT`: Default OpenCV implementation
+- `DNN_BACKEND_OPENCV`: Pure OpenCV implementation
+- `DNN_BACKEND_CUDA`: NVIDIA CUDA
+- `DNN_BACKEND_INFERENCE_ENGINE`: Intel OpenVINO
+- `DNN_BACKEND_VKCOM`: Vulkan
+
+```cpp
+net.setPreferableBackend(DNN_BACKEND_CUDA);
+```
+
+### setPreferableTarget
+
+```cpp
+void Net::setPreferableTarget(int targetId);
+```
+
+**Available targets**:
+- `DNN_TARGET_CPU`: CPU
+- `DNN_TARGET_OPENCL`: OpenCL (GPU)
+- `DNN_TARGET_OPENCL_FP16`: OpenCL with FP16
+- `DNN_TARGET_CUDA`: CUDA
+- `DNN_TARGET_CUDA_FP16`: CUDA with FP16
+- `DNN_TARGET_MYRIAD`: Intel Myriad
+- `DNN_TARGET_FPGA`: FPGA
+
+```cpp
+net.setPreferableTarget(DNN_TARGET_CUDA);
+```
+
+### Backend/Target Compatibility
+
+```cpp
+// CPU
+net.setPreferableBackend(DNN_BACKEND_OPENCV);
+net.setPreferableTarget(DNN_TARGET_CPU);
+
+// OpenCL GPU
+net.setPreferableBackend(DNN_BACKEND_OPENCV);
+net.setPreferableTarget(DNN_TARGET_OPENCL);
+
+// CUDA GPU
+net.setPreferableBackend(DNN_BACKEND_CUDA);
+net.setPreferableTarget(DNN_TARGET_CUDA);
+
+// Intel OpenVINO
+net.setPreferableBackend(DNN_BACKEND_INFERENCE_ENGINE);
+net.setPreferableTarget(DNN_TARGET_CPU);
+```
+
+## Setting Inputs
+
+### setInput
+
+```cpp
+void Net::setInput(
+    InputArray blob,
+    const String& name = "",
+    double scalefactor = 1.0,
+    const Scalar& mean = Scalar()
+);
+```
+
+**Parameters**:
+- `blob`: 4D blob (NCHW format)
+- `name`: Input layer name (optional if single input)
+- `scalefactor`: Multiplicative scaling factor
+- `mean`: Mean values to subtract
+
+```cpp
+Mat blob = blobFromImage(img, 1.0/255, Size(224, 224));
+net.setInput(blob);
+
+// With preprocessing
+net.setInput(blob, "data", 1.0/255, Scalar(104, 117, 123));
+```
+
+## Forward Pass
+
+### forward (Single Output)
+
+```cpp
+Mat Net::forward(const String& outputName = String());
+```
+
+```cpp
+// Get output from last layer
+Mat output = net.forward();
+
+// Get specific output layer
+Mat output = net.forward("conv5");
+```
+
+### forward (Multiple Outputs)
+
+```cpp
+void Net::forward(
+    OutputArrayOfArrays outputBlobs,
+    const String& outputName = String()
+);
+
+void Net::forward(
+    OutputArrayOfArrays outputBlobs,
+    const std::vector<String>& outBlobNames
+);
+```
+
+```cpp
+// Multiple outputs
+std::vector<Mat> outputs;
+net.forward(outputs, {"output1", "output2", "output3"});
+
+// All unconnected outputs
+std::vector<String> outNames = net.getUnconnectedOutLayersNames();
+std::vector<Mat> outputs;
+net.forward(outputs, outNames);
+```
+
+### forwardAsync (Asynchronous)
+
+```cpp
+AsyncArray Net::forwardAsync(const String& outputName = String());
+```
+
+```cpp
+net.setInput(blob);
+AsyncArray async = net.forwardAsync();
+
+// Do other work...
+
+Mat output = async.get();  // Wait for result
+```
+
+## Network Information
+
+### empty
+
+```cpp
+bool Net::empty() const;
+```
+
+Check if network is loaded:
+
+```cpp
+if(net.empty()) {
+    std::cerr << "Failed to load model\n";
+    return -1;
+}
+```
+
+### getLayerNames
+
+```cpp
+std::vector<String> Net::getLayerNames() const;
+```
+
+Get all layer names:
+
+```cpp
+std::vector<String> layerNames = net.getLayerNames();
+for(const String& name : layerNames) {
+    std::cout << name << std::endl;
+}
+```
+
+### getLayerId
+
+```cpp
+int Net::getLayerId(const String& layer) const;
+```
+
+Get layer ID by name:
+
+```cpp
+int layerId = net.getLayerId("conv1");
+```
+
+### getLayer
+
+```cpp
+Ptr<Layer> Net::getLayer(int layerId) const;
+Ptr<Layer> Net::getLayer(const String& layerName) const;
+```
+
+Get layer object:
+
+```cpp
+Ptr<Layer> layer = net.getLayer("conv1");
+String type = layer->type;
+```
+
+### getUnconnectedOutLayersNames
+
+```cpp
+std::vector<String> Net::getUnconnectedOutLayersNames() const;
+```
+
+Get output layer names:
+
+```cpp
+std::vector<String> outNames = net.getUnconnectedOutLayersNames();
+for(const String& name : outNames) {
+    std::cout << "Output: " << name << std::endl;
+}
+```
+
+## Network Modification
+
+### setInputsNames
+
+```cpp
+void Net::setInputsNames(const std::vector<String>& inputBlobNames);
+```
+
+### setInputShape
+
+```cpp
+void Net::setInputShape(const String& inputName, const MatShape& shape);
+```
+
+### getParam
+
+```cpp
+Mat Net::getParam(int layer, int numParam = 0) const;
+Mat Net::getParam(const String& layerName, int numParam = 0) const;
+```
+
+Get layer parameters (weights):
+
+```cpp
+Mat weights = net.getParam("conv1", 0);  // Weights
+Mat biases = net.getParam("conv1", 1);   // Biases
+```
+
+### setParam
+
+```cpp
+void Net::setParam(int layer, int numParam, const Mat& blob);
+void Net::setParam(const String& layerName, int numParam, const Mat& blob);
+```
+
+Set layer parameters:
+
+```cpp
+Mat newWeights = /* ... */;
+net.setParam("conv1", 0, newWeights);
+```
+
+## Performance Analysis
+
+### getPerfProfile
+
+```cpp
+int64 Net::getPerfProfile(std::vector<double>& timings);
+```
+
+Get layer-wise timing:
+
+```cpp
+std::vector<double> timings;
+int64 overall = net.getPerfProfile(timings);
+
+std::vector<String> layerNames = net.getLayerNames();
+for(size_t i = 0; i < timings.size(); i++) {
+    std::cout << layerNames[i] << ": " 
+              << timings[i] << " ms\n";
+}
+std::cout << "Total: " << overall / 1000.0 << " ms\n";
+```
+
+### getFLOPS
+
+```cpp
+int64 Net::getFLOPS(const MatShape& netInputShape) const;
+int64 Net::getFLOPS(const std::vector<MatShape>& netInputShapes) const;
+```
+
+Compute FLOPs:
+
+```cpp
+MatShape inputShape = {1, 3, 224, 224};
+int64 flops = net.getFLOPS(inputShape);
+std::cout << "Model FLOPs: " << flops / 1e9 << " G\n";
+```
+
+### getMemoryConsumption
+
+```cpp
+void Net::getMemoryConsumption(
+    const MatShape& netInputShape,
+    size_t& weights, 
+    size_t& blobs
+) const;
+```
+
+Get memory usage:
+
+```cpp
+size_t weights, blobs;
+net.getMemoryConsumption({1, 3, 224, 224}, weights, blobs);
+std::cout << "Weights: " << weights / 1e6 << " MB\n";
+std::cout << "Blobs: " << blobs / 1e6 << " MB\n";
+```
+
+## Network Optimization
+
+### enableFusion
+
+```cpp
+void Net::enableFusion(bool fusion);
+```
+
+Enable/disable layer fusion:
+
+```cpp
+net.enableFusion(true);  // Default
+```
+
+### enableWinograd
+
+```cpp
+void Net::enableWinograd(bool useWinograd);
+```
+
+Enable Winograd convolution optimization:
+
+```cpp
+net.enableWinograd(true);  // Default
+```
+
+## Debugging
+
+### dump
+
+```cpp
+String Net::dump();
+```
+
+Get network structure:
+
+```cpp
+String structure = net.dump();
+std::cout << structure;
+```
+
+### dumpToFile
+
+```cpp
+void Net::dumpToFile(const String& path);
+```
+
+Save structure to file:
+
+```cpp
+net.dumpToFile("network_structure.txt");
+```
+
+### dumpToPbtxt
+
+```cpp
+void Net::dumpToPbtxt(const String& path);
+```
+
+Save as protobuf text (viewable in Netron):
+
+```cpp
+net.dumpToPbtxt("network.pbtxt");
+// View at https://netron.app
+```
+
+## Complete Example
+
+```cpp
+#include <opencv2/dnn.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
+
+using namespace cv;
+using namespace cv::dnn;
+
+int main() {
+    // Load model
+    Net net = readNet("model.onnx");
+    
+    if(net.empty()) {
+        std::cerr << "Failed to load model\n";
+        return -1;
+    }
+    
+    // Configure backend/target
+    net.setPreferableBackend(DNN_BACKEND_CUDA);
+    net.setPreferableTarget(DNN_TARGET_CUDA);
+    
+    // Load and preprocess image
+    Mat img = imread("image.jpg");
+    Mat blob = blobFromImage(img, 1.0/255, Size(224, 224), 
+                            Scalar(), true, false);
+    
+    // Set input
+    net.setInput(blob);
+    
+    // Forward pass
+    Mat output = net.forward();
+    
+    // Get performance info
+    std::vector<double> timings;
+    int64 t = net.getPerfProfile(timings);
+    std::cout << "Inference time: " << t / 1000.0 << " ms\n";
+    
+    // Process output
+    Point classIdPoint;
+    minMaxLoc(output.reshape(1, 1), 0, 0, 0, &classIdPoint);
+    int classId = classIdPoint.x;
+    
+    std::cout << "Predicted class: " << classId << std::endl;
+    
+    return 0;
+}
+```
+
+## See Also
+
+- [DNN Module](/modules/dnn) - DNN module overview
+- [DNN Layers](/api/dnn/layers) - Layer types
+- [DNN Inference](/api/dnn/inference) - Inference utilities

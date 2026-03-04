@@ -1,0 +1,700 @@
+---
+title: High-Level GUI Module
+description: Window management, image display, and user interaction tools for creating simple graphical interfaces
+---
+
+The High-Level GUI (highgui) module provides easy-to-use interfaces for creating windows, displaying images, and handling user interaction through keyboard, mouse, and trackbars.
+
+## Overview
+
+From opencv2/highgui.hpp:55-66:
+
+> While OpenCV was designed for use in full-scale applications and can be used within functionally rich UI frameworks (such as Qt, WinForms, or Cocoa) or without any UI at all, sometimes there it is required to try functionality quickly and visualize the results. This is what the HighGUI module has been designed for.
+
+<CardGroup cols={2}>
+  <Card title="Windows" icon="window-maximize">
+    Create and manage display windows
+  </Card>
+  <Card title="Image Display" icon="image">
+    Show images with imshow() function
+  </Card>
+  <Card title="User Input" icon="keyboard">
+    Handle keyboard and mouse events
+  </Card>
+  <Card title="Trackbars" icon="sliders">
+    Interactive parameter adjustment
+  </Card>
+</CardGroup>
+
+## Window Management
+
+### Creating Windows
+
+From highgui.hpp:142-152:
+
+```cpp
+#include <opencv2/highgui.hpp>
+using namespace cv;
+
+// Create window with auto-sizing
+namedWindow("My Window", WINDOW_AUTOSIZE);
+
+// Create resizable window
+namedWindow("Resizable", WINDOW_NORMAL);
+
+// Create fullscreen window
+namedWindow("Fullscreen", WINDOW_FULLSCREEN);
+
+// Create window with OpenGL support
+namedWindow("OpenGL", WINDOW_OPENGL);
+```
+
+### Window Flags
+
+```cpp
+enum WindowFlags {
+    WINDOW_NORMAL = 0x00000000,     // User can resize
+    WINDOW_AUTOSIZE = 0x00000001,   // Size constrained by image
+    WINDOW_OPENGL = 0x00001000,     // OpenGL support
+    WINDOW_FULLSCREEN = 1,          // Fullscreen mode
+    WINDOW_FREERATIO = 0x00000100,  // No aspect ratio constraint
+    WINDOW_KEEPRATIO = 0x00000000   // Respect aspect ratio
+};
+```
+
+### Window Operations
+
+```cpp
+// Move window
+moveWindow("My Window", 100, 100);
+
+// Resize window (only for WINDOW_NORMAL)
+resizeWindow("My Window", 800, 600);
+
+// Destroy specific window
+destroyWindow("My Window");
+
+// Destroy all windows
+destroyAllWindows();
+
+// Get window property
+int isVisible = getWindowProperty("My Window", WND_PROP_VISIBLE);
+int isFullscreen = getWindowProperty("My Window", WND_PROP_FULLSCREEN);
+
+// Set window property
+setWindowProperty("My Window", WND_PROP_FULLSCREEN, WINDOW_FULLSCREEN);
+setWindowProperty("My Window", WND_PROP_TOPMOST, 1);  // Always on top
+```
+
+## Displaying Images
+
+### Basic Image Display
+
+```cpp
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgcodecs.hpp>
+
+using namespace cv;
+
+int main() {
+    // Load image
+    Mat img = imread("photo.jpg");
+    
+    if (img.empty()) {
+        cerr << "Could not load image" << endl;
+        return -1;
+    }
+    
+    // Create window and display
+    namedWindow("Display", WINDOW_AUTOSIZE);
+    imshow("Display", img);
+    
+    // Wait for key press
+    waitKey(0);
+    
+    // Cleanup
+    destroyAllWindows();
+    
+    return 0;
+}
+```
+
+### Multiple Images
+
+```cpp
+// Display multiple images
+Mat img1 = imread("image1.jpg");
+Mat img2 = imread("image2.jpg");
+Mat img3 = imread("image3.jpg");
+
+namedWindow("Image 1", WINDOW_NORMAL);
+namedWindow("Image 2", WINDOW_NORMAL);
+namedWindow("Image 3", WINDOW_NORMAL);
+
+// Position windows
+moveWindow("Image 1", 0, 0);
+moveWindow("Image 2", 650, 0);
+moveWindow("Image 3", 1300, 0);
+
+// Display
+imshow("Image 1", img1);
+imshow("Image 2", img2);
+imshow("Image 3", img3);
+
+waitKey(0);
+```
+
+### Updating Display
+
+```cpp
+// Create window once
+namedWindow("Animation", WINDOW_AUTOSIZE);
+
+// Update display in loop
+for (int i = 0; i < 100; i++) {
+    Mat frame = generateFrame(i);
+    imshow("Animation", frame);
+    
+    // Wait 30ms between frames
+    if (waitKey(30) >= 0) break;
+}
+```
+
+## Keyboard Input
+
+### waitKey Function
+
+```cpp
+// Wait indefinitely for key
+int key = waitKey(0);
+
+// Wait with timeout (milliseconds)
+int key = waitKey(30);  // Wait 30ms
+
+// Check specific keys
+if (key == 'q' || key == 27) {  // 'q' or ESC
+    break;
+}
+
+// Arrow keys (platform-dependent)
+const int KEY_UP = 2490368;
+const int KEY_DOWN = 2621440;
+const int KEY_LEFT = 2424832;
+const int KEY_RIGHT = 2555904;
+
+// Special keys
+if (key == 's') {
+    imwrite("screenshot.png", image);
+}
+if (key == ' ') {  // Space
+    paused = !paused;
+}
+```
+
+### Interactive Key Handling
+
+From samples/cpp/edge.cpp:
+
+```cpp
+#include <opencv2/highgui.hpp>
+
+using namespace cv;
+
+int main() {
+    Mat image = imread("photo.jpg");
+    
+    namedWindow("Controls", WINDOW_AUTOSIZE);
+    imshow("Controls", image);
+    
+    cout << "Commands:\n"
+         << "  q/ESC - quit\n"
+         << "  s - save\n"
+         << "  r - reset\n";
+    
+    while (true) {
+        int key = waitKey(0);
+        
+        if (key == 'q' || key == 27) {
+            break;
+        }
+        else if (key == 's') {
+            imwrite("saved.png", image);
+            cout << "Image saved\n";
+        }
+        else if (key == 'r') {
+            image = imread("photo.jpg");
+            imshow("Controls", image);
+            cout << "Image reset\n";
+        }
+    }
+    
+    return 0;
+}
+```
+
+## Mouse Events
+
+From highgui.hpp:166-189:
+
+### Mouse Callback
+
+```cpp
+// Mouse event types
+enum MouseEventTypes {
+    EVENT_MOUSEMOVE = 0,       // Mouse moved
+    EVENT_LBUTTONDOWN = 1,     // Left button pressed
+    EVENT_RBUTTONDOWN = 2,     // Right button pressed
+    EVENT_MBUTTONDOWN = 3,     // Middle button pressed
+    EVENT_LBUTTONUP = 4,       // Left button released
+    EVENT_RBUTTONUP = 5,       // Right button released
+    EVENT_MBUTTONUP = 6,       // Middle button released
+    EVENT_LBUTTONDBLCLK = 7,   // Left button double-click
+    EVENT_RBUTTONDBLCLK = 8,   // Right button double-click
+    EVENT_MBUTTONDBLCLK = 9,   // Middle button double-click
+    EVENT_MOUSEWHEEL = 10,     // Mouse wheel scrolled
+    EVENT_MOUSEHWHEEL = 11     // Horizontal wheel scrolled
+};
+
+// Mouse event flags
+enum MouseEventFlags {
+    EVENT_FLAG_LBUTTON = 1,    // Left button down
+    EVENT_FLAG_RBUTTON = 2,    // Right button down
+    EVENT_FLAG_MBUTTON = 4,    // Middle button down
+    EVENT_FLAG_CTRLKEY = 8,    // Ctrl key pressed
+    EVENT_FLAG_SHIFTKEY = 16,  // Shift key pressed
+    EVENT_FLAG_ALTKEY = 32     // Alt key pressed
+};
+```
+
+### Implementing Mouse Callback
+
+```cpp
+// Global or class member variables
+Mat image;
+vector<Point> points;
+
+// Mouse callback function
+void onMouse(int event, int x, int y, int flags, void* userdata) {
+    if (event == EVENT_LBUTTONDOWN) {
+        // Left click - add point
+        points.push_back(Point(x, y));
+        circle(image, Point(x, y), 3, Scalar(0, 0, 255), -1);
+        imshow("Image", image);
+    }
+    else if (event == EVENT_RBUTTONDOWN) {
+        // Right click - clear points
+        points.clear();
+        image = imread("original.jpg");
+        imshow("Image", image);
+    }
+    else if (event == EVENT_MOUSEMOVE) {
+        // Show coordinates in window title
+        if (flags & EVENT_FLAG_LBUTTON) {
+            // Drawing while left button held
+            circle(image, Point(x, y), 2, Scalar(255, 0, 0), -1);
+            imshow("Image", image);
+        }
+    }
+}
+
+int main() {
+    image = imread("photo.jpg");
+    
+    namedWindow("Image");
+    setMouseCallback("Image", onMouse, nullptr);
+    
+    imshow("Image", image);
+    waitKey(0);
+    
+    return 0;
+}
+```
+
+### Interactive Drawing
+
+```cpp
+Mat canvas;
+bool drawing = false;
+Point prevPt(-1, -1);
+
+void drawCallback(int event, int x, int y, int flags, void*) {
+    if (event == EVENT_LBUTTONDOWN) {
+        drawing = true;
+        prevPt = Point(x, y);
+    }
+    else if (event == EVENT_MOUSEMOVE && drawing) {
+        Point pt(x, y);
+        line(canvas, prevPt, pt, Scalar(0, 255, 0), 2);
+        prevPt = pt;
+        imshow("Drawing", canvas);
+    }
+    else if (event == EVENT_LBUTTONUP) {
+        drawing = false;
+    }
+}
+
+int main() {
+    canvas = Mat::zeros(480, 640, CV_8UC3);
+    
+    namedWindow("Drawing");
+    setMouseCallback("Drawing", drawCallback);
+    
+    imshow("Drawing", canvas);
+    waitKey(0);
+    
+    return 0;
+}
+```
+
+## Trackbars
+
+Example from samples/cpp/edge.cpp:
+
+### Creating Trackbars
+
+```cpp
+// Global variables for trackbar values
+int threshold1 = 50;
+int threshold2 = 150;
+
+// Trackbar callback function
+void onThresholdChange(int, void*) {
+    Mat edges;
+    Canny(gray, edges, threshold1, threshold2);
+    imshow("Edges", edges);
+}
+
+int main() {
+    Mat image = imread("photo.jpg");
+    Mat gray;
+    cvtColor(image, gray, COLOR_BGR2GRAY);
+    
+    // Create window
+    namedWindow("Edges", WINDOW_AUTOSIZE);
+    
+    // Create trackbars (edge.cpp:75-76)
+    createTrackbar("Threshold 1", "Edges",
+                   &threshold1, 255, onThresholdChange);
+    createTrackbar("Threshold 2", "Edges",
+                   &threshold2, 255, onThresholdChange);
+    
+    // Initial display
+    onThresholdChange(0, nullptr);
+    
+    waitKey(0);
+    return 0;
+}
+```
+
+### Multiple Trackbars
+
+```cpp
+Mat image, result;
+int blur_size = 1;
+int threshold_val = 128;
+int morph_size = 1;
+
+void processImage(int, void*) {
+    Mat blurred, binary, morphed;
+    
+    // Apply blur
+    int ksize = blur_size * 2 + 1;
+    GaussianBlur(image, blurred, Size(ksize, ksize), 0);
+    
+    // Threshold
+    threshold(blurred, binary, threshold_val, 255, THRESH_BINARY);
+    
+    // Morphology
+    int msize = morph_size * 2 + 1;
+    Mat element = getStructuringElement(MORPH_RECT,
+                                       Size(msize, msize));
+    morphologyEx(binary, result, MORPH_CLOSE, element);
+    
+    imshow("Result", result);
+}
+
+int main() {
+    image = imread("document.jpg", IMREAD_GRAYSCALE);
+    
+    namedWindow("Result");
+    
+    createTrackbar("Blur", "Result", &blur_size, 15, processImage);
+    createTrackbar("Threshold", "Result", &threshold_val, 255, processImage);
+    createTrackbar("Morph", "Result", &morph_size, 10, processImage);
+    
+    processImage(0, nullptr);
+    waitKey(0);
+    
+    return 0;
+}
+```
+
+### Getting Trackbar Position
+
+```cpp
+// Get current trackbar position
+int pos = getTrackbarPos("Threshold", "Window");
+
+// Set trackbar position
+setTrackbarPos("Threshold", "Window", 100);
+
+// Set min/max values (requires Qt backend)
+setTrackbarMin("Threshold", "Window", 10);
+setTrackbarMax("Threshold", "Window", 200);
+```
+
+## Practical Examples
+
+### Image Viewer with Controls
+
+```cpp
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/imgcodecs.hpp>
+
+using namespace cv;
+using namespace std;
+
+Mat originalImage, displayImage;
+int brightness = 50;
+int contrast = 50;
+
+void updateImage(int, void*) {
+    double alpha = contrast / 50.0;  // 0.0 to 2.0
+    int beta = brightness - 50;      // -50 to +50
+    
+    displayImage = Mat::zeros(originalImage.size(),
+                             originalImage.type());
+    
+    originalImage.convertTo(displayImage, -1, alpha, beta);
+    imshow("Image Viewer", displayImage);
+}
+
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        cout << "Usage: " << argv[0] << " <image>\n";
+        return -1;
+    }
+    
+    originalImage = imread(argv[1]);
+    if (originalImage.empty()) {
+        cerr << "Error loading image\n";
+        return -1;
+    }
+    
+    namedWindow("Image Viewer", WINDOW_NORMAL);
+    
+    createTrackbar("Brightness", "Image Viewer",
+                   &brightness, 100, updateImage);
+    createTrackbar("Contrast", "Image Viewer",
+                   &contrast, 100, updateImage);
+    
+    updateImage(0, nullptr);
+    
+    cout << "Controls:\n"
+         << "  q - quit\n"
+         << "  s - save\n"
+         << "  r - reset\n";
+    
+    while (true) {
+        int key = waitKey(30);
+        
+        if (key == 'q' || key == 27) break;
+        if (key == 's') {
+            imwrite("output.jpg", displayImage);
+            cout << "Saved output.jpg\n";
+        }
+        if (key == 'r') {
+            brightness = 50;
+            contrast = 50;
+            setTrackbarPos("Brightness", "Image Viewer", 50);
+            setTrackbarPos("Contrast", "Image Viewer", 50);
+            updateImage(0, nullptr);
+        }
+    }
+    
+    return 0;
+}
+```
+
+### ROI Selector
+
+```cpp
+Mat image, roiImage;
+Rect roiRect;
+bool selecting = false;
+Point startPt;
+
+void mouseHandler(int event, int x, int y, int flags, void*) {
+    if (event == EVENT_LBUTTONDOWN) {
+        selecting = true;
+        startPt = Point(x, y);
+        roiRect = Rect(x, y, 0, 0);
+    }
+    else if (event == EVENT_MOUSEMOVE && selecting) {
+        roiRect = Rect(
+            min(startPt.x, x),
+            min(startPt.y, y),
+            abs(x - startPt.x),
+            abs(y - startPt.y)
+        );
+        
+        Mat display = image.clone();
+        rectangle(display, roiRect, Scalar(0, 255, 0), 2);
+        imshow("Select ROI", display);
+    }
+    else if (event == EVENT_LBUTTONUP) {
+        selecting = false;
+        
+        if (roiRect.width > 0 && roiRect.height > 0) {
+            roiImage = image(roiRect).clone();
+            imshow("ROI", roiImage);
+        }
+    }
+}
+
+int main() {
+    image = imread("photo.jpg");
+    
+    namedWindow("Select ROI");
+    setMouseCallback("Select ROI", mouseHandler);
+    
+    imshow("Select ROI", image);
+    
+    cout << "Click and drag to select region\n";
+    waitKey(0);
+    
+    return 0;
+}
+```
+
+### Color Picker
+
+```cpp
+Mat image;
+Scalar selectedColor;
+
+void pickColor(int event, int x, int y, int flags, void*) {
+    if (event == EVENT_LBUTTONDOWN) {
+        Vec3b pixel = image.at<Vec3b>(y, x);
+        selectedColor = Scalar(pixel[0], pixel[1], pixel[2]);
+        
+        cout << "Selected color (BGR): "
+             << (int)pixel[0] << ", "
+             << (int)pixel[1] << ", "
+             << (int)pixel[2] << endl;
+        
+        // Show color swatch
+        Mat swatch(100, 100, CV_8UC3, selectedColor);
+        imshow("Selected Color", swatch);
+    }
+}
+
+int main() {
+    image = imread("colorful.jpg");
+    
+    namedWindow("Image");
+    namedWindow("Selected Color");
+    
+    setMouseCallback("Image", pickColor);
+    
+    imshow("Image", image);
+    
+    cout << "Click on image to pick color\n";
+    waitKey(0);
+    
+    return 0;
+}
+```
+
+## Best Practices
+
+<Note>
+**Window Lifecycle:**
+Always destroy windows when done:
+```cpp
+namedWindow("Window");
+imshow("Window", img);
+waitKey(0);
+destroyAllWindows();  // Important for cleanup
+```
+</Note>
+
+<Note>
+**Event Loop:**
+`waitKey()` is essential for window updates:
+```cpp
+while (true) {
+    imshow("Display", frame);
+    if (waitKey(1) >= 0) break;  // Must call waitKey!
+}
+```
+Without `waitKey()`, windows won't refresh or respond to events.
+</Note>
+
+<Note>
+**Trackbar Callbacks:**
+Trackbar callbacks can be nullptr if you handle updates elsewhere:
+```cpp
+createTrackbar("Value", "Window", &value, 100, nullptr);
+
+while (true) {
+    int currentValue = getTrackbarPos("Value", "Window");
+    // Use currentValue...
+    imshow("Window", result);
+    if (waitKey(30) >= 0) break;
+}
+```
+</Note>
+
+## Platform-Specific Features
+
+### Qt Backend
+
+When built with Qt support, additional features are available:
+
+```cpp
+// Create buttons (Qt only)
+createButton("Process", buttonCallback, nullptr,
+            QT_PUSH_BUTTON, false);
+
+// Display text overlay (Qt only)
+displayOverlay("Window", "Processing...", 1000);
+
+// Status bar (Qt only)
+displayStatusBar("Window", "Ready", 0);
+
+// Save window parameters
+saveWindowParameters("Window");
+loadWindowParameters("Window");
+```
+
+## Limitations
+
+<Note>
+**Simple GUI Only:**
+HighGUI is designed for quick visualization and simple interaction. For production applications with complex UI requirements, use:
+- Qt
+- wxWidgets  
+- GTK
+- Platform-native frameworks
+</Note>
+
+<Note>
+**Thread Safety:**
+HighGUI functions should be called from the main thread. For multi-threaded applications, handle GUI updates carefully.
+</Note>
+
+## Related Modules
+
+- [Image I/O](/modules/imgcodecs) - Load images to display
+- [Video I/O](/modules/videoio) - Display video streams
+- [Image Processing](/modules/imgproc) - Process images before display
+
+## Source Reference
+
+Main header: `~/workspace/source/modules/highgui/include/opencv2/highgui.hpp`
+
+Examples:
+- `samples/cpp/edge.cpp` - Trackbar usage
+- Various tutorial samples demonstrate GUI features

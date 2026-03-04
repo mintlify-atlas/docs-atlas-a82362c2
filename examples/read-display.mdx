@@ -1,0 +1,217 @@
+---
+title: Read and Display Images
+description: Learn how to load, display, and save images using OpenCV
+---
+
+This guide demonstrates the fundamental operations of reading images from disk, displaying them in windows, and saving them to files.
+
+## Overview
+
+Image I/O is the foundation of computer vision applications. OpenCV provides simple functions to:
+- Read images from various formats (JPEG, PNG, BMP, etc.)
+- Display images in GUI windows
+- Save processed images to disk
+- Handle errors when files are not found
+
+## Basic Image Loading and Display
+
+<Steps>
+  <Step title="Read the image">
+    Use `imread()` to load an image file. Always check if the image was loaded successfully.
+  </Step>
+  
+  <Step title="Display the image">
+    Use `imshow()` to display the image in a named window, followed by `waitKey()` to keep the window open.
+  </Step>
+  
+  <Step title="Save the image (optional)">
+    Use `imwrite()` to save the image to a file.
+  </Step>
+</Steps>
+
+## Complete Example
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import sys
+
+    # Read the image
+    img = cv.imread(cv.samples.findFile("starry_night.jpg"))
+
+    # Check if image was loaded successfully
+    if img is None:
+        sys.exit("Could not read the image.")
+
+    # Display the image in a window
+    cv.imshow("Display window", img)
+    k = cv.waitKey(0)  # Wait for a keystroke
+
+    # Save image if 's' key is pressed
+    if k == ord("s"):
+        cv.imwrite("starry_night.png", img)
+    ```
+  </Tab>
+  
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/core.hpp>
+    #include <opencv2/imgcodecs.hpp>
+    #include <opencv2/highgui.hpp>
+    #include <iostream>
+
+    using namespace cv;
+
+    int main()
+    {
+        // Read the image
+        std::string image_path = samples::findFile("starry_night.jpg");
+        Mat img = imread(image_path, IMREAD_COLOR);
+
+        // Check if image was loaded successfully
+        if(img.empty())
+        {
+            std::cout << "Could not read the image: " << image_path << std::endl;
+            return 1;
+        }
+
+        // Display the image in a window
+        imshow("Display window", img);
+        int k = waitKey(0); // Wait for a keystroke in the window
+
+        // Save image if 's' key is pressed
+        if(k == 's')
+        {
+            imwrite("starry_night.png", img);
+        }
+
+        return 0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Window Operations
+
+OpenCV provides several functions to manage display windows:
+
+### Creating and Managing Windows
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    # Create a named window with specific properties
+    cv.namedWindow("My Window", cv.WINDOW_NORMAL)
+    
+    # Resize the window
+    cv.resizeWindow("My Window", 800, 600)
+    
+    # Move the window to a specific position
+    cv.moveWindow("My Window", 100, 100)
+    
+    # Display an image
+    img = cv.imread("image.jpg")
+    cv.imshow("My Window", img)
+    cv.waitKey(0)
+    
+    # Destroy specific window
+    cv.destroyWindow("My Window")
+    
+    # Or destroy all windows
+    cv.destroyAllWindows()
+    ```
+  </Tab>
+  
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/highgui.hpp>
+    using namespace cv;
+
+    // Create a named window with specific properties
+    namedWindow("My Window", WINDOW_NORMAL);
+    
+    // Resize the window
+    resizeWindow("My Window", 800, 600);
+    
+    // Move the window to a specific position
+    moveWindow("My Window", 100, 100);
+    
+    // Display an image
+    Mat img = imread("image.jpg");
+    imshow("My Window", img);
+    waitKey(0);
+    
+    // Destroy specific window
+    destroyWindow("My Window");
+    
+    // Or destroy all windows
+    destroyAllWindows();
+    ```
+  </Tab>
+</Tabs>
+
+## Image Reading Flags
+
+The `imread()` function accepts flags to control how images are loaded:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    # Read image in color (default)
+    img_color = cv.imread("image.jpg", cv.IMREAD_COLOR)
+
+    # Read image in grayscale
+    img_gray = cv.imread("image.jpg", cv.IMREAD_GRAYSCALE)
+
+    # Read image with alpha channel
+    img_alpha = cv.imread("image.png", cv.IMREAD_UNCHANGED)
+
+    # Read image and reduce it to 1 channel grayscale
+    img_reduced = cv.imread("image.jpg", cv.IMREAD_REDUCED_GRAYSCALE_2)
+    ```
+  </Tab>
+  
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/imgcodecs.hpp>
+    using namespace cv;
+
+    // Read image in color (default)
+    Mat img_color = imread("image.jpg", IMREAD_COLOR);
+
+    // Read image in grayscale
+    Mat img_gray = imread("image.jpg", IMREAD_GRAYSCALE);
+
+    // Read image with alpha channel
+    Mat img_alpha = imread("image.png", IMREAD_UNCHANGED);
+
+    // Read image and reduce it to 1 channel grayscale
+    Mat img_reduced = imread("image.jpg", IMREAD_REDUCED_GRAYSCALE_2);
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  Always check if an image was loaded successfully before processing it. An empty/null image will cause your program to crash.
+</Note>
+
+## Key Functions
+
+| Function | Description |
+|----------|-------------|
+| `imread()` | Loads an image from a file |
+| `imshow()` | Displays an image in a window |
+| `imwrite()` | Saves an image to a file |
+| `waitKey()` | Waits for a key press (0 = wait indefinitely) |
+| `namedWindow()` | Creates a window with a specific name |
+| `destroyWindow()` | Closes a specific window |
+| `destroyAllWindows()` | Closes all OpenCV windows |
+
+<Tip>
+  Use `cv.samples.findFile()` to locate sample images that come with OpenCV. This ensures your code works across different platforms and installations.
+</Tip>

@@ -1,0 +1,412 @@
+---
+title: Core Module
+description: Fundamental data structures, matrix operations, and utility functions that form the backbone of OpenCV
+---
+
+The Core module is the foundation of OpenCV, providing essential data structures, basic operations, and utilities that other modules depend on.
+
+## Overview
+
+From the OpenCV source (~/workspace/source/modules/core/include/opencv2/core.hpp:62-67):
+
+> The Core module is the backbone of OpenCV, offering fundamental data structures, matrix operations, and utility functions that other modules depend on. It's essential for handling image data, performing mathematical computations, and managing memory efficiently within the OpenCV ecosystem.
+
+## Key Components
+
+<CardGroup cols={2}>
+  <Card title="Mat Class" icon="table">
+    N-dimensional dense array for storing images and matrices
+  </Card>
+  <Card title="Array Operations" icon="calculator">
+    Mathematical operations on arrays and matrices
+  </Card>
+  <Card title="Persistence" icon="floppy-disk">
+    XML/YAML/JSON file I/O for data structures
+  </Card>
+  <Card title="Utilities" icon="wrench">
+    System functions, logging, and error handling
+  </Card>
+</CardGroup>
+
+## Mat - The Core Data Structure
+
+The `Mat` class is OpenCV's primary container for images and matrices.
+
+### Creating Mat Objects
+
+```cpp
+#include <opencv2/core.hpp>
+using namespace cv;
+
+// Create empty matrix
+Mat img;
+
+// Create with size and type
+Mat img1(480, 640, CV_8UC3);  // 8-bit, 3-channel (BGR)
+Mat img2(Size(640, 480), CV_8UC1);  // 8-bit, single channel
+
+// Create and initialize
+Mat zeros = Mat::zeros(100, 100, CV_8UC1);
+Mat ones = Mat::ones(100, 100, CV_32F);
+Mat eye = Mat::eye(3, 3, CV_64F);
+
+// Create from data
+float data[] = {1, 2, 3, 4};
+Mat m(2, 2, CV_32F, data);
+```
+
+### Mat Properties
+
+```cpp
+Mat img = imread("image.jpg");
+
+// Dimensions
+int rows = img.rows;
+int cols = img.cols;
+Size size = img.size();  // width x height
+int channels = img.channels();
+
+// Type information
+int type = img.type();  // e.g., CV_8UC3
+int depth = img.depth();  // e.g., CV_8U
+
+// Memory
+size_t step = img.step;  // bytes per row
+bool continuous = img.isContinuous();
+```
+
+## Array Operations
+
+The core module provides extensive array operations defined in opencv2/core.hpp.
+
+### Arithmetic Operations
+
+```cpp
+// Addition (core.hpp:298)
+void add(InputArray src1, InputArray src2, OutputArray dst);
+
+Mat a, b, result;
+add(a, b, result);
+
+// Also supports operator overloading
+Mat c = a + b;
+Mat d = a - b;
+Mat e = a * 2.5;
+```
+
+### Element-wise Operations
+
+```cpp
+// Multiplication
+multiply(src1, src2, dst);
+
+// Division
+divide(src1, src2, dst);
+
+// Absolute value
+absdiff(src1, src2, dst);
+
+// Power
+pow(src, power, dst);
+
+// Square root
+sqrt(src, dst);
+
+// Logarithm
+log(src, dst);
+
+// Exponential
+exp(src, dst);
+```
+
+### Matrix Operations
+
+```cpp
+// Matrix multiplication
+Mat A, B, C;
+C = A * B;  // Matrix product
+gemm(A, B, 1, Mat(), 0, C);  // General matrix multiply
+
+// Transpose
+Mat At = A.t();
+transpose(A, At);
+
+// Inversion
+Mat invA = A.inv();
+invert(A, invA);
+
+// Determinant
+double det = determinant(A);
+
+// Eigenvalues and eigenvectors
+Mat eigenvalues, eigenvectors;
+eigen(A, eigenvalues, eigenvectors);
+
+// SVD (Singular Value Decomposition)
+SVD svd(A);
+Mat U = svd.u;
+Mat W = svd.w;
+Mat Vt = svd.vt;
+```
+
+## Reduction Operations
+
+From core.hpp:210-215, OpenCV provides reduction types:
+
+```cpp
+enum ReduceTypes {
+    REDUCE_SUM = 0,   // Sum of all rows/columns
+    REDUCE_AVG = 1,   // Mean of all rows/columns  
+    REDUCE_MAX = 2,   // Maximum value
+    REDUCE_MIN = 3,   // Minimum value
+    REDUCE_SUM2 = 4   // Sum of squares
+};
+
+// Example usage
+Mat src, dst;
+reduce(src, dst, 0, REDUCE_SUM);  // Sum along columns
+reduce(src, dst, 1, REDUCE_AVG);  // Average along rows
+```
+
+## Statistical Functions
+
+```cpp
+// Min/Max
+double minVal, maxVal;
+Point minLoc, maxLoc;
+minMaxLoc(src, &minVal, &maxVal, &minLoc, &maxLoc);
+
+// Mean and standard deviation
+Scalar meanVal = mean(src);
+Scalar meanVal, stddevVal;
+meanStdDev(src, meanVal, stddevVal);
+
+// Sum
+Scalar sum = sum(src);
+
+// Count non-zero
+int count = countNonZero(src);
+
+// Norm
+double n = norm(src, NORM_L2);
+double n2 = norm(src1, src2, NORM_INF);
+```
+
+## Border Handling
+
+From core.hpp:223-244, OpenCV provides `borderInterpolate()` for extrapolation:
+
+```cpp
+// Border types
+enum BorderTypes {
+    BORDER_CONSTANT,     // iiiiii|abcdefgh|iiiiiii
+    BORDER_REPLICATE,    // aaaaaa|abcdefgh|hhhhhhh
+    BORDER_REFLECT,      // fedcba|abcdefgh|hgfedcb
+    BORDER_WRAP,         // cdefgh|abcdefgh|abcdefg
+    BORDER_REFLECT_101,  // gfedcb|abcdefgh|gfedcba
+    BORDER_TRANSPARENT,  // Not modified
+    BORDER_ISOLATED      // Do not look outside ROI
+};
+
+// Create border (core.hpp:294)
+void copyMakeBorder(InputArray src, OutputArray dst,
+                    int top, int bottom, int left, int right,
+                    int borderType, const Scalar& value = Scalar());
+```
+
+## Data Persistence
+
+Save and load data structures to XML/YAML/JSON files.
+
+```cpp
+// Writing
+FileStorage fs("data.yml", FileStorage::WRITE);
+fs << "image" << img;
+fs << "matrix" << mat;
+fs << "number" << 42;
+fs.release();
+
+// Reading
+FileStorage fs("data.yml", FileStorage::READ);
+Mat img, mat;
+int number;
+fs["image"] >> img;
+fs["matrix"] >> mat;
+fs["number"] >> number;
+fs.release();
+```
+
+## Utility Functions
+
+### Exception Handling
+
+From core.hpp:112-156:
+
+```cpp
+// Exception class
+class Exception : public std::exception {
+public:
+    int code;         // Error code
+    String err;       // Error description
+    String func;      // Function name
+    String file;      // Source file
+    int line;         // Line number
+};
+
+// Error handling
+try {
+    // OpenCV operations
+} catch(const cv::Exception& e) {
+    std::cerr << "Error: " << e.what() << std::endl;
+}
+```
+
+### System Information
+
+```cpp
+// OpenCV version
+String version = getBuildInformation();
+
+// Number of CPU cores
+int cores = getNumberOfCPUs();
+
+// Number of threads
+int threads = getNumThreads();
+setNumThreads(4);
+
+// Tick count (for performance measurement)
+int64 t1 = getTickCount();
+// ... operations ...
+int64 t2 = getTickCount();
+double time = (t2 - t1) / getTickFrequency();
+```
+
+## Data Types
+
+OpenCV supports various data types:
+
+```cpp
+// Depth types
+CV_8U   // 8-bit unsigned (0-255)
+CV_8S   // 8-bit signed (-128-127)
+CV_16U  // 16-bit unsigned
+CV_16S  // 16-bit signed
+CV_32S  // 32-bit signed integer
+CV_32F  // 32-bit floating point
+CV_64F  // 64-bit floating point
+
+// Type macros: CV_<depth>C<channels>
+CV_8UC1  // 8-bit, 1 channel (grayscale)
+CV_8UC3  // 8-bit, 3 channels (BGR color)
+CV_32FC1 // 32-bit float, 1 channel
+CV_64FC3 // 64-bit float, 3 channels
+```
+
+## Sorting
+
+From core.hpp:158-167:
+
+```cpp
+enum SortFlags {
+    SORT_EVERY_ROW = 0,      // Sort each row independently
+    SORT_EVERY_COLUMN = 1,   // Sort each column independently
+    SORT_ASCENDING = 0,      // Ascending order
+    SORT_DESCENDING = 16     // Descending order
+};
+
+// Sort array
+sort(src, dst, SORT_EVERY_ROW | SORT_ASCENDING);
+
+// Sort with indices
+sortIdx(src, dst, SORT_EVERY_ROW | SORT_DESCENDING);
+```
+
+## Memory Management
+
+```cpp
+// Mat uses reference counting
+Mat a = imread("image.jpg");
+Mat b = a;  // Shallow copy (same data)
+Mat c = a.clone();  // Deep copy (new data)
+
+// Check reference count
+int refs = a.u->refcount;
+
+// Release (automatic with scope)
+a.release();
+
+// ROI (Region of Interest) - shares data
+Rect roi(10, 10, 100, 100);
+Mat roiMat = img(roi);
+
+// Check if data is continuous
+if (img.isContinuous()) {
+    // Can treat as 1D array
+}
+```
+
+## Example: Matrix Operations
+
+From samples/cpp/cout_mat.cpp:
+
+```cpp
+#include <opencv2/core.hpp>
+#include <iostream>
+
+using namespace cv;
+using namespace std;
+
+int main() {
+    // Create matrices
+    Mat A = (Mat_<double>(3,3) << 1, 2, 3, 4, 5, 6, 7, 8, 9);
+    Mat B = Mat::eye(3, 3, CV_64F);
+    
+    // Operations
+    Mat C = A + B;
+    Mat D = A * B;
+    Mat At = A.t();
+    
+    // Display
+    cout << "A = " << endl << A << endl;
+    cout << "A + I = " << endl << C << endl;
+    cout << "A * I = " << endl << D << endl;
+    cout << "A^T = " << endl << At << endl;
+    
+    // Statistics
+    Scalar mean_val = mean(A);
+    cout << "Mean: " << mean_val[0] << endl;
+    
+    return 0;
+}
+```
+
+## Best Practices
+
+<Note>
+**Memory Efficiency:**
+- Use `Mat::clone()` only when you need a deep copy
+- Prefer ROI over copying when working with image regions
+- Let Mat destructor handle memory cleanup automatically
+</Note>
+
+<Note>
+**Type Safety:**
+- Always check `Mat::type()` before operations
+- Use `convertTo()` for type conversion
+- Verify dimensions match before matrix operations
+</Note>
+
+## Related Modules
+
+- [Image Processing](/modules/imgproc) - Uses Mat for all operations
+- [Image I/O](/modules/imgcodecs) - Reads/writes images as Mat
+- [Video Analysis](/modules/video) - Processes video frames as Mat
+
+## Source Reference
+
+Key header file: `~/workspace/source/modules/core/include/opencv2/core.hpp`
+
+See also:
+- `opencv2/core/mat.hpp` - Mat class implementation
+- `opencv2/core/operations.hpp` - Array operations
+- `opencv2/core/persistence.hpp` - File I/O

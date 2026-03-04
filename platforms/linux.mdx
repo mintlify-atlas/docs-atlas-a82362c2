@@ -1,0 +1,476 @@
+---
+title: Building OpenCV on Linux
+description: Complete guide for building and installing OpenCV on Linux distributions with various compilers and configurations
+---
+
+OpenCV provides comprehensive support for Linux platforms across multiple architectures including x86, x86_64, ARM, RISC-V, and more.
+
+## Quick Start
+
+Get up and running with OpenCV on Linux in a few minutes:
+
+<Steps>
+  <Step title="Install Dependencies">
+    Install compiler, build tools, and CMake:
+    
+    ```bash
+    # Debian/Ubuntu
+    sudo apt update
+    sudo apt install build-essential cmake git pkg-config
+    
+    # Fedora/RHEL
+    sudo dnf install gcc gcc-c++ cmake git
+    
+    # Arch Linux
+    sudo pacman -S base-devel cmake git
+    ```
+  </Step>
+  
+  <Step title="Download OpenCV">
+    Get the source code from GitHub:
+    
+    ```bash
+    cd ~
+    git clone https://github.com/opencv/opencv.git
+    cd opencv
+    ```
+    
+    Or download a release archive:
+    
+    ```bash
+    wget -O opencv.zip https://github.com/opencv/opencv/archive/4.x.zip
+    unzip opencv.zip
+    cd opencv-4.x
+    ```
+  </Step>
+  
+  <Step title="Build OpenCV">
+    Configure and compile:
+    
+    ```bash
+    mkdir build && cd build
+    cmake -DCMAKE_BUILD_TYPE=Release ..
+    make -j$(nproc)
+    ```
+  </Step>
+  
+  <Step title="Install">
+    Install to system directories (optional):
+    
+    ```bash
+    sudo make install
+    ```
+  </Step>
+</Steps>
+
+## Compiler Support
+
+OpenCV supports multiple compilers on Linux:
+
+<Tabs>
+  <Tab title="GCC">
+    GCC is the default compiler on most Linux systems:
+    
+    ```bash
+    # Install GCC
+    sudo apt install gcc g++
+    
+    # Verify version (5.x or later required)
+    gcc --version
+    
+    # Build with GCC (default)
+    cmake -DCMAKE_BUILD_TYPE=Release ..
+    make -j$(nproc)
+    ```
+  </Tab>
+  
+  <Tab title="Clang">
+    Clang offers faster compilation and better diagnostics:
+    
+    ```bash
+    # Install Clang
+    sudo apt install clang
+    
+    # Configure to use Clang
+    cmake -DCMAKE_C_COMPILER=clang \
+          -DCMAKE_CXX_COMPILER=clang++ \
+          -DCMAKE_BUILD_TYPE=Release \
+          ..
+    make -j$(nproc)
+    ```
+  </Tab>
+</Tabs>
+
+## Build System Options
+
+<Tabs>
+  <Tab title="Make (Default)">
+    Traditional GNU Make build system:
+    
+    ```bash
+    cmake -DCMAKE_BUILD_TYPE=Release ..
+    make -j$(nproc)
+    ```
+    
+    The `-j$(nproc)` flag enables parallel compilation using all CPU cores.
+  </Tab>
+  
+  <Tab title="Ninja">
+    Ninja is faster than Make for large projects:
+    
+    ```bash
+    # Install Ninja
+    sudo apt install ninja-build
+    
+    # Configure for Ninja
+    cmake -GNinja -DCMAKE_BUILD_TYPE=Release ..
+    ninja
+    ```
+    
+    Ninja automatically detects and uses all available CPU cores.
+  </Tab>
+</Tabs>
+
+## Installing Dependencies
+
+### Required Dependencies
+
+```bash
+# Debian/Ubuntu - Minimal build
+sudo apt install build-essential cmake git
+
+# Debian/Ubuntu - With common features
+sudo apt install build-essential cmake git pkg-config \
+                 libgtk-3-dev libavcodec-dev libavformat-dev \
+                 libswscale-dev libv4l-dev libxvidcore-dev \
+                 libx264-dev libjpeg-dev libpng-dev libtiff-dev \
+                 gfortran openexr libatlas-base-dev python3-dev \
+                 python3-numpy libtbb2 libtbb-dev libdc1394-dev
+```
+
+### Optional Dependencies
+
+<AccordionGroup>
+  <Accordion title="GUI Support (highgui module)">
+    ```bash
+    # GTK+ 3 (recommended)
+    sudo apt install libgtk-3-dev
+    
+    # Qt5 (alternative)
+    sudo apt install qtbase5-dev qttools5-dev
+    ```
+  </Accordion>
+  
+  <Accordion title="Video I/O Support">
+    ```bash
+    # FFmpeg libraries
+    sudo apt install libavcodec-dev libavformat-dev libswscale-dev
+    
+    # GStreamer
+    sudo apt install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+    
+    # V4L (Video4Linux)
+    sudo apt install libv4l-dev v4l-utils
+    ```
+  </Accordion>
+  
+  <Accordion title="Image Codecs">
+    ```bash
+    sudo apt install libjpeg-dev libpng-dev libtiff-dev \
+                     libwebp-dev libopenexr-dev
+    ```
+  </Accordion>
+  
+  <Accordion title="Python Support">
+    ```bash
+    sudo apt install python3-dev python3-numpy python3-pip
+    ```
+  </Accordion>
+  
+  <Accordion title="Parallel Processing">
+    ```bash
+    # Intel TBB (Threading Building Blocks)
+    sudo apt install libtbb-dev
+    
+    # OpenMP (usually included with GCC)
+    # Already available with gcc package
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Cross-Compilation
+
+OpenCV provides toolchain files for cross-compilation to other architectures:
+
+### ARM 32-bit (ARMv7)
+
+```bash
+# Install cross-compiler
+sudo apt install gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+
+# Configure with toolchain file
+cmake -DCMAKE_TOOLCHAIN_FILE=../platforms/linux/arm-gnueabi.toolchain.cmake \
+      -DCMAKE_BUILD_TYPE=Release \
+      ..
+make -j$(nproc)
+```
+
+### ARM 64-bit (AArch64)
+
+```bash
+# Install cross-compiler
+sudo apt install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+# Configure with toolchain file
+cmake -DCMAKE_TOOLCHAIN_FILE=../platforms/linux/aarch64-gnu.toolchain.cmake \
+      -DCMAKE_BUILD_TYPE=Release \
+      ..
+make -j$(nproc)
+```
+
+### RISC-V 64-bit
+
+```bash
+# Install RISC-V toolchain
+sudo apt install gcc-riscv64-linux-gnu g++-riscv64-linux-gnu
+
+# Configure with toolchain file
+cmake -DCMAKE_TOOLCHAIN_FILE=../platforms/linux/riscv64-gcc.toolchain.cmake \
+      -DCMAKE_BUILD_TYPE=Release \
+      ..
+make -j$(nproc)
+```
+
+<Note>
+Available toolchain files in `platforms/linux/`:
+- `arm-gnueabi.toolchain.cmake` - ARM v7 with hard float
+- `aarch64-gnu.toolchain.cmake` - ARM 64-bit
+- `riscv64-gcc.toolchain.cmake` - RISC-V 64-bit (GCC)
+- `riscv64-clang.toolchain.cmake` - RISC-V 64-bit (Clang)
+- `ppc64le-gnu.toolchain.cmake` - PowerPC 64-bit little-endian
+- `mips64r6el-gnu.toolchain.cmake` - MIPS 64-bit
+</Note>
+
+## Build Configuration Options
+
+### Common CMake Options
+
+```bash
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DBUILD_EXAMPLES=ON \
+      -DBUILD_TESTS=OFF \
+      -DBUILD_PERF_TESTS=OFF \
+      -DWITH_OPENGL=ON \
+      -DWITH_TBB=ON \
+      -DWITH_GTK=ON \
+      ..
+```
+
+### Minimal Build for Embedded Systems
+
+```bash
+cmake -DCMAKE_BUILD_TYPE=MinSizeRel \
+      -DBUILD_SHARED_LIBS=OFF \
+      -DBUILD_TESTS=OFF \
+      -DBUILD_PERF_TESTS=OFF \
+      -DBUILD_EXAMPLES=OFF \
+      -DWITH_GTK=OFF \
+      -DWITH_QT=OFF \
+      -DWITH_OPENGL=OFF \
+      -DWITH_FFMPEG=OFF \
+      ..
+```
+
+### GPU Acceleration
+
+<Tabs>
+  <Tab title="CUDA (NVIDIA)">
+    ```bash
+    # Install CUDA Toolkit from NVIDIA
+    # https://developer.nvidia.com/cuda-downloads
+    
+    cmake -DWITH_CUDA=ON \
+          -DCUDA_ARCH_BIN="6.0 6.1 7.0 7.5 8.0 8.6" \
+          -DCMAKE_BUILD_TYPE=Release \
+          ..
+    ```
+  </Tab>
+  
+  <Tab title="OpenCL">
+    ```bash
+    # Install OpenCL headers and ICD loader
+    sudo apt install opencl-headers ocl-icd-opencl-dev
+    
+    cmake -DWITH_OPENCL=ON \
+          -DCMAKE_BUILD_TYPE=Release \
+          ..
+    ```
+  </Tab>
+  
+  <Tab title="VA-API (Intel)">
+    ```bash
+    # Install VA-API development files
+    sudo apt install libva-dev
+    
+    cmake -DWITH_VA=ON \
+          -DCMAKE_BUILD_TYPE=Release \
+          ..
+    ```
+  </Tab>
+</Tabs>
+
+## Installation
+
+### System-Wide Installation
+
+<Warning>
+System-wide installation requires root privileges and may conflict with distribution packages. Consider using a custom prefix instead.
+</Warning>
+
+```bash
+# Default installation to /usr/local
+sudo make install
+sudo ldconfig
+
+# Files are installed to:
+# /usr/local/lib - libraries (.so files)
+# /usr/local/include/opencv4 - headers
+# /usr/local/bin - executables
+# /usr/local/share/opencv4 - data files
+# /usr/local/lib/cmake/opencv4 - CMake config
+```
+
+### Custom Installation Directory
+
+```bash
+# Install to user directory
+cmake -DCMAKE_INSTALL_PREFIX=$HOME/.local \
+      -DCMAKE_BUILD_TYPE=Release \
+      ..
+make -j$(nproc)
+make install
+
+# Update library path
+echo 'export LD_LIBRARY_PATH=$HOME/.local/lib:$LD_LIBRARY_PATH' >> ~/.bashrc
+source ~/.bashrc
+```
+
+## Verification
+
+Verify your OpenCV installation:
+
+<Steps>
+  <Step title="Check Installed Files">
+    ```bash
+    # Check libraries
+    ls build/lib/
+    
+    # Check CMake package
+    ls build/opencv*.cmake
+    ```
+  </Step>
+  
+  <Step title="Test with Python">
+    ```python
+    python3 -c "import cv2; print(cv2.__version__)"
+    ```
+  </Step>
+  
+  <Step title="Build Info">
+    ```python
+    python3 -c "import cv2; print(cv2.getBuildInformation())"
+    ```
+  </Step>
+</Steps>
+
+## Distribution-Specific Notes
+
+<Tabs>
+  <Tab title="Ubuntu/Debian">
+    ```bash
+    # Install from distribution packages (older version)
+    sudo apt install libopencv-dev python3-opencv
+    
+    # Or build from source for latest version
+    sudo apt install build-essential cmake git pkg-config \
+                     libgtk-3-dev libavcodec-dev libavformat-dev \
+                     libswscale-dev
+    ```
+  </Tab>
+  
+  <Tab title="Fedora/RHEL">
+    ```bash
+    # Install from distribution packages
+    sudo dnf install opencv opencv-devel
+    
+    # Or build from source
+    sudo dnf install gcc gcc-c++ cmake git gtk3-devel \
+                     ffmpeg-devel python3-devel numpy
+    ```
+  </Tab>
+  
+  <Tab title="Arch Linux">
+    ```bash
+    # Install from distribution packages
+    sudo pacman -S opencv vtk hdf5 glew
+    
+    # Or build from source
+    sudo pacman -S base-devel cmake git gtk3 ffmpeg python-numpy
+    ```
+  </Tab>
+</Tabs>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="CMake cannot find dependencies">
+    Install development packages for missing dependencies:
+    
+    ```bash
+    # Check CMake output for missing packages
+    # Install corresponding -dev or -devel packages
+    sudo apt install lib<package>-dev
+    ```
+  </Accordion>
+  
+  <Accordion title="Linking errors during compilation">
+    Clean and rebuild:
+    
+    ```bash
+    rm -rf build/
+    mkdir build && cd build
+    cmake -DCMAKE_BUILD_TYPE=Release ..
+    make -j$(nproc)
+    ```
+  </Accordion>
+  
+  <Accordion title="Python module not found after installation">
+    Ensure Python can find the cv2 module:
+    
+    ```bash
+    # Find where cv2.so was installed
+    find /usr/local -name "cv2*.so"
+    
+    # Add to Python path if needed
+    export PYTHONPATH=/usr/local/lib/python3.x/site-packages:$PYTHONPATH
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="CMake Configuration" icon="gear" href="/configuration/cmake-options">
+    Explore all CMake configuration options
+  </Card>
+  <Card title="Getting Started" icon="rocket" href="/getting-started/quickstart">
+    Write your first OpenCV application
+  </Card>
+  <Card title="Cross-Compilation" icon="microchip" href="/platforms/overview">
+    Build for embedded systems
+  </Card>
+  <Card title="GPU Acceleration" icon="bolt" href="/optimization/gpu">
+    Enable CUDA and OpenCL support
+  </Card>
+</CardGroup>

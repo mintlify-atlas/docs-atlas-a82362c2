@@ -1,0 +1,436 @@
+---
+title: Clustering Algorithms
+description: Unsupervised machine learning clustering algorithms including k-means and Expectation Maximization (EM) for Gaussian mixture models
+---
+
+Clustering algorithms group data points into clusters based on their similarity without requiring labeled training data.
+
+## kmeans - K-Means Clustering
+
+The k-means algorithm finds centers of clusters and groups input samples around the clusters. It's one of the most popular clustering algorithms.
+
+### Function Signature
+
+```cpp
+double cv::kmeans(
+    InputArray data,
+    int K,
+    InputOutputArray bestLabels,
+    TermCriteria criteria,
+    int attempts,
+    int flags,
+    OutputArray centers = noArray()
+);
+```
+
+### Parameters
+
+<ParamField path="data" type="InputArray" required>
+  Data for clustering. An array of N-dimensional points with float coordinates.
+  
+  Examples:
+  - `Mat points(count, 2, CV_32F)` - 2D points as rows
+  - `Mat points(count, 1, CV_32FC2)` - 2D points as single channel
+  - `Mat points(1, count, CV_32FC2)` - 2D points as columns
+  - `std::vector<cv::Point2f> points(sampleCount)` - vector of points
+</ParamField>
+
+<ParamField path="K" type="int" required>
+  Number of clusters to split the set by. Must be at least 2.
+</ParamField>
+
+<ParamField path="bestLabels" type="InputOutputArray" required>
+  Input/output integer array that stores the cluster indices for every sample.
+  
+  Each element is in the range [0, K-1] indicating which cluster the sample belongs to.
+</ParamField>
+
+<ParamField path="criteria" type="TermCriteria" required>
+  The algorithm termination criteria: maximum number of iterations and/or desired accuracy.
+  
+  The accuracy is specified as `criteria.epsilon`. The algorithm stops when each cluster center moves by less than epsilon.
+  
+  Example: `TermCriteria(TermCriteria::MAX_ITER + TermCriteria::EPS, 100, 0.01)`
+</ParamField>
+
+<ParamField path="attempts" type="int" required>
+  Number of times the algorithm is executed using different initial labellings.
+  
+  The algorithm returns the labels that yield the best compactness. Use at least 3 attempts for better results.
+</ParamField>
+
+<ParamField path="flags" type="int" required>
+  Flag specifying the method for center initialization.
+  
+  **Flags:**
+  - `KMEANS_RANDOM_CENTERS` (0): Select random initial centers in each attempt
+  - `KMEANS_PP_CENTERS` (2): Use kmeans++ center initialization (recommended)
+  - `KMEANS_USE_INITIAL_LABELS` (1): Use user-supplied labels for first attempt
+</ParamField>
+
+<ParamField path="centers" type="OutputArray">
+  Output matrix of the cluster centers, one row per each cluster center.
+  
+  Size: K × dimensions
+</ParamField>
+
+### Returns
+
+**Type:** `double`
+
+The function returns the compactness measure computed as:
+
+$$\sum_i \|\text{samples}_i - \text{centers}_{\text{labels}_i}\|^2$$
+
+The best (minimum) compactness value is chosen among all attempts, and the corresponding labels and cluster centers are returned.
+
+### Example Usage
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/core.hpp>
+    #include <opencv2/highgui.hpp>
+    #include <iostream>
+    
+    using namespace cv;
+    using namespace std;
+    
+    int main() {
+        // Generate random 2D points
+        int sampleCount = 100;
+        Mat points(sampleCount, 2, CV_32F);
+        randu(points, Scalar(0, 0), Scalar(100, 100));
+        
+        // K-means parameters
+        int K = 3;
+        Mat labels;
+        Mat centers;
+        TermCriteria criteria(TermCriteria::EPS + TermCriteria::MAX_ITER, 100, 0.01);
+        
+        // Run k-means
+        double compactness = kmeans(
+            points,
+            K,
+            labels,
+            criteria,
+            3, // attempts
+            KMEANS_PP_CENTERS,
+            centers
+        );
+        
+        cout << "Compactness: " << compactness << endl;
+        cout << "Centers:\n" << centers << endl;
+        
+        // Access cluster labels
+        for (int i = 0; i < 10; i++) {
+            cout << "Point " << i << " belongs to cluster " 
+                 << labels.at<int>(i) << endl;
+        }
+        
+        return 0;
+    }
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+    import matplotlib.pyplot as plt
+    
+    # Generate random 2D points
+    points = np.random.randint(0, 100, (100, 2)).astype(np.float32)
+    
+    # K-means parameters
+    K = 3
+    criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 100, 0.01)
+    
+    # Run k-means
+    compactness, labels, centers = cv.kmeans(
+        points,
+        K,
+        None,
+        criteria,
+        attempts=3,
+        flags=cv.KMEANS_PP_CENTERS
+    )
+    
+    print(f"Compactness: {compactness}")
+    print(f"Centers:\n{centers}")
+    
+    # Visualize results
+    colors = ['red', 'blue', 'green']
+    for i in range(K):
+        cluster_points = points[labels.flatten() == i]
+        plt.scatter(cluster_points[:, 0], cluster_points[:, 1], 
+                   c=colors[i], label=f'Cluster {i}')
+    plt.scatter(centers[:, 0], centers[:, 1], 
+               marker='x', s=200, c='black', label='Centers')
+    plt.legend()
+    plt.show()
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  For best results, use `KMEANS_PP_CENTERS` flag which implements the kmeans++ initialization algorithm by Arthur and Vassilvitskii. This provides better initial centers than random selection.
+</Note>
+
+---
+
+## EM - Expectation Maximization
+
+The Expectation Maximization algorithm implements Gaussian Mixture Models (GMM) for clustering. It models data as a mixture of multiple Gaussian distributions.
+
+### Creating an EM Model
+
+```cpp
+Ptr<EM> em = EM::create();
+```
+
+### Key Methods
+
+<ParamField path="setClustersNumber" type="void">
+  Sets the number of mixture components
+  
+  **Parameters:**
+  - `val` (int): Number of clusters/mixtures (default: 5)
+</ParamField>
+
+<ParamField path="setCovarianceMatrixType" type="void">
+  Sets the constraint on covariance matrices
+  
+  **Parameters:**
+  - `val` (int): Type of covariance matrices
+  
+  **Types:**
+  - `EM::COV_MAT_SPHERICAL` (0): Scaled identity matrix μ_k * I
+  - `EM::COV_MAT_DIAGONAL` (1): Diagonal matrix with positive diagonal elements (recommended)
+  - `EM::COV_MAT_GENERIC` (2): Symmetric positive definite matrix
+</ParamField>
+
+<ParamField path="setTermCriteria" type="void">
+  Sets the termination criteria of the EM algorithm
+  
+  **Parameters:**
+  - `val` (TermCriteria): Criteria for max iterations or likelihood change
+  
+  The EM algorithm terminates when:
+  - Maximum number of iterations (M-steps) is reached, OR
+  - Relative change of likelihood logarithm is less than epsilon
+  
+  Default: `TermCriteria(TermCriteria::MAX_ITER + TermCriteria::EPS, 100, epsilon)`
+</ParamField>
+
+<ParamField path="trainEM" type="bool">
+  Estimates Gaussian mixture parameters from a sample set (Expectation step start)
+  
+  **Parameters:**
+  - `samples` (InputArray): Samples from which GMM will be estimated (CV_64F or will be converted)
+  - `logLikelihoods` (OutputArray): Optional output matrix of likelihood logarithm values
+  - `labels` (OutputArray): Optional output "class label" for each sample
+  - `probs` (OutputArray): Optional posterior probabilities matrix (nsamples × nclusters)
+  
+  **Returns:** bool - true if training succeeded
+  
+  This variation starts with Expectation step. Initial values are estimated by k-means algorithm.
+</ParamField>
+
+<ParamField path="trainE" type="bool">
+  Estimates Gaussian mixture parameters with initial means provided
+  
+  **Parameters:**
+  - `samples` (InputArray): Training samples matrix
+  - `means0` (InputArray): Initial means of mixture components (nclusters × dims)
+  - `covs0` (InputArray): Optional initial covariance matrices
+  - `weights0` (InputArray): Optional initial weights of mixture components
+  - `logLikelihoods` (OutputArray): Optional likelihood logarithm output
+  - `labels` (OutputArray): Optional cluster labels output
+  - `probs` (OutputArray): Optional posterior probabilities output
+  
+  **Returns:** bool - true if training succeeded
+</ParamField>
+
+<ParamField path="trainM" type="bool">
+  Estimates Gaussian mixture parameters starting with Maximization step
+  
+  **Parameters:**
+  - `samples` (InputArray): Training samples
+  - `probs0` (InputArray): Initial probabilities
+  - `logLikelihoods` (OutputArray): Optional likelihood output
+  - `labels` (OutputArray): Optional labels output
+  - `probs` (OutputArray): Optional probabilities output
+  
+  **Returns:** bool - true if training succeeded
+</ParamField>
+
+<ParamField path="predict" type="float">
+  Returns posterior probabilities for the provided samples
+  
+  **Parameters:**
+  - `samples` (InputArray): Input samples matrix
+  - `results` (OutputArray): Optional output matrix of results (nsamples × nclusters)
+  - `flags` (int): Optional flags (ignored)
+  
+  **Returns:** float - predicted class for single sample
+</ParamField>
+
+<ParamField path="predict2" type="Vec2d">
+  Returns likelihood logarithm value and index of most probable mixture component
+  
+  **Parameters:**
+  - `sample` (InputArray): A sample for classification (1 × dims or dims × 1)
+  - `probs` (OutputArray): Optional posterior probabilities (1 × nclusters, CV_64FC1)
+  
+  **Returns:** Vec2d
+  - Element [0]: Likelihood logarithm value
+  - Element [1]: Index of most probable mixture component
+</ParamField>
+
+<ParamField path="getWeights" type="Mat">
+  Returns weights of the mixtures
+  
+  **Returns:** Mat - vector with number of elements equal to number of mixtures
+</ParamField>
+
+<ParamField path="getMeans" type="Mat">
+  Returns the cluster centers (means of the Gaussian mixture)
+  
+  **Returns:** Mat - matrix with rows = number of mixtures, cols = space dimensionality
+</ParamField>
+
+<ParamField path="getCovs" type="void">
+  Returns covariance matrices
+  
+  **Parameters:**
+  - `covs` (std::vector\<Mat\>&): Output vector of covariance matrices
+  
+  Returns vector of covariation matrices (one per mixture, each is NxN where N is dimensionality)
+</ParamField>
+
+### Example Usage
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/ml.hpp>
+    #include <iostream>
+    
+    using namespace cv;
+    using namespace cv::ml;
+    using namespace std;
+    
+    int main() {
+        // Generate sample data
+        Mat samples(300, 2, CV_32F);
+        randn(samples.rowRange(0, 100), Scalar(0, 0), Scalar(10, 10));
+        randn(samples.rowRange(100, 200), Scalar(50, 50), Scalar(10, 10));
+        randn(samples.rowRange(200, 300), Scalar(25, 75), Scalar(10, 10));
+        
+        // Create and configure EM
+        Ptr<EM> em = EM::create();
+        em->setClustersNumber(3);
+        em->setCovarianceMatrixType(EM::COV_MAT_DIAGONAL);
+        em->setTermCriteria(TermCriteria(
+            TermCriteria::MAX_ITER + TermCriteria::EPS,
+            100,
+            0.1
+        ));
+        
+        // Train EM model
+        Mat labels, probs, logLikelihoods;
+        em->trainEM(samples, logLikelihoods, labels, probs);
+        
+        // Get model parameters
+        Mat means = em->getMeans();
+        Mat weights = em->getWeights();
+        vector<Mat> covs;
+        em->getCovs(covs);
+        
+        cout << "Means:\n" << means << endl;
+        cout << "Weights:\n" << weights << endl;
+        
+        // Predict for new sample
+        Mat testSample = (Mat_<float>(1, 2) << 5.0, 5.0);
+        Mat outputProbs;
+        Vec2d prediction = em->predict2(testSample, outputProbs);
+        
+        cout << "Log likelihood: " << prediction[0] << endl;
+        cout << "Most probable cluster: " << prediction[1] << endl;
+        cout << "Probabilities: " << outputProbs << endl;
+        
+        return 0;
+    }
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+    import matplotlib.pyplot as plt
+    
+    # Generate sample data (3 Gaussian clusters)
+    samples1 = np.random.randn(100, 2) * 10 + [0, 0]
+    samples2 = np.random.randn(100, 2) * 10 + [50, 50]
+    samples3 = np.random.randn(100, 2) * 10 + [25, 75]
+    samples = np.vstack([samples1, samples2, samples3]).astype(np.float32)
+    
+    # Create and configure EM
+    em = cv.ml.EM_create()
+    em.setClustersNumber(3)
+    em.setCovarianceMatrixType(cv.ml.EM_COV_MAT_DIAGONAL)
+    em.setTermCriteria((cv.TERM_CRITERIA_MAX_ITER + cv.TERM_CRITERIA_EPS, 
+                        100, 0.1))
+    
+    # Train EM model
+    em.trainEM(samples)
+    
+    # Get model parameters
+    means = em.getMeans()
+    weights = em.getWeights()
+    
+    print(f"Means:\n{means}")
+    print(f"Weights:\n{weights}")
+    
+    # Predict for new samples
+    retval, probs = em.predict(samples)
+    labels = probs.argmax(axis=1)
+    
+    # Visualize
+    colors = ['red', 'blue', 'green']
+    for i in range(3):
+        cluster_points = samples[labels == i]
+        plt.scatter(cluster_points[:, 0], cluster_points[:, 1], 
+                   c=colors[i], label=f'Cluster {i}')
+    plt.scatter(means[:, 0], means[:, 1], 
+               marker='x', s=200, c='black', label='Means')
+    plt.legend()
+    plt.title('EM Clustering')
+    plt.show()
+    ```
+  </Tab>
+</Tabs>
+
+### When to Use EM vs K-Means
+
+**Use EM when:**
+- Clusters have different shapes and sizes
+- You need probabilistic cluster assignments
+- Data follows Gaussian distributions
+- You want to model uncertainty in cluster membership
+
+**Use K-Means when:**
+- Clusters are roughly spherical and similar in size
+- You need hard cluster assignments
+- Speed is critical (K-means is faster)
+- You have very large datasets
+
+<Note>
+  The EM algorithm is more flexible than k-means as it can model elliptical clusters with different orientations and sizes. However, it's more computationally expensive and requires more samples for reliable estimation.
+</Note>
+
+## See Also
+
+- [Classification Algorithms](/api/ml/classification) - SVM, KNN, Decision Trees, and more
+- [Regression Algorithms](/api/ml/regression) - Linear and logistic regression methods
+- [TrainData Class](https://docs.opencv.org/4.x/dc/d32/classcv_1_1ml_1_1TrainData.html) - Managing training data

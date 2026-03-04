@@ -1,0 +1,235 @@
+---
+title: "Image Basics"
+description: "Understanding image representation and manipulation in OpenCV"
+---
+
+## Image as Matrix
+
+In OpenCV, images are represented as `Mat` objects - multi-dimensional arrays where:
+- **Grayscale images**: Single-channel 2D arrays (CV_8UC1)
+- **Color images**: Multi-channel 2D arrays (typically CV_8UC3 for BGR)
+- **Pixel values**: Usually 8-bit unsigned integers (0-255)
+
+## Image Properties
+
+### Dimensions
+
+```cpp
+Mat img = imread("image.jpg");
+
+int height = img.rows;      // Image height
+int width = img.cols;       // Image width
+int channels = img.channels(); // Number of channels
+Size size = img.size();     // Size(width, height)
+```
+
+### Data Type
+
+```cpp
+int type = img.type();      // e.g., CV_8UC3
+int depth = img.depth();    // e.g., CV_8U
+bool empty = img.empty();   // Check if image is empty
+```
+
+## Color Spaces
+
+OpenCV uses **BGR** (not RGB) as the default color order:
+
+```cpp
+// Load color image (BGR by default)
+Mat bgr = imread("image.jpg");
+
+// Access BGR values
+Vec3b pixel = bgr.at<Vec3b>(y, x);
+uchar blue = pixel[0];
+uchar green = pixel[1];
+uchar red = pixel[2];
+```
+
+<Warning>
+Most other libraries use RGB order. Always convert when interfacing with external systems.
+</Warning>
+
+See [Color Spaces](/concepts/color-spaces) for conversion details.
+
+## Pixel Access
+
+### Single Pixel
+
+```cpp
+// Grayscale image
+uchar intensity = grayImg.at<uchar>(y, x);
+
+// Color image
+Vec3b color = colorImg.at<Vec3b>(y, x);
+color[0] = 255;  // Modify blue channel
+colorImg.at<Vec3b>(y, x) = color;
+```
+
+### Efficient Row Access
+
+```cpp
+for(int i = 0; i < img.rows; i++) {
+    uchar* row = img.ptr<uchar>(i);
+    for(int j = 0; j < img.cols; j++) {
+        row[j] = /* process pixel */;
+    }
+}
+```
+
+### Multi-Channel Access
+
+```cpp
+for(int i = 0; i < img.rows; i++) {
+    Vec3b* row = img.ptr<Vec3b>(i);
+    for(int j = 0; j < img.cols; j++) {
+        row[j][0] = /* blue */;
+        row[j][1] = /* green */;
+        row[j][2] = /* red */;
+    }
+}
+```
+
+## Image Operations
+
+### Creating Images
+
+```cpp
+// Create blank image
+Mat img(480, 640, CV_8UC3, Scalar(0, 0, 0));  // Black
+
+// Create from size
+Mat img = Mat::zeros(Size(640, 480), CV_8UC3);
+Mat img = Mat::ones(Size(640, 480), CV_8UC1);
+```
+
+### Copying Images
+
+```cpp
+// Shallow copy (shares data)
+Mat img2 = img1;
+
+// Deep copy
+Mat img2 = img1.clone();
+img1.copyTo(img2);
+
+// Copy with mask
+img1.copyTo(img2, mask);
+```
+
+### Image ROI
+
+```cpp
+// Select rectangular region
+Rect roi(x, y, width, height);
+Mat region = img(roi);
+
+// Modify ROI (affects original)
+region = Scalar(0, 255, 0);  // Fill with green
+```
+
+## Channel Operations
+
+### Split and Merge
+
+```cpp
+// Split into channels
+vector<Mat> channels;
+split(img, channels);  // channels[0]=B, channels[1]=G, channels[2]=R
+
+// Merge channels
+Mat merged;
+merge(channels, merged);
+```
+
+### Extract Single Channel
+
+```cpp
+// Extract blue channel
+Mat blueChannel;
+extractChannel(img, blueChannel, 0);
+
+// Set channel to zero
+Mat channels[3];
+split(img, channels);
+channels[0] = Mat::zeros(img.size(), CV_8UC1);
+merge(channels, 3, img);  // Blue channel now zero
+```
+
+## Image I/O
+
+### Reading Images
+
+```cpp
+// Read color image
+Mat img = imread("image.jpg");
+
+// Read grayscale
+Mat gray = imread("image.jpg", IMREAD_GRAYSCALE);
+
+// Read with alpha channel
+Mat rgba = imread("image.png", IMREAD_UNCHANGED);
+```
+
+### Writing Images
+
+```cpp
+// Save image
+imwrite("output.jpg", img);
+
+// Save with parameters
+vector<int> params = {IMWRITE_JPEG_QUALITY, 95};
+imwrite("output.jpg", img, params);
+```
+
+## Common Patterns
+
+### Convert to Grayscale
+
+```cpp
+Mat gray;
+cvtColor(img, gray, COLOR_BGR2GRAY);
+```
+
+### Resize Image
+
+```cpp
+Mat resized;
+resize(img, resized, Size(320, 240));
+
+// Scale by factor
+resize(img, resized, Size(), 0.5, 0.5);
+```
+
+### Crop Image
+
+```cpp
+Rect cropRegion(x, y, width, height);
+Mat cropped = img(cropRegion).clone();
+```
+
+## Performance Tips
+
+<CardGroup cols={2}>
+<Card title="Use Pointer Access" icon="gauge-high">
+Prefer ptr&lt;T&gt;() over at&lt;T&gt;() for pixel-level operations
+</Card>
+
+<Card title="Check Continuity" icon="link">
+Continuous matrices enable faster processing
+</Card>
+
+<Card title="Avoid Copies" icon="copy">
+Use references and ROI instead of cloning
+</Card>
+
+<Card title="Batch Operations" icon="layer-group">
+Use OpenCV functions instead of pixel loops
+</Card>
+</CardGroup>
+
+## See Also
+
+- [Matrices](/concepts/matrices) - Understanding Mat class
+- [Color Spaces](/concepts/color-spaces) - Color conversion
+- [ImgProc Module](/modules/imgproc) - Image processing functions

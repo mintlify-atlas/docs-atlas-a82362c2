@@ -1,0 +1,511 @@
+---
+title: Object Detection with DNN
+description: Detect objects in images and videos using YOLO, SSD, and Faster R-CNN models with OpenCV DNN module
+---
+
+Object detection identifies and localizes multiple objects in an image, providing both class labels and bounding box coordinates. OpenCV's DNN module supports popular detection models like YOLO, SSD, and Faster R-CNN.
+
+## Supported Models
+
+<Tabs>
+  <Tab title="YOLO">
+    **YOLO (You Only Look Once)** - Real-time object detection
+    
+    - YOLOv3, YOLOv4 (Darknet)
+    - YOLOv5 (PyTorch/ONNX)
+    - YOLOv8, YOLOv9, YOLOv10 (Ultralytics)
+    - YOLOX, YOLO-NAS
+    
+    YOLO models are single-stage detectors optimized for speed.
+  </Tab>
+  
+  <Tab title="SSD">
+    **SSD (Single Shot MultiBox Detector)**
+    
+    - MobileNet-SSD (Caffe)
+    - SSD with various backbones (TensorFlow)
+    
+    SSD models balance speed and accuracy with multi-scale feature maps.
+  </Tab>
+  
+  <Tab title="Faster R-CNN">
+    **Faster R-CNN** - Two-stage detector
+    
+    - Faster R-CNN with Inception v2
+    - Faster R-CNN with ResNet
+    
+    Two-stage detectors prioritize accuracy over speed.
+  </Tab>
+</Tabs>
+
+## YOLO Object Detection (Python)
+
+<Steps>
+  <Step title="Import Libraries">
+    ```python
+    import cv2 as cv
+    import numpy as np
+    ```
+  </Step>
+
+  <Step title="Load the Model">
+    ```python
+    # Load YOLOv8 model
+    model = 'yolov8n.onnx'
+    net = cv.dnn.readNet(model)
+    net.setPreferableBackend(cv.dnn.DNN_BACKEND_OPENCV)
+    net.setPreferableTarget(cv.dnn.DNN_TARGET_CPU)
+    
+    # Load class names
+    with open('object_detection_classes_yolo.txt', 'rt') as f:
+        classes = f.read().rstrip('\n').split('\n')
+    ```
+  </Step>
+
+  <Step title="Prepare Input">
+    ```python
+    # Read image
+    frame = cv.imread('image.jpg')
+    frameHeight, frameWidth = frame.shape[:2]
+    
+    # Create blob from image
+    # YOLOv8 uses 640x640 input with scale 1/255
+    blob = cv.dnn.blobFromImage(frame, 1/255.0, (640, 640), [0, 0, 0], True, crop=False)
+    ```
+  </Step>
+
+  <Step title="Run Detection">
+    ```python
+    # Set input and run forward pass
+    net.setInput(blob)
+    outNames = net.getUnconnectedOutLayersNames()
+    outs = net.forward(outNames)
+    ```
+  </Step>
+
+  <Step title="Post-process Results">
+    ```python
+    def postprocess(frame, outs, confThreshold=0.5, nmsThreshold=0.4):
+        frameHeight, frameWidth = frame.shape[:2]
+        
+        classIds = []
+        confidences = []
+        boxes = []
+        
+        # For YOLOv8, output shape is [1, 84, 8400] -> transpose to [1, 8400, 84]
+        for out in outs:
+            out = out[0].transpose(1, 0)  # [8400, 84]
+            
+            for detection in out:
+                scores = detection[4:]  # class scores
+                classId = np.argmax(scores)
+                confidence = scores[classId]
+                
+                if confidence > confThreshold:
+                    # YOLOv8 uses center format: [cx, cy, w, h]
+                    center_x = int(detection[0] * frameWidth / 640)
+                    center_y = int(detection[1] * frameHeight / 640)
+                    width = int(detection[2] * frameWidth / 640)
+                    height = int(detection[3] * frameHeight / 640)
+                    left = int(center_x - width / 2)
+                    top = int(center_y - height / 2)
+                    
+                    classIds.append(classId)
+                    confidences.append(float(confidence))
+                    boxes.append([left, top, width, height])
+        
+        # Apply Non-Maximum Suppression
+        indices = cv.dnn.NMSBoxes(boxes, confidences, confThreshold, nmsThreshold)
+        
+        return classIds, confidences, boxes, indices
+    
+    classIds, confidences, boxes, indices = postprocess(frame, outs)
+    ```
+  </Step>
+
+  <Step title="Draw Detections">
+    ```python
+    def drawPred(frame, classId, conf, left, top, right, bottom, classes):
+        # Draw bounding box
+        cv.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
+        
+        # Create label
+        label = f'{classes[classId]}: {conf:.2f}'
+        
+        # Draw label background
+        labelSize, baseLine = cv.getTextSize(label, cv.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+        top = max(top, labelSize[1])
+        cv.rectangle(frame, (left, top - labelSize[1]), 
+                    (left + labelSize[0], top + baseLine), 
+                    (255, 255, 255), cv.FILLED)
+        
+        # Draw label text
+        cv.putText(frame, label, (left, top), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0))
+    
+    # Draw all detections
+    for i in indices:
+        box = boxes[i]
+        left, top, width, height = box
+        drawPred(frame, classIds[i], confidences[i], left, top, 
+                left + width, top + height, classes)
+    
+    # Display result
+    cv.imshow('Object Detection', frame)
+    cv.waitKey(0)
+    ```
+  </Step>
+</Steps>
+
+## YOLO Object Detection (C++)
+
+<Tabs>
+  <Tab title="Complete Example">
+    ```cpp
+    #include <opencv2/dnn.hpp>
+    #include <opencv2/imgproc.hpp>
+    #include <opencv2/highgui.hpp>
+    #include <fstream>
+    #include <iostream>
+    
+    using namespace cv;
+    using namespace cv::dnn;
+    
+    std::vector<std::string> classes;
+    
+    void getClasses(std::string classesFile) {
+        std::ifstream ifs(classesFile.c_str());
+        if (!ifs.is_open())
+            CV_Error(Error::StsError, "File " + classesFile + " not found");
+        std::string line;
+        while (std::getline(ifs, line))
+            classes.push_back(line);
+    }
+    
+    void drawPrediction(int classId, float conf, int left, int top, 
+                       int right, int bottom, Mat& frame) {
+        rectangle(frame, Point(left, top), Point(right, bottom), Scalar(0, 255, 0));
+        
+        std::string label = format("%.2f", conf);
+        if (!classes.empty()) {
+            CV_Assert(classId < (int)classes.size());
+            label = classes[classId] + ": " + label;
+        }
+        
+        int baseLine;
+        Size labelSize = getTextSize(label, FONT_HERSHEY_SIMPLEX, 0.5, 1, &baseLine);
+        top = max(top, labelSize.height);
+        rectangle(frame, Point(left, top - labelSize.height),
+                 Point(left + labelSize.width, top + baseLine), 
+                 Scalar::all(255), FILLED);
+        putText(frame, label, Point(left, top), FONT_HERSHEY_SIMPLEX, 0.5, Scalar());
+    }
+    
+    void yoloPostProcessing(std::vector<Mat>& outs,
+                           std::vector<int>& keep_classIds,
+                           std::vector<float>& keep_confidences,
+                           std::vector<Rect2d>& keep_boxes,
+                           float conf_threshold,
+                           float iou_threshold,
+                           const std::string& model_name,
+                           const int nc = 80) {
+        std::vector<int> classIds;
+        std::vector<float> confidences;
+        std::vector<Rect2d> boxes;
+        
+        // For YOLOv8/v9/v10, transpose output
+        if (model_name == "yolov8" || model_name == "yolov10" || model_name == "yolov9") {
+            cv::transposeND(outs[0], {0, 2, 1}, outs[0]);
+        }
+        
+        for (auto preds : outs) {
+            preds = preds.reshape(1, preds.size[1]);
+            for (int i = 0; i < preds.rows; ++i) {
+                // Filter out non-objects
+                float obj_conf = (model_name == "yolov8" || model_name == "yolov9" || 
+                                 model_name == "yolov10") ? 1.0f : preds.at<float>(i, 4);
+                if (obj_conf < conf_threshold)
+                    continue;
+                
+                Mat scores = preds.row(i).colRange(
+                    (model_name == "yolov8" || model_name == "yolov9" || 
+                     model_name == "yolov10") ? 4 : 5, preds.cols);
+                double conf;
+                Point maxLoc;
+                minMaxLoc(scores, 0, &conf, 0, &maxLoc);
+                
+                conf = (model_name == "yolov8" || model_name == "yolov9" || 
+                       model_name == "yolov10") ? conf : conf * obj_conf;
+                if (conf < conf_threshold)
+                    continue;
+                
+                // Get bbox coordinates
+                float* det = preds.ptr<float>(i);
+                double cx = det[0];
+                double cy = det[1];
+                double w = det[2];
+                double h = det[3];
+                
+                if (model_name == "yolov10") {
+                    boxes.push_back(Rect2d(cx, cy, w, h));
+                } else {
+                    boxes.push_back(Rect2d(cx - 0.5 * w, cy - 0.5 * h,
+                                          cx + 0.5 * w, cy + 0.5 * h));
+                }
+                classIds.push_back(maxLoc.x);
+                confidences.push_back(static_cast<float>(conf));
+            }
+        }
+        
+        // Apply NMS
+        std::vector<int> keep_idx;
+        NMSBoxes(boxes, confidences, conf_threshold, iou_threshold, keep_idx);
+        
+        for (auto i : keep_idx) {
+            keep_classIds.push_back(classIds[i]);
+            keep_confidences.push_back(confidences[i]);
+            keep_boxes.push_back(boxes[i]);
+        }
+    }
+    
+    int main(int argc, char** argv) {
+        // Load model
+        std::string weightPath = "yolov8n.onnx";
+        Net net = readNet(weightPath);
+        net.setPreferableBackend(DNN_BACKEND_OPENCV);
+        net.setPreferableTarget(DNN_TARGET_CPU);
+        
+        // Load classes
+        getClasses("object_detection_classes_yolo.txt");
+        
+        // Read image
+        Mat img = imread("image.jpg");
+        
+        // Preprocess
+        Mat blob;
+        Size size(640, 640);
+        Scalar mean(0, 0, 0);
+        Scalar scale(1.0/255.0, 1.0/255.0, 1.0/255.0);
+        blobFromImage(img, blob, 1.0/255.0, size, mean, true, false);
+        
+        // Forward pass
+        net.setInput(blob);
+        std::vector<Mat> outs;
+        net.forward(outs, net.getUnconnectedOutLayersNames());
+        
+        // Postprocess
+        std::vector<int> keep_classIds;
+        std::vector<float> keep_confidences;
+        std::vector<Rect2d> keep_boxes;
+        yoloPostProcessing(outs, keep_classIds, keep_confidences, keep_boxes,
+                          0.5, 0.4, "yolov8", 80);
+        
+        // Draw results
+        std::vector<Rect> boxes;
+        for (auto box : keep_boxes) {
+            boxes.push_back(Rect(cvFloor(box.x), cvFloor(box.y), 
+                               cvFloor(box.width - box.x), cvFloor(box.height - box.y)));
+        }
+        
+        for (size_t idx = 0; idx < boxes.size(); ++idx) {
+            Rect box = boxes[idx];
+            drawPrediction(keep_classIds[idx], keep_confidences[idx], 
+                         box.x, box.y, box.width + box.x, box.height + box.y, img);
+        }
+        
+        imshow("YOLO Object Detection", img);
+        waitKey(0);
+        
+        return 0;
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Video Processing">
+    ```cpp
+    // Open video capture
+    VideoCapture cap;
+    cap.open(0); // or video file path
+    
+    Mat img;
+    while (waitKey(1) < 0) {
+        cap >> img;
+        if (img.empty())
+            break;
+        
+        // Preprocess
+        Mat inp = blobFromImageWithParams(img, imgParams);
+        
+        // Forward
+        net.setInput(inp);
+        std::vector<Mat> outs;
+        net.forward(outs, net.getUnconnectedOutLayersNames());
+        
+        // Postprocess
+        std::vector<int> keep_classIds;
+        std::vector<float> keep_confidences;
+        std::vector<Rect2d> keep_boxes;
+        yoloPostProcessing(outs, keep_classIds, keep_confidences, keep_boxes,
+                          confThreshold, nmsThreshold, yolo_model, nc);
+        
+        // Draw boxes
+        for (size_t idx = 0; idx < keep_boxes.size(); ++idx) {
+            Rect2d box = keep_boxes[idx];
+            drawPrediction(keep_classIds[idx], keep_confidences[idx], 
+                         box.x, box.y, box.width + box.x, box.height + box.y, img);
+        }
+        
+        imshow("YOLO Object Detector", img);
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## SSD Object Detection
+
+### MobileNet-SSD (Caffe)
+
+```python
+import cv2 as cv
+
+# Load MobileNet-SSD model
+model = 'MobileNetSSD_deploy.caffemodel'
+config = 'MobileNetSSD_deploy.prototxt'
+net = cv.dnn.readNetFromCaffe(config, model)
+
+# Prepare input
+frame = cv.imread('image.jpg')
+blob = cv.dnn.blobFromImage(frame, 0.007843, (300, 300), [127.5, 127.5, 127.5], False)
+
+# Run detection
+net.setInput(blob)
+detections = net.forward()
+
+# Process detections
+for i in range(detections.shape[2]):
+    confidence = detections[0, 0, i, 2]
+    if confidence > 0.5:
+        # Extract bounding box
+        box = detections[0, 0, i, 3:7] * np.array([width, height, width, height])
+        (left, top, right, bottom) = box.astype("int")
+        
+        # Draw detection
+        cv.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
+```
+
+## Model Configurations
+
+### YOLOv8 (ONNX)
+
+```yaml
+yolov8:
+  model: "yolov8n.onnx"
+  mean: [0, 0, 0]
+  scale: 0.00392  # 1/255
+  width: 640
+  height: 640
+  rgb: true
+  classes: "object_detection_classes_yolo.txt"
+```
+
+**Download:** https://github.com/ultralytics/ultralytics
+
+### YOLOv4 (Darknet)
+
+```yaml
+yolov4:
+  model: "yolov4.weights"
+  config: "yolov4.cfg"
+  mean: [0, 0, 0]
+  scale: 0.00392
+  width: 416
+  height: 416
+  rgb: true
+  classes: "object_detection_classes_yolo.txt"
+```
+
+**Download:** https://github.com/AlexeyAB/darknet/releases
+
+### MobileNet-SSD (Caffe)
+
+```yaml
+ssd_caffe:
+  model: "MobileNetSSD_deploy.caffemodel"
+  config: "MobileNetSSD_deploy.prototxt"
+  mean: [127.5, 127.5, 127.5]
+  scale: 0.007843
+  width: 300
+  height: 300
+  rgb: false
+  classes: "object_detection_classes_pascal_voc.txt"
+```
+
+### Faster R-CNN (TensorFlow)
+
+```yaml
+faster_rcnn_tf:
+  model: "faster_rcnn_inception_v2_coco_2018_01_28.pb"
+  config: "faster_rcnn_inception_v2_coco_2018_01_28.pbtxt"
+  mean: [0, 0, 0]
+  scale: 1.0
+  width: 800
+  height: 600
+  rgb: true
+```
+
+**Download:** http://download.tensorflow.org/models/object_detection/
+
+## Non-Maximum Suppression (NMS)
+
+<Note>
+  NMS removes duplicate detections by suppressing boxes with high overlap.
+</Note>
+
+```python
+# Apply NMS
+confidence_threshold = 0.5
+nms_threshold = 0.4
+
+indices = cv.dnn.NMSBoxes(boxes, confidences, confidence_threshold, nms_threshold)
+
+for i in indices:
+    box = boxes[i]
+    # Draw detection
+    drawPrediction(frame, classIds[i], confidences[i], box[0], box[1], 
+                  box[0] + box[2], box[1] + box[3])
+```
+
+## Performance Tips
+
+<Steps>
+  <Step title="Use GPU Acceleration">
+    ```python
+    net.setPreferableBackend(cv.dnn.DNN_BACKEND_CUDA)
+    net.setPreferableTarget(cv.dnn.DNN_TARGET_CUDA)
+    ```
+  </Step>
+  
+  <Step title="Use FP16 for Faster Inference">
+    ```python
+    net.setPreferableTarget(cv.dnn.DNN_TARGET_CUDA_FP16)
+    ```
+  </Step>
+  
+  <Step title="Choose Appropriate Model Size">
+    - YOLOv8n (nano): Fastest, lowest accuracy
+    - YOLOv8s (small): Balanced
+    - YOLOv8m (medium): Higher accuracy
+    - YOLOv8l/x (large/xlarge): Best accuracy, slowest
+  </Step>
+</Steps>
+
+<Warning>
+  Different YOLO versions (v3, v4, v5, v8) have different output formats and require different post-processing.
+</Warning>
+
+## Source Code
+
+Complete source code for object detection:
+
+- Python: `samples/dnn/object_detection.py`
+- C++ (YOLO): `samples/dnn/yolo_detector.cpp`
+- C++ (Generic): `samples/dnn/object_detection.cpp`

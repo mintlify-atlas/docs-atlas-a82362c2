@@ -1,0 +1,563 @@
+---
+title: Building OpenCV on macOS
+description: Complete guide for building and installing OpenCV on macOS with support for Intel and Apple Silicon
+---
+
+OpenCV provides native support for macOS on both Intel (x86_64) and Apple Silicon (arm64) architectures. Build universal binaries or create XCFrameworks for multi-platform support.
+
+## Quick Start
+
+Get OpenCV running on macOS in minutes:
+
+<Steps>
+  <Step title="Install Xcode Command Line Tools">
+    ```bash
+    xcode-select --install
+    ```
+    
+    <Note>
+    Xcode 12.2 or later is required. The full Xcode app is recommended but not strictly necessary for basic builds.
+    </Note>
+  </Step>
+  
+  <Step title="Install Homebrew (Optional)">
+    ```bash
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    ```
+  </Step>
+  
+  <Step title="Install CMake">
+    Via Homebrew:
+    ```bash
+    brew install cmake
+    ```
+    
+    Or download from [cmake.org](https://cmake.org/download/) and install the .dmg package.
+  </Step>
+  
+  <Step title="Clone and Build OpenCV">
+    ```bash
+    cd ~/
+    git clone https://github.com/opencv/opencv.git
+    cd opencv
+    mkdir build && cd build
+    
+    cmake -DCMAKE_BUILD_TYPE=Release ..
+    make -j$(sysctl -n hw.ncpu)
+    sudo make install
+    ```
+  </Step>
+</Steps>
+
+## System Requirements
+
+- **macOS**: 10.12 (Sierra) or later
+- **Xcode**: 12.2 or later
+- **CMake**: 3.19.0 or later (3.17+ for older Xcode)
+- **Python**: 3.8 or later (for Python bindings)
+
+<Warning>
+macOS 12.3+ does not include Python 2.7. Install Python 3.x from [python.org](https://www.python.org/) or Homebrew.
+</Warning>
+
+## Installation Methods
+
+<Tabs>
+  <Tab title="Build from Source">
+    For the latest features and custom configuration:
+    
+    ```bash
+    # Clone repository
+    git clone https://github.com/opencv/opencv.git
+    cd opencv
+    mkdir build && cd build
+    
+    # Configure
+    cmake -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX=/usr/local \
+          -DBUILD_EXAMPLES=ON \
+          ..
+    
+    # Build using all CPU cores
+    make -j$(sysctl -n hw.ncpu)
+    
+    # Install
+    sudo make install
+    ```
+  </Tab>
+  
+  <Tab title="Homebrew">
+    For quick installation of stable releases:
+    
+    ```bash
+    # Install OpenCV
+    brew install opencv
+    
+    # With contrib modules (unofficial tap)
+    brew install opencv@4
+    ```
+    
+    <Note>
+    Homebrew packages may not include all optional features. Build from source for full control.
+    </Note>
+  </Tab>
+  
+  <Tab title="pip (Python only)">
+    For Python bindings only:
+    
+    ```bash
+    # Basic OpenCV
+    pip install opencv-python
+    
+    # With contrib modules
+    pip install opencv-contrib-python
+    ```
+  </Tab>
+</Tabs>
+
+## Building for Apple Silicon
+
+OpenCV supports native Apple Silicon (M1/M2/M3) builds:
+
+### Native ARM64 Build
+
+```bash
+# Build natively on Apple Silicon Mac
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_OSX_ARCHITECTURES=arm64 \
+      ..
+make -j$(sysctl -n hw.ncpu)
+```
+
+### Universal Binary (x86_64 + arm64)
+
+```bash
+# Build for both Intel and Apple Silicon
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+      ..
+make -j$(sysctl -n hw.ncpu)
+```
+
+<Note>
+Universal binaries work on both Intel and Apple Silicon Macs, but result in larger file sizes.
+</Note>
+
+### Architecture-Specific Optimizations
+
+```bash
+# Apple Silicon - enable ARM NEON optimizations
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_OSX_ARCHITECTURES=arm64 \
+      -DENABLE_NEON=ON \
+      ..
+
+# Intel - enable AVX/AVX2
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+      -DCPU_BASELINE=AVX2 \
+      ..
+```
+
+## Building OpenCV Framework
+
+For use in Xcode projects, build OpenCV as a framework:
+
+```bash
+cd ~/
+git clone https://github.com/opencv/opencv.git
+cd opencv/platforms/osx
+
+# Build framework for macOS
+python3 build_framework.py ~/opencv_build
+
+# Build universal binary framework
+python3 build_framework.py ~/opencv_build \
+        --macos_archs x86_64,arm64
+```
+
+The script creates:
+- `~/opencv_build/opencv2.framework` - The framework
+- `~/opencv_build/build/` - Intermediate build files
+
+### Framework Build Options
+
+```bash
+# With contrib modules
+python3 build_framework.py ~/opencv_build \
+        --opencv ~/opencv \
+        --contrib ~/opencv_contrib
+
+# Exclude specific modules
+python3 build_framework.py ~/opencv_build \
+        --without video --without objc
+
+# Enable non-free modules
+python3 build_framework.py ~/opencv_build \
+        --enable_nonfree
+
+# Build only for Apple Silicon
+python3 build_framework.py ~/opencv_build \
+        --macos_archs arm64 \
+        --build_only_specified_archs
+```
+
+## Building XCFramework
+
+For multi-platform distribution (macOS + iOS + Catalyst):
+
+```bash
+cd opencv/platforms/apple
+
+python3 build_xcframework.py --out ~/opencv_xcframework
+```
+
+This builds OpenCV for:
+- **macOS**: x86_64, arm64
+- **iOS**: arm64, armv7
+- **iOS Simulator**: x86_64, arm64
+- **Mac Catalyst**: x86_64, arm64
+
+The resulting `opencv2.xcframework` can be used across all Apple platforms.
+
+### XCFramework Build Options
+
+```bash
+# Build only for macOS
+python3 build_xcframework.py --out ~/opencv_xcframework \
+        --macos_archs arm64,x86_64 \
+        --build_only_specified_archs
+
+# With contrib modules
+python3 build_xcframework.py --out ~/opencv_xcframework \
+        --contrib ~/opencv_contrib
+
+# Exclude modules to reduce size
+python3 build_xcframework.py --out ~/opencv_xcframework \
+        --without video --without objc
+```
+
+<Tip>
+Building XCFramework can take 30-60 minutes as it compiles for 8 architectures across 4 platforms. Use `--build_only_specified_archs` to reduce build time.
+</Tip>
+
+## Dependencies and Optional Features
+
+### Core Dependencies
+
+```bash
+# Install via Homebrew
+brew install cmake pkg-config
+
+# For Python support
+brew install python numpy
+```
+
+### Optional Dependencies
+
+<AccordionGroup>
+  <Accordion title="Image I/O">
+    ```bash
+    brew install jpeg libpng libtiff webp openexr
+    ```
+  </Accordion>
+  
+  <Accordion title="Video I/O">
+    ```bash
+    brew install ffmpeg
+    
+    # Enable in CMake
+    cmake -DWITH_FFMPEG=ON ..
+    ```
+  </Accordion>
+  
+  <Accordion title="GUI Support">
+    macOS uses native Cocoa framework by default (no additional dependencies).
+    
+    For Qt-based GUI:
+    ```bash
+    brew install qt5
+    
+    cmake -DWITH_QT=ON \
+          -DQt5_DIR=/usr/local/opt/qt5/lib/cmake/Qt5 \
+          ..
+    ```
+  </Accordion>
+  
+  <Accordion title="Parallel Processing">
+    ```bash
+    # Intel TBB
+    brew install tbb
+    
+    cmake -DWITH_TBB=ON ..
+    ```
+  </Accordion>
+  
+  <Accordion title="OpenCL Support">
+    macOS includes OpenCL by default:
+    ```bash
+    cmake -DWITH_OPENCL=ON ..
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## CMake Configuration Options
+
+### Standard Build
+
+```bash
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DCMAKE_OSX_DEPLOYMENT_TARGET=10.12 \
+      -DBUILD_EXAMPLES=ON \
+      -DBUILD_TESTS=OFF \
+      -DBUILD_PERF_TESTS=OFF \
+      -DWITH_TBB=ON \
+      -DWITH_OPENCL=ON \
+      ..
+```
+
+### Python-Specific Configuration
+
+```bash
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DPYTHON3_EXECUTABLE=$(which python3) \
+      -DPYTHON3_INCLUDE_DIR=$(python3 -c "from sysconfig import get_paths; print(get_paths()['include'])") \
+      -DPYTHON3_NUMPY_INCLUDE_DIRS=$(python3 -c "import numpy; print(numpy.get_include())") \
+      ..
+```
+
+<Note>
+Python 2 support has been removed from recent OpenCV versions. Use Python 3.8 or later.
+</Note>
+
+### Optimized Build for Apple Silicon
+
+```bash
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_OSX_ARCHITECTURES=arm64 \
+      -DENABLE_NEON=ON \
+      -DWITH_TBB=ON \
+      -DWITH_OPENCL=ON \
+      -DBUILD_TESTS=OFF \
+      ..
+```
+
+## Building with opencv_contrib
+
+Include extra modules from opencv_contrib:
+
+```bash
+# Clone both repositories
+cd ~/
+git clone https://github.com/opencv/opencv.git
+git clone https://github.com/opencv/opencv_contrib.git
+
+# Build with contrib
+cd opencv
+mkdir build && cd build
+
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DOPENCV_EXTRA_MODULES_PATH=~/opencv_contrib/modules \
+      ..
+
+make -j$(sysctl -n hw.ncpu)
+```
+
+## Installation Locations
+
+### Default Installation
+
+With `sudo make install`, files are placed in:
+
+```bash
+/usr/local/lib/                    # Libraries (.dylib)
+/usr/local/include/opencv4/        # Headers
+/usr/local/bin/                    # Executables
+/usr/local/share/opencv4/          # Data files
+/usr/local/lib/cmake/opencv4/      # CMake config
+/usr/local/lib/python3.x/site-packages/  # Python module
+```
+
+### Custom Installation
+
+```bash
+# Install to user directory
+cmake -DCMAKE_INSTALL_PREFIX=$HOME/.local \
+      -DCMAKE_BUILD_TYPE=Release \
+      ..
+make -j$(sysctl -n hw.ncpu)
+make install
+
+# Update paths
+export PATH=$HOME/.local/bin:$PATH
+export DYLD_LIBRARY_PATH=$HOME/.local/lib:$DYLD_LIBRARY_PATH
+export PKG_CONFIG_PATH=$HOME/.local/lib/pkgconfig:$PKG_CONFIG_PATH
+```
+
+## Using OpenCV in Xcode Projects
+
+### With CMake (Recommended)
+
+In your `CMakeLists.txt`:
+
+```cmake
+cmake_minimum_required(VERSION 3.17)
+project(MyProject)
+
+find_package(OpenCV REQUIRED)
+include_directories(${OpenCV_INCLUDE_DIRS})
+
+add_executable(myapp main.cpp)
+target_link_libraries(myapp ${OpenCV_LIBS})
+```
+
+Generate Xcode project:
+
+```bash
+cmake -G Xcode -DOpenCV_DIR=~/opencv/build ..
+```
+
+### With OpenCV Framework
+
+1. Drag `opencv2.framework` into your Xcode project
+2. Add to **Target → Build Phases → Link Binary With Libraries**
+3. Include in code:
+
+```objectivec
+#import <opencv2/opencv.hpp>
+```
+
+## Verification
+
+Test your installation:
+
+<Tabs>
+  <Tab title="C++">
+    Create `test.cpp`:
+    
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    #include <iostream>
+    
+    int main() {
+        std::cout << "OpenCV version: " << CV_VERSION << std::endl;
+        return 0;
+    }
+    ```
+    
+    Compile and run:
+    ```bash
+    clang++ test.cpp -o test $(pkg-config --cflags --libs opencv4)
+    ./test
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```bash
+    # Check version
+    python3 -c "import cv2; print(cv2.__version__)"
+    
+    # Show build info
+    python3 -c "import cv2; print(cv2.getBuildInformation())"
+    ```
+  </Tab>
+  
+  <Tab title="Framework">
+    ```bash
+    # Verify framework structure
+    ls -la ~/opencv_build/opencv2.framework/
+    
+    # Check architectures
+    lipo -info ~/opencv_build/opencv2.framework/opencv2
+    ```
+  </Tab>
+</Tabs>
+
+## Performance Optimization
+
+### Use Accelerate Framework
+
+macOS's Accelerate framework provides optimized BLAS/LAPACK:
+
+```bash
+cmake -DWITH_LAPACK=ON \
+      -DLAPACK_LIBRARIES="-framework Accelerate" \
+      ..
+```
+
+### Enable Multi-threading
+
+```bash
+cmake -DWITH_TBB=ON \
+      -DWITH_OPENMP=OFF \  # OpenMP not recommended on macOS
+      ..
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Python module not found after installation">
+    Check installation path:
+    ```bash
+    python3 -c "import sys; print(sys.path)"
+    find /usr/local -name "cv2*.so" 2>/dev/null
+    ```
+    
+    Add to PYTHONPATH if needed:
+    ```bash
+    export PYTHONPATH=/usr/local/lib/python3.x/site-packages:$PYTHONPATH
+    ```
+  </Accordion>
+  
+  <Accordion title="CMake version too old error">
+    Update CMake:
+    ```bash
+    brew upgrade cmake
+    # Or download latest from cmake.org
+    ```
+    
+    Xcode 12.2+ requires CMake 3.19.0+
+  </Accordion>
+  
+  <Accordion title="Architecture mismatch errors">
+    Ensure consistent architecture:
+    ```bash
+    # Check what you're building for
+    cmake -LA | grep CMAKE_OSX_ARCHITECTURES
+    
+    # Rebuild for specific architecture
+    rm -rf build/
+    mkdir build && cd build
+    cmake -DCMAKE_OSX_ARCHITECTURES=arm64 ..
+    ```
+  </Accordion>
+  
+  <Accordion title="Framework build fails">
+    Clean and retry:
+    ```bash
+    rm -rf ~/opencv_build
+    cd opencv/platforms/osx
+    python3 build_framework.py ~/opencv_build
+    ```
+    
+    Check Xcode and CMake versions meet requirements.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="iOS Development" icon="mobile" href="/platforms/ios">
+    Build OpenCV for iOS devices
+  </Card>
+  <Card title="Getting Started" icon="rocket" href="/getting-started/quickstart">
+    Write your first OpenCV application
+  </Card>
+  <Card title="Python Bindings" icon="python" href="/python/installation">
+    Use OpenCV with Python on macOS
+  </Card>
+  <Card title="XCFramework Guide" icon="box" href="/platforms/macos">
+    Build for all Apple platforms
+  </Card>
+</CardGroup>

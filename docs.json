@@ -1,122 +1,201 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "OpenCV",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#138af8",
+    "light": "#f82b43",
+    "dark": "#138af8"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "https://media.brand.dev/0795180c-b63b-45a0-9c37-fb2afd63cc8e.jpg",
+  "logo": {
+    "light": "https://media.brand.dev/d62079e7-c005-46fa-82ad-f690fce98b4c.png",
+    "dark": "https://media.brand.dev/d62079e7-c005-46fa-82ad-f690fce98b4c.png"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/opencv/opencv"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/opencv/opencv",
+      "twitter": "https://twitter.com/opencvlive",
+      "linkedin": "https://linkedin.com/company/opencv",
+      "youtube": "https://youtube.com/@opencvofficial"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Getting Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "installation",
+              "quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/matrices",
+              "concepts/image-basics",
+              "concepts/color-spaces",
+              "concepts/memory-management"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Modules",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "modules/overview",
+              "modules/core",
+              "modules/imgproc",
+              "modules/imgcodecs",
+              "modules/videoio",
+              "modules/highgui",
+              "modules/video",
+              "modules/calib3d",
+              "modules/features2d",
+              "modules/objdetect",
+              "modules/dnn",
+              "modules/ml",
+              "modules/photo",
+              "modules/stitching",
+              "modules/gapi"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Tutorials",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "tutorials/image-operations",
+              "tutorials/video-processing",
+              "tutorials/feature-detection",
+              "tutorials/object-detection",
+              "tutorials/face-detection",
+              "tutorials/deep-learning",
+              "tutorials/camera-calibration"
+            ]
+          },
+          {
+            "group": "Language Bindings",
+            "pages": [
+              "bindings/cpp",
+              "bindings/python",
+              "bindings/java",
+              "bindings/javascript"
+            ]
+          },
+          {
+            "group": "Platform Support",
+            "pages": [
+              "platforms/overview",
+              "platforms/linux",
+              "platforms/windows",
+              "platforms/macos",
+              "platforms/android",
+              "platforms/ios"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Core",
             "pages": [
-              "api-reference/introduction"
+              "api/core/mat",
+              "api/core/operations",
+              "api/core/utilities"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Image Processing",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/imgproc/filtering",
+              "api/imgproc/geometric",
+              "api/imgproc/color-conversion",
+              "api/imgproc/drawing",
+              "api/imgproc/feature-detection"
+            ]
+          },
+          {
+            "group": "Video Analysis",
+            "pages": [
+              "api/video/motion",
+              "api/video/tracking",
+              "api/video/optical-flow"
+            ]
+          },
+          {
+            "group": "Camera Calibration",
+            "pages": [
+              "api/calib3d/calibration",
+              "api/calib3d/pose-estimation",
+              "api/calib3d/stereo"
+            ]
+          },
+          {
+            "group": "Object Detection",
+            "pages": [
+              "api/objdetect/cascade",
+              "api/objdetect/face",
+              "api/objdetect/aruco",
+              "api/objdetect/qrcode"
+            ]
+          },
+          {
+            "group": "Deep Learning",
+            "pages": [
+              "api/dnn/network",
+              "api/dnn/layers",
+              "api/dnn/inference"
+            ]
+          },
+          {
+            "group": "Machine Learning",
+            "pages": [
+              "api/ml/classification",
+              "api/ml/clustering",
+              "api/ml/regression"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Examples",
+        "groups": [
+          {
+            "group": "Basic Operations",
+            "pages": [
+              "examples/read-display",
+              "examples/image-transformations",
+              "examples/color-spaces"
+            ]
+          },
+          {
+            "group": "Advanced Applications",
+            "pages": [
+              "examples/face-recognition",
+              "examples/object-tracking",
+              "examples/panorama-stitching",
+              "examples/pose-estimation"
+            ]
+          },
+          {
+            "group": "Deep Learning",
+            "pages": [
+              "examples/image-classification",
+              "examples/object-detection-dnn",
+              "examples/semantic-segmentation"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

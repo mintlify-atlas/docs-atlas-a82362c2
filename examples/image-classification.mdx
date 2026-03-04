@@ -1,0 +1,343 @@
+---
+title: Image Classification with DNN
+description: Learn how to perform image classification using OpenCV DNN module with popular models like ResNet, MobileNet, and GoogLeNet
+---
+
+Image classification is the task of assigning a label or category to an entire image. OpenCV's DNN module provides support for running pre-trained classification models from various frameworks.
+
+## Supported Models
+
+The following classification models are commonly used:
+
+- **ResNet** - Deep residual networks with skip connections
+- **MobileNet** - Lightweight models optimized for mobile devices
+- **GoogLeNet** - Inception architecture from Google
+- **SqueezeNet** - Compact model with high accuracy
+- **VGG** - Very deep convolutional networks
+
+## Python Implementation
+
+<Steps>
+  <Step title="Import Libraries">
+    ```python
+    import cv2 as cv
+    import numpy as np
+    ```
+  </Step>
+
+  <Step title="Load the Model">
+    ```python
+    # Load the pre-trained model
+    model = 'bvlc_googlenet.caffemodel'
+    config = 'bvlc_googlenet.prototxt'
+    net = cv.dnn.readNet(model, config)
+    
+    # Set computation backend and target
+    net.setPreferableBackend(cv.dnn.DNN_BACKEND_OPENCV)
+    net.setPreferableTarget(cv.dnn.DNN_TARGET_CPU)
+    ```
+    
+    <Note>
+      You can use `DNN_BACKEND_CUDA` and `DNN_TARGET_CUDA` for GPU acceleration if available.
+    </Note>
+  </Step>
+
+  <Step title="Load Class Names">
+    ```python
+    # Load class labels
+    classes = None
+    with open('classification_classes_ILSVRC2012.txt', 'rt') as f:
+        classes = f.read().rstrip('\n').split('\n')
+    ```
+  </Step>
+
+  <Step title="Prepare Input Image">
+    ```python
+    # Read the input image
+    frame = cv.imread('image.jpg')
+    
+    # Create a 4D blob from the image
+    # GoogLeNet uses 224x224 input with mean [104, 117, 123]
+    blob = cv.dnn.blobFromImage(frame, 1.0, (224, 224), [104, 117, 123], False, crop=False)
+    ```
+    
+    <Note>
+      The `blobFromImage` function performs:
+      - Mean subtraction
+      - Scaling
+      - Optional channel swapping (BGR to RGB)
+      - Resizing to target dimensions
+    </Note>
+  </Step>
+
+  <Step title="Run Inference">
+    ```python
+    # Set the input blob
+    net.setInput(blob)
+    
+    # Forward pass to get predictions
+    out = net.forward()
+    
+    # Get the class with highest score
+    out = out.flatten()
+    classId = np.argmax(out)
+    confidence = out[classId]
+    
+    # Print the result
+    label = f'{classes[classId]}: {confidence:.4f}'
+    print(label)
+    ```
+  </Step>
+
+  <Step title="Visualize Results">
+    ```python
+    # Get inference time
+    t, _ = net.getPerfProfile()
+    inference_time = t * 1000.0 / cv.getTickFrequency()
+    
+    # Put text on image
+    label = f'Inference time: {inference_time:.2f} ms'
+    cv.putText(frame, label, (0, 15), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0))
+    
+    label = f'{classes[classId]}: {confidence:.4f}'
+    cv.putText(frame, label, (0, 40), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0))
+    
+    # Display the result
+    cv.imshow('Classification', frame)
+    cv.waitKey(0)
+    ```
+  </Step>
+</Steps>
+
+## C++ Implementation
+
+<Tabs>
+  <Tab title="Basic Usage">
+    ```cpp
+    #include <opencv2/dnn.hpp>
+    #include <opencv2/imgproc.hpp>
+    #include <opencv2/highgui.hpp>
+    #include <fstream>
+    #include <iostream>
+    
+    using namespace cv;
+    using namespace dnn;
+    
+    int main() {
+        // Load the network
+        String model = "bvlc_googlenet.caffemodel";
+        String config = "bvlc_googlenet.prototxt";
+        Net net = readNet(model, config);
+        net.setPreferableBackend(DNN_BACKEND_OPENCV);
+        net.setPreferableTarget(DNN_TARGET_CPU);
+        
+        // Read input image
+        Mat frame = imread("image.jpg");
+        
+        // Create a 4D blob from the frame
+        Mat blob;
+        Scalar mean(104, 117, 123);
+        blobFromImage(frame, blob, 1.0, Size(224, 224), mean, false, false);
+        
+        // Set input blob
+        net.setInput(blob);
+        
+        // Make forward pass
+        Mat prob = net.forward();
+        
+        // Get the class with highest score
+        Point classIdPoint;
+        double confidence;
+        minMaxLoc(prob.reshape(1, 1), 0, &confidence, 0, &classIdPoint);
+        int classId = classIdPoint.x;
+        
+        std::cout << "Class ID: " << classId << ", Confidence: " << confidence << std::endl;
+        
+        return 0;
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Video Processing">
+    ```cpp
+    // Open video capture
+    VideoCapture cap;
+    cap.open("video.mp4"); // or use 0 for camera
+    
+    Mat frame, blob;
+    while (waitKey(1) < 0) {
+        cap >> frame;
+        if (frame.empty()) {
+            break;
+        }
+        
+        // Create blob from frame
+        blobFromImage(frame, blob, 1.0, Size(224, 224), mean, swapRB, false);
+        
+        // Run inference
+        net.setInput(blob);
+        Mat prob = net.forward();
+        
+        // Get classification result
+        Point classIdPoint;
+        double confidence;
+        minMaxLoc(prob.reshape(1, 1), 0, &confidence, 0, &classIdPoint);
+        int classId = classIdPoint.x;
+        
+        // Display results
+        std::string label = format("%s: %.4f", classes[classId].c_str(), confidence);
+        putText(frame, label, Point(0, 40), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 255, 0));
+        
+        imshow("Classification", frame);
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Model Download and Configuration
+
+### GoogLeNet (Caffe)
+
+```yaml
+googlenet:
+  model: "bvlc_googlenet.caffemodel"
+  config: "bvlc_googlenet.prototxt"
+  mean: [104, 117, 123]
+  scale: 1.0
+  width: 224
+  height: 224
+  rgb: false
+  classes: "classification_classes_ILSVRC2012.txt"
+```
+
+**Download:** http://dl.caffe.berkeleyvision.org/bvlc_googlenet.caffemodel
+
+### SqueezeNet (Caffe)
+
+```yaml
+squeezenet:
+  model: "squeezenet_v1.1.caffemodel"
+  config: "squeezenet_v1.1.prototxt"
+  mean: [0, 0, 0]
+  scale: 1.0
+  width: 227
+  height: 227
+  rgb: false
+  classes: "classification_classes_ILSVRC2012.txt"
+```
+
+**Download:** https://github.com/DeepScale/SqueezeNet (SqueezeNet v1.1)
+
+## Preprocessing Parameters
+
+<Note>
+  Different models require different preprocessing parameters:
+</Note>
+
+| Model | Input Size | Mean | Scale | RGB Order |
+|-------|-----------|------|-------|----------|
+| GoogLeNet | 224x224 | [104, 117, 123] | 1.0 | BGR |
+| SqueezeNet | 227x227 | [0, 0, 0] | 1.0 | BGR |
+| ResNet | 224x224 | [103.94, 116.78, 123.68] | 1.0 | BGR |
+| MobileNet | 224x224 | [127.5, 127.5, 127.5] | 0.007843 | RGB |
+
+## Backend and Target Options
+
+### Available Backends
+
+```python
+# Computation backends
+cv.dnn.DNN_BACKEND_DEFAULT      # Automatic selection
+cv.dnn.DNN_BACKEND_OPENCV       # OpenCV implementation
+cv.dnn.DNN_BACKEND_INFERENCE_ENGINE  # Intel OpenVINO
+cv.dnn.DNN_BACKEND_CUDA         # NVIDIA CUDA
+cv.dnn.DNN_BACKEND_VKCOM        # Vulkan
+```
+
+### Available Targets
+
+```python
+# Target devices
+cv.dnn.DNN_TARGET_CPU           # CPU
+cv.dnn.DNN_TARGET_OPENCL        # OpenCL (GPU)
+cv.dnn.DNN_TARGET_OPENCL_FP16   # OpenCL with FP16
+cv.dnn.DNN_TARGET_CUDA          # CUDA (GPU)
+cv.dnn.DNN_TARGET_CUDA_FP16     # CUDA with FP16
+```
+
+<Warning>
+  When using CUDA backend, ensure you have compiled OpenCV with CUDA support and the appropriate CUDA toolkit installed.
+</Warning>
+
+## Complete Example
+
+Here's a complete classification example that processes video frames:
+
+```python
+import cv2 as cv
+import numpy as np
+import argparse
+
+def main():
+    # Parse arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model', required=True, help='Path to model file')
+    parser.add_argument('--config', help='Path to config file')
+    parser.add_argument('--classes', help='Path to classes file')
+    parser.add_argument('--input', help='Path to input image or video')
+    parser.add_argument('--backend', type=int, default=cv.dnn.DNN_BACKEND_OPENCV)
+    parser.add_argument('--target', type=int, default=cv.dnn.DNN_TARGET_CPU)
+    args = parser.parse_args()
+    
+    # Load class names
+    classes = None
+    if args.classes:
+        with open(args.classes, 'rt') as f:
+            classes = f.read().rstrip('\n').split('\n')
+    
+    # Load network
+    net = cv.dnn.readNet(args.model, args.config)
+    net.setPreferableBackend(args.backend)
+    net.setPreferableTarget(args.target)
+    
+    # Open video capture
+    cap = cv.VideoCapture(args.input if args.input else 0)
+    
+    while cv.waitKey(1) < 0:
+        hasFrame, frame = cap.read()
+        if not hasFrame:
+            break
+        
+        # Create blob
+        blob = cv.dnn.blobFromImage(frame, 1.0, (224, 224), [104, 117, 123], False)
+        
+        # Run model
+        net.setInput(blob)
+        out = net.forward()
+        
+        # Get result
+        out = out.flatten()
+        classId = np.argmax(out)
+        confidence = out[classId]
+        
+        # Display
+        t, _ = net.getPerfProfile()
+        label = f'Inference time: {t * 1000.0 / cv.getTickFrequency():.2f} ms'
+        cv.putText(frame, label, (0, 15), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0))
+        
+        if classes:
+            label = f'{classes[classId]}: {confidence:.4f}'
+            cv.putText(frame, label, (0, 40), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0))
+        
+        cv.imshow('Classification', frame)
+
+if __name__ == '__main__':
+    main()
+```
+
+## Source Code
+
+The complete source code for classification examples can be found in the OpenCV repository:
+
+- Python: `samples/dnn/classification.py`
+- C++: `samples/dnn/classification.cpp`

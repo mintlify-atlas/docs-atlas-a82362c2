@@ -1,0 +1,466 @@
+---
+title: Image Transformations
+description: Learn how to resize, rotate, flip, crop, and apply geometric transformations to images
+---
+
+This guide covers essential geometric transformations including resizing, rotation, flipping, cropping, and more advanced affine and perspective transformations.
+
+## Overview
+
+Image transformations allow you to modify the geometry of images. Common operations include:
+- Resizing images to different dimensions
+- Rotating images by any angle
+- Flipping images horizontally or vertically
+- Cropping regions of interest
+- Applying affine and perspective transformations
+
+## Resizing Images
+
+Resize images to specific dimensions or by a scaling factor.
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    # Load image
+    img = cv.imread("image.jpg")
+    height, width = img.shape[:2]
+
+    # Resize to specific dimensions
+    resized = cv.resize(img, (800, 600))
+
+    # Resize by scaling factor
+    scaled = cv.resize(img, None, fx=0.5, fy=0.5, interpolation=cv.INTER_LINEAR)
+
+    # Resize maintaining aspect ratio
+    new_width = 640
+    aspect_ratio = new_width / width
+    new_height = int(height * aspect_ratio)
+    resized_aspect = cv.resize(img, (new_width, new_height))
+
+    cv.imshow("Original", img)
+    cv.imshow("Resized", resized)
+    cv.imshow("Scaled", scaled)
+    cv.waitKey(0)
+    cv.destroyAllWindows()
+    ```
+  </Tab>
+  
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    Mat img = imread("image.jpg");
+    int height = img.rows;
+    int width = img.cols;
+
+    // Resize to specific dimensions
+    Mat resized;
+    resize(img, resized, Size(800, 600));
+
+    // Resize by scaling factor
+    Mat scaled;
+    resize(img, scaled, Size(), 0.5, 0.5, INTER_LINEAR);
+
+    // Resize maintaining aspect ratio
+    int new_width = 640;
+    double aspect_ratio = (double)new_width / width;
+    int new_height = (int)(height * aspect_ratio);
+    Mat resized_aspect;
+    resize(img, resized_aspect, Size(new_width, new_height));
+
+    imshow("Original", img);
+    imshow("Resized", resized);
+    imshow("Scaled", scaled);
+    waitKey(0);
+    ```
+  </Tab>
+</Tabs>
+
+### Interpolation Methods
+
+| Method | Description | Use Case |
+|--------|-------------|----------|
+| `INTER_NEAREST` | Nearest neighbor | Fastest, lowest quality |
+| `INTER_LINEAR` | Bilinear interpolation | Good balance (default) |
+| `INTER_CUBIC` | Bicubic interpolation | Slower, higher quality |
+| `INTER_AREA` | Resampling using pixel area | Best for downsampling |
+| `INTER_LANCZOS4` | Lanczos interpolation | Highest quality, slowest |
+
+## Rotating Images
+
+Rotate images by 90-degree increments or arbitrary angles.
+
+### Simple 90-Degree Rotations
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    img = cv.imread("image.jpg")
+
+    # Rotate 90 degrees clockwise
+    rotated_90_cw = cv.rotate(img, cv.ROTATE_90_CLOCKWISE)
+
+    # Rotate 90 degrees counter-clockwise
+    rotated_90_ccw = cv.rotate(img, cv.ROTATE_90_COUNTERCLOCKWISE)
+
+    # Rotate 180 degrees
+    rotated_180 = cv.rotate(img, cv.ROTATE_180)
+
+    cv.imshow("Original", img)
+    cv.imshow("90° CW", rotated_90_cw)
+    cv.imshow("180°", rotated_180)
+    cv.waitKey(0)
+    ```
+  </Tab>
+  
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    Mat img = imread("image.jpg");
+    Mat rotated_90_cw, rotated_90_ccw, rotated_180;
+
+    // Rotate 90 degrees clockwise
+    rotate(img, rotated_90_cw, ROTATE_90_CLOCKWISE);
+
+    // Rotate 90 degrees counter-clockwise
+    rotate(img, rotated_90_ccw, ROTATE_90_COUNTERCLOCKWISE);
+
+    // Rotate 180 degrees
+    rotate(img, rotated_180, ROTATE_180);
+
+    imshow("Original", img);
+    imshow("90° CW", rotated_90_cw);
+    imshow("180°", rotated_180);
+    waitKey(0);
+    ```
+  </Tab>
+</Tabs>
+
+### Arbitrary Angle Rotation
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    img = cv.imread("image.jpg")
+    height, width = img.shape[:2]
+
+    # Define rotation center (image center)
+    center = (width // 2, height // 2)
+
+    # Rotation angle in degrees (positive = counter-clockwise)
+    angle = 45
+
+    # Scale factor (1.0 = no scaling)
+    scale = 1.0
+
+    # Get rotation matrix
+    rotation_matrix = cv.getRotationMatrix2D(center, angle, scale)
+
+    # Apply rotation
+    rotated = cv.warpAffine(img, rotation_matrix, (width, height))
+
+    cv.imshow("Original", img)
+    cv.imshow("Rotated 45°", rotated)
+    cv.waitKey(0)
+    ```
+  </Tab>
+  
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    Mat img = imread("image.jpg");
+    int height = img.rows;
+    int width = img.cols;
+
+    // Define rotation center (image center)
+    Point2f center(width / 2.0, height / 2.0);
+
+    // Rotation angle in degrees (positive = counter-clockwise)
+    double angle = 45.0;
+
+    // Scale factor (1.0 = no scaling)
+    double scale = 1.0;
+
+    // Get rotation matrix
+    Mat rotation_matrix = getRotationMatrix2D(center, angle, scale);
+
+    // Apply rotation
+    Mat rotated;
+    warpAffine(img, rotated, rotation_matrix, Size(width, height));
+
+    imshow("Original", img);
+    imshow("Rotated 45°", rotated);
+    waitKey(0);
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  When rotating by arbitrary angles, parts of the image may be cropped. To preserve the entire rotated image, calculate new dimensions and adjust the rotation matrix accordingly.
+</Note>
+
+## Flipping Images
+
+Flip images horizontally, vertically, or both.
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    img = cv.imread("image.jpg")
+
+    # Flip horizontally (mirror)
+    flipped_h = cv.flip(img, 1)
+
+    # Flip vertically
+    flipped_v = cv.flip(img, 0)
+
+    # Flip both horizontally and vertically
+    flipped_both = cv.flip(img, -1)
+
+    cv.imshow("Original", img)
+    cv.imshow("Horizontal Flip", flipped_h)
+    cv.imshow("Vertical Flip", flipped_v)
+    cv.imshow("Both", flipped_both)
+    cv.waitKey(0)
+    ```
+  </Tab>
+  
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    Mat img = imread("image.jpg");
+    Mat flipped_h, flipped_v, flipped_both;
+
+    // Flip horizontally (mirror)
+    flip(img, flipped_h, 1);
+
+    // Flip vertically
+    flip(img, flipped_v, 0);
+
+    // Flip both horizontally and vertically
+    flip(img, flipped_both, -1);
+
+    imshow("Original", img);
+    imshow("Horizontal Flip", flipped_h);
+    imshow("Vertical Flip", flipped_v);
+    imshow("Both", flipped_both);
+    waitKey(0);
+    ```
+  </Tab>
+</Tabs>
+
+## Cropping Images
+
+Crop a region of interest from an image using array slicing.
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    img = cv.imread("image.jpg")
+
+    # Define crop region (y1:y2, x1:x2)
+    y1, y2 = 100, 400
+    x1, x2 = 200, 600
+
+    # Crop the image
+    cropped = img[y1:y2, x1:x2]
+
+    cv.imshow("Original", img)
+    cv.imshow("Cropped", cropped)
+    cv.waitKey(0)
+    ```
+  </Tab>
+  
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    Mat img = imread("image.jpg");
+
+    // Define crop region using Rect(x, y, width, height)
+    Rect roi(200, 100, 400, 300);
+
+    // Crop the image
+    Mat cropped = img(roi);
+
+    imshow("Original", img);
+    imshow("Cropped", cropped);
+    waitKey(0);
+    ```
+  </Tab>
+</Tabs>
+
+## Affine Transformations
+
+Affine transformations preserve parallel lines and include translation, rotation, scaling, and shearing.
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    img = cv.imread("image.jpg")
+    rows, cols = img.shape[:2]
+
+    # Define source points (3 points from original image)
+    src_points = np.float32([[50, 50], [200, 50], [50, 200]])
+
+    # Define destination points (where those points should move to)
+    dst_points = np.float32([[10, 100], [200, 50], [100, 250]])
+
+    # Get affine transformation matrix
+    affine_matrix = cv.getAffineTransform(src_points, dst_points)
+
+    # Apply affine transformation
+    transformed = cv.warpAffine(img, affine_matrix, (cols, rows))
+
+    cv.imshow("Original", img)
+    cv.imshow("Affine Transform", transformed)
+    cv.waitKey(0)
+    ```
+  </Tab>
+  
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+    using namespace std;
+
+    Mat img = imread("image.jpg");
+    int rows = img.rows;
+    int cols = img.cols;
+
+    // Define source points (3 points from original image)
+    Point2f src_points[3];
+    src_points[0] = Point2f(50, 50);
+    src_points[1] = Point2f(200, 50);
+    src_points[2] = Point2f(50, 200);
+
+    // Define destination points
+    Point2f dst_points[3];
+    dst_points[0] = Point2f(10, 100);
+    dst_points[1] = Point2f(200, 50);
+    dst_points[2] = Point2f(100, 250);
+
+    // Get affine transformation matrix
+    Mat affine_matrix = getAffineTransform(src_points, dst_points);
+
+    // Apply affine transformation
+    Mat transformed;
+    warpAffine(img, transformed, affine_matrix, Size(cols, rows));
+
+    imshow("Original", img);
+    imshow("Affine Transform", transformed);
+    waitKey(0);
+    ```
+  </Tab>
+</Tabs>
+
+## Perspective Transformations
+
+Perspective transformations correct for camera angle and viewpoint changes.
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    img = cv.imread("image.jpg")
+    rows, cols = img.shape[:2]
+
+    # Define source points (4 corners from original image)
+    src_points = np.float32([[56, 65], [368, 52], [28, 387], [389, 390]])
+
+    # Define destination points (rectangle)
+    dst_points = np.float32([[0, 0], [300, 0], [0, 300], [300, 300]])
+
+    # Get perspective transformation matrix
+    perspective_matrix = cv.getPerspectiveTransform(src_points, dst_points)
+
+    # Apply perspective transformation
+    warped = cv.warpPerspective(img, perspective_matrix, (300, 300))
+
+    cv.imshow("Original", img)
+    cv.imshow("Perspective Transform", warped)
+    cv.waitKey(0)
+    ```
+  </Tab>
+  
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+    using namespace std;
+
+    Mat img = imread("image.jpg");
+
+    // Define source points (4 corners from original image)
+    vector<Point2f> src_points;
+    src_points.push_back(Point2f(56, 65));
+    src_points.push_back(Point2f(368, 52));
+    src_points.push_back(Point2f(28, 387));
+    src_points.push_back(Point2f(389, 390));
+
+    // Define destination points (rectangle)
+    vector<Point2f> dst_points;
+    dst_points.push_back(Point2f(0, 0));
+    dst_points.push_back(Point2f(300, 0));
+    dst_points.push_back(Point2f(0, 300));
+    dst_points.push_back(Point2f(300, 300));
+
+    // Get perspective transformation matrix
+    Mat perspective_matrix = getPerspectiveTransform(src_points, dst_points);
+
+    // Apply perspective transformation
+    Mat warped;
+    warpPerspective(img, warped, perspective_matrix, Size(300, 300));
+
+    imshow("Original", img);
+    imshow("Perspective Transform", warped);
+    waitKey(0);
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+  Perspective transformations are commonly used for document scanning, where you select the four corners of a document in a photo and transform it to a flat, rectangular view.
+</Tip>
+
+## Key Functions
+
+| Function | Description |
+|----------|-------------|
+| `resize()` | Resize image to specific dimensions or scale |
+| `rotate()` | Rotate image by 90, 180, or 270 degrees |
+| `flip()` | Flip image horizontally, vertically, or both |
+| `getRotationMatrix2D()` | Get rotation matrix for arbitrary angles |
+| `getAffineTransform()` | Get affine transformation matrix from 3 point pairs |
+| `getPerspectiveTransform()` | Get perspective transformation matrix from 4 point pairs |
+| `warpAffine()` | Apply affine transformation |
+| `warpPerspective()` | Apply perspective transformation |
+
+<Note>
+  When applying transformations, pixels that fall outside the destination image are cropped. Use appropriate border modes or adjust output dimensions to preserve all data.
+</Note>

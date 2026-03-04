@@ -1,0 +1,365 @@
+---
+title: Camera Calibration
+description: Functions for calibrating monocular cameras, detecting calibration patterns, and estimating camera intrinsic parameters
+---
+
+## Overview
+
+Camera calibration estimates intrinsic parameters (focal length, principal point, distortion coefficients) from multiple views of a calibration pattern. OpenCV supports chessboard and circular grid patterns.
+
+## Core Functions
+
+### calibrateCamera
+
+Finds the camera intrinsic and extrinsic parameters from several views of a calibration pattern.
+
+```cpp
+double cv::calibrateCamera(
+    InputArrayOfArrays objectPoints,
+    InputArrayOfArrays imagePoints,
+    Size imageSize,
+    InputOutputArray cameraMatrix,
+    InputOutputArray distCoeffs,
+    OutputArrayOfArrays rvecs,
+    OutputArrayOfArrays tvecs,
+    int flags = 0,
+    TermCriteria criteria = TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, 30, DBL_EPSILON)
+)
+```
+
+<ParamField path="objectPoints" type="InputArrayOfArrays" required>
+  Vector of vectors of calibration pattern points in the calibration pattern coordinate space (e.g. `std::vector<std::vector<cv::Vec3f>>`). The outer vector contains as many elements as pattern views. For planar patterns, Z-coordinate is 0.
+</ParamField>
+
+<ParamField path="imagePoints" type="InputArrayOfArrays" required>
+  Vector of vectors of the projections of calibration pattern points (e.g. `std::vector<std::vector<cv::Vec2f>>`). Must match the size of objectPoints.
+</ParamField>
+
+<ParamField path="imageSize" type="Size" required>
+  Size of the image used only to initialize the camera intrinsic matrix.
+</ParamField>
+
+<ParamField path="cameraMatrix" type="InputOutputArray" required>
+  Input/output 3x3 floating-point camera intrinsic matrix. If `CALIB_USE_INTRINSIC_GUESS` is specified, some or all of fx, fy, cx, cy must be initialized before calling.
+</ParamField>
+
+<ParamField path="distCoeffs" type="InputOutputArray" required>
+  Input/output vector of distortion coefficients `(k1, k2, p1, p2[, k3[, k4, k5, k6[, s1, s2, s3, s4[, τx, τy]]]])`.
+</ParamField>
+
+<ParamField path="rvecs" type="OutputArrayOfArrays">
+  Output vector of rotation vectors (Rodrigues) estimated for each pattern view. Each rotation vector brings the calibration pattern from object coordinate space to camera coordinate space.
+</ParamField>
+
+<ParamField path="tvecs" type="OutputArrayOfArrays">
+  Output vector of translation vectors estimated for each pattern view.
+</ParamField>
+
+<ParamField path="flags" type="int" default="0">
+  Different flags for calibration behavior (see Calibration Flags below).
+</ParamField>
+
+<ParamField path="criteria" type="TermCriteria" default="TermCriteria(COUNT+EPS, 30, DBL_EPSILON)">
+  Termination criteria for the iterative optimization algorithm.
+</ParamField>
+
+**Returns:** The overall RMS re-projection error.
+
+<Note>
+The algorithm is based on Zhang2000. It performs:
+1. Compute initial intrinsic parameters (for planar patterns) or read from input
+2. Estimate initial camera pose using solvePnP
+3. Run global Levenberg-Marquardt optimization to minimize reprojection error
+</Note>
+
+### Extended Version
+
+```cpp
+double cv::calibrateCamera(
+    InputArrayOfArrays objectPoints,
+    InputArrayOfArrays imagePoints,
+    Size imageSize,
+    InputOutputArray cameraMatrix,
+    InputOutputArray distCoeffs,
+    OutputArrayOfArrays rvecs,
+    OutputArrayOfArrays tvecs,
+    OutputArray stdDeviationsIntrinsics,
+    OutputArray stdDeviationsExtrinsics,
+    OutputArray perViewErrors,
+    int flags = 0,
+    TermCriteria criteria = TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, 30, DBL_EPSILON)
+)
+```
+
+Extended version provides additional outputs:
+
+<ParamField path="stdDeviationsIntrinsics" type="OutputArray">
+  Output vector of standard deviations estimated for intrinsic parameters. Order: `(fx, fy, cx, cy, k1, k2, p1, p2, k3, k4, k5, k6, s1, s2, s3, s4, τx, τy)`
+</ParamField>
+
+<ParamField path="stdDeviationsExtrinsics" type="OutputArray">
+  Output vector of standard deviations estimated for extrinsic parameters. Order: `(R0, T0, ..., R_{M-1}, T_{M-1})` where M is the number of pattern views.
+</ParamField>
+
+<ParamField path="perViewErrors" type="OutputArray">
+  Output vector of the RMS re-projection error estimated for each pattern view.
+</ParamField>
+
+## Calibration Flags
+
+Flags control which parameters are estimated or fixed during calibration:
+
+| Flag | Value | Description |
+|------|-------|-------------|
+| `CALIB_USE_INTRINSIC_GUESS` | 0x00001 | cameraMatrix contains valid initial values that are optimized further |
+| `CALIB_FIX_PRINCIPAL_POINT` | 0x00004 | Principal point is not changed during optimization |
+| `CALIB_FIX_ASPECT_RATIO` | 0x00002 | Only fy is estimated, ratio fx/fy stays same as input |
+| `CALIB_ZERO_TANGENT_DIST` | 0x00008 | Tangential distortion coefficients (p1, p2) are set to zero |
+| `CALIB_FIX_FOCAL_LENGTH` | 0x00010 | Focal length is not changed (requires `CALIB_USE_INTRINSIC_GUESS`) |
+| `CALIB_FIX_K1` | 0x00020 | k1 distortion coefficient is not changed |
+| `CALIB_FIX_K2` | 0x00040 | k2 distortion coefficient is not changed |
+| `CALIB_FIX_K3` | 0x00080 | k3 distortion coefficient is not changed |
+| `CALIB_FIX_K4` | 0x00800 | k4 distortion coefficient is not changed |
+| `CALIB_FIX_K5` | 0x01000 | k5 distortion coefficient is not changed |
+| `CALIB_FIX_K6` | 0x02000 | k6 distortion coefficient is not changed |
+| `CALIB_RATIONAL_MODEL` | 0x04000 | Enable k4, k5, k6 coefficients (8+ coefficients) |
+| `CALIB_THIN_PRISM_MODEL` | 0x08000 | Enable s1, s2, s3, s4 coefficients (12+ coefficients) |
+| `CALIB_FIX_S1_S2_S3_S4` | 0x10000 | Thin prism distortion coefficients are not changed |
+| `CALIB_TILTED_MODEL` | 0x40000 | Enable tauX and tauY coefficients (14 coefficients) |
+| `CALIB_FIX_TAUX_TAUY` | 0x80000 | Tilted sensor model coefficients are not changed |
+| `CALIB_USE_QR` | 0x100000 | Use QR instead of SVD decomposition (faster but less precise) |
+| `CALIB_FIX_TANGENT_DIST` | 0x200000 | Fix tangential distortion coefficients |
+| `CALIB_USE_LU` | 1 &lt;&lt; 17 | Use LU instead of SVD decomposition (much faster but less precise) |
+
+## Pattern Detection
+
+### findChessboardCorners
+
+Finds the positions of internal corners of the chessboard.
+
+```cpp
+bool cv::findChessboardCorners(
+    InputArray image,
+    Size patternSize,
+    OutputArray corners,
+    int flags = CALIB_CB_ADAPTIVE_THRESH + CALIB_CB_NORMALIZE_IMAGE
+)
+```
+
+<ParamField path="image" type="InputArray" required>
+  Source chessboard view. Must be an 8-bit grayscale or color image.
+</ParamField>
+
+<ParamField path="patternSize" type="Size" required>
+  Number of inner corners per chessboard row and column: `Size(points_per_row, points_per_column)` = `Size(columns, rows)`. For an 8x8 chessboard, use `Size(7, 7)`.
+</ParamField>
+
+<ParamField path="corners" type="OutputArray" required>
+  Output array of detected corners.
+</ParamField>
+
+<ParamField path="flags" type="int" default="CALIB_CB_ADAPTIVE_THRESH + CALIB_CB_NORMALIZE_IMAGE">
+  Operation flags:
+  - `CALIB_CB_ADAPTIVE_THRESH` (1): Use adaptive thresholding
+  - `CALIB_CB_NORMALIZE_IMAGE` (2): Normalize image gamma with equalizeHist
+  - `CALIB_CB_FILTER_QUADS` (4): Use additional criteria to filter false quads
+  - `CALIB_CB_FAST_CHECK` (8): Run fast check for chessboard corners
+  - `CALIB_CB_PLAIN` (256): Take image as-is without processing
+</ParamField>
+
+**Returns:** Non-zero if all corners are found and placed in order (row by row, left to right), otherwise 0.
+
+<Warning>
+The function requires white space (like a square-thick border) around the board to make detection more robust. Without borders, the outer black squares cannot be segmented properly.
+</Warning>
+
+**Example:**
+```cpp
+Size patternsize(8, 6); // interior number of corners
+Mat gray = ...; // source image
+vector<Point2f> corners;
+
+bool patternfound = findChessboardCorners(gray, patternsize, corners,
+    CALIB_CB_ADAPTIVE_THRESH + CALIB_CB_NORMALIZE_IMAGE + CALIB_CB_FAST_CHECK);
+
+if(patternfound)
+  cornerSubPix(gray, corners, Size(11, 11), Size(-1, -1),
+    TermCriteria(CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 30, 0.1));
+
+drawChessboardCorners(img, patternsize, Mat(corners), patternfound);
+```
+
+### findChessboardCornersSB
+
+Finds chessboard corners using a sector-based approach (more accurate and robust).
+
+```cpp
+bool cv::findChessboardCornersSB(
+    InputArray image,
+    Size patternSize,
+    OutputArray corners,
+    int flags = 0
+)
+```
+
+<ParamField path="flags" type="int" default="0">
+  Operation flags:
+  - `CALIB_CB_NORMALIZE_IMAGE` (2): Normalize image gamma
+  - `CALIB_CB_EXHAUSTIVE` (16): Run exhaustive search to improve detection rate
+  - `CALIB_CB_ACCURACY` (32): Upsample input image for better sub-pixel accuracy
+  - `CALIB_CB_LARGER` (64): Allow detected pattern to be larger than patternSize
+  - `CALIB_CB_MARKER` (128): Pattern must have a marker (for consistent coordinate system)
+</ParamField>
+
+This method uses a localized Radon transformation and is:
+- More robust to noise
+- Faster on larger images
+- Returns more accurate sub-pixel positions than cornerSubPix
+
+<Note>
+Based on the paper "Accurate Detection and Localization of Checkerboard Corners for Calibration" (Duda 2018).
+</Note>
+
+### drawChessboardCorners
+
+Renders the detected chessboard corners.
+
+```cpp
+void cv::drawChessboardCorners(
+    InputOutputArray image,
+    Size patternSize,
+    InputArray corners,
+    bool patternWasFound
+)
+```
+
+<ParamField path="image" type="InputOutputArray" required>
+  Destination image. Must be an 8-bit color image.
+</ParamField>
+
+<ParamField path="patternSize" type="Size" required>
+  Number of inner corners per chessboard row and column.
+</ParamField>
+
+<ParamField path="corners" type="InputArray" required>
+  Array of detected corners from findChessboardCorners.
+</ParamField>
+
+<ParamField path="patternWasFound" type="bool" required>
+  Parameter indicating whether the complete board was found. Pass the return value of findChessboardCorners.
+</ParamField>
+
+Draws individual corners as red circles (if board not found) or as colored corners connected with lines (if board found).
+
+## Helper Functions
+
+### initCameraMatrix2D
+
+Finds an initial camera intrinsic matrix from 3D-2D point correspondences.
+
+```cpp
+Mat cv::initCameraMatrix2D(
+    InputArrayOfArrays objectPoints,
+    InputArrayOfArrays imagePoints,
+    Size imageSize,
+    double aspectRatio = 1.0
+)
+```
+
+<ParamField path="aspectRatio" type="double" default="1.0">
+  If zero or negative, both fx and fy are estimated independently. Otherwise, fx = fy * aspectRatio.
+</ParamField>
+
+**Returns:** Initial camera intrinsic matrix for calibration process.
+
+<Note>
+Currently only supports planar calibration patterns (Z-coordinate = 0).
+</Note>
+
+### calibrationMatrixValues
+
+Computes useful camera characteristics from the camera intrinsic matrix.
+
+```cpp
+void cv::calibrationMatrixValues(
+    InputArray cameraMatrix,
+    Size imageSize,
+    double apertureWidth,
+    double apertureHeight,
+    CV_OUT double& fovx,
+    CV_OUT double& fovy,
+    CV_OUT double& focalLength,
+    CV_OUT Point2d& principalPoint,
+    CV_OUT double& aspectRatio
+)
+```
+
+<ParamField path="apertureWidth" type="double" required>
+  Physical width of the sensor in mm.
+</ParamField>
+
+<ParamField path="apertureHeight" type="double" required>
+  Physical height of the sensor in mm.
+</ParamField>
+
+<ParamField path="fovx" type="double&">
+  Output field of view in degrees along horizontal sensor axis.
+</ParamField>
+
+<ParamField path="fovy" type="double&">
+  Output field of view in degrees along vertical sensor axis.
+</ParamField>
+
+<ParamField path="focalLength" type="double&">
+  Focal length of the lens in mm.
+</ParamField>
+
+<ParamField path="principalPoint" type="Point2d&">
+  Principal point in mm.
+</ParamField>
+
+<ParamField path="aspectRatio" type="double&">
+  fy/fx ratio.
+</ParamField>
+
+## Advanced Calibration
+
+### calibrateCameraRO
+
+Calibrates camera using the releasing object method for improved precision.
+
+```cpp
+double cv::calibrateCameraRO(
+    InputArrayOfArrays objectPoints,
+    InputArrayOfArrays imagePoints,
+    Size imageSize,
+    int iFixedPoint,
+    InputOutputArray cameraMatrix,
+    InputOutputArray distCoeffs,
+    OutputArrayOfArrays rvecs,
+    OutputArrayOfArrays tvecs,
+    OutputArray newObjPoints,
+    int flags = 0,
+    TermCriteria criteria = TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, 30, DBL_EPSILON)
+)
+```
+
+<ParamField path="iFixedPoint" type="int" required>
+  Index of the 3D object point in objectPoints[0] to be fixed. Range [1, objectPoints[0].size()-2] enables object-releasing method. Values outside this range use standard calibration.
+</ParamField>
+
+<ParamField path="newObjPoints" type="OutputArray">
+  Updated output vector of calibration pattern points with potentially scaled coordinates.
+</ParamField>
+
+This method can dramatically improve precision for inaccurate, unmeasured, roughly planar targets. Requires identical calibration board fully visible in all views.
+
+<Warning>
+Calibration time may be much longer with this method. Use CALIB_USE_QR or CALIB_USE_LU for faster calibration.
+</Warning>
+
+## See Also
+
+- [Pose Estimation](/api/calib3d/pose-estimation) - solvePnP, solvePnPRansac for estimating camera pose
+- [Stereo Calibration](/api/calib3d/stereo) - stereoCalibrate for calibrating stereo camera systems
+- OpenCV samples: `calibration.cpp`, `3calibration.cpp`

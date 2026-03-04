@@ -1,0 +1,667 @@
+---
+title: Video Analysis Module
+description: Video analysis algorithms including optical flow, object tracking, and background subtraction
+---
+
+The Video Analysis module provides algorithms for motion analysis, object tracking, and background/foreground segmentation in video streams.
+
+## Overview
+
+From opencv2/video.hpp:47-52:
+
+> This module contains algorithms for motion analysis, object tracking, and background subtraction. It enables applications such as motion detection, object following, and foreground extraction from video sequences.
+
+<CardGroup cols={2}>
+  <Card title="Optical Flow" icon="wind">
+    Dense and sparse motion estimation between frames
+  </Card>
+  <Card title="Object Tracking" icon="crosshairs">
+    Track objects using MeanShift and CamShift
+  </Card>
+  <Card title="Background Subtraction" icon="layer-group">
+    Separate foreground from background
+  </Card>
+  <Card title="Motion Analysis" icon="chart-line">
+    Analyze motion patterns in video
+  </Card>
+</CardGroup>
+
+## Module Components
+
+From opencv2/video.hpp, the module includes:
+- `opencv2/video/tracking.hpp` - Optical flow and tracking
+- `opencv2/video/background_segm.hpp` - Background subtraction
+
+## Optical Flow
+
+Optical flow estimates the motion of pixels between consecutive frames.
+
+### Lucas-Kanade Sparse Optical Flow
+
+From tracking.hpp:134-186, tracks sparse feature points:
+
+```cpp
+#include <opencv2/video/tracking.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
+
+using namespace cv;
+using namespace std;
+
+// Detect good features to track
+vector<Point2f> detectFeatures(const Mat& gray) {
+    vector<Point2f> points;
+    goodFeaturesToTrack(gray, points,
+                       100,    // max corners
+                       0.01,   // quality level
+                       10);    // min distance
+    return points;
+}
+
+int main() {
+    VideoCapture cap("video.mp4");
+    
+    Mat prevGray, gray, frame;
+    cap >> frame;
+    cvtColor(frame, prevGray, COLOR_BGR2GRAY);
+    
+    // Detect initial features
+    vector<Point2f> prevPoints = detectFeatures(prevGray);
+    
+    while (cap.read(frame)) {
+        cvtColor(frame, gray, COLOR_BGR2GRAY);
+        
+        // Calculate optical flow (tracking.hpp:181-186)
+        vector<Point2f> nextPoints;
+        vector<uchar> status;
+        vector<float> err;
+        
+        calcOpticalFlowPyrLK(
+            prevGray, gray,      // Previous and current frames
+            prevPoints,          // Previous points
+            nextPoints,          // Output: new positions
+            status,              // Output: tracking status
+            err,                 // Output: error
+            Size(21, 21),        // Window size
+            3                    // Max pyramid level
+        );
+        
+        // Draw tracks
+        for (size_t i = 0; i < prevPoints.size(); i++) {
+            if (status[i]) {
+                line(frame, prevPoints[i], nextPoints[i],
+                     Scalar(0, 255, 0), 2);
+                circle(frame, nextPoints[i], 3,
+                      Scalar(0, 255, 0), -1);
+            }
+        }
+        
+        imshow("Optical Flow", frame);
+        if (waitKey(30) >= 0) break;
+        
+        // Update for next iteration
+        prevGray = gray.clone();
+        prevPoints = nextPoints;
+    }
+    
+    return 0;
+}
+```
+
+### Dense Optical Flow (Farneback)
+
+From tracking.hpp:188-200, computes flow for every pixel:
+
+```cpp
+#include <opencv2/video/tracking.hpp>
+
+void computeDenseFlow(const Mat& prev, const Mat& next,
+                      Mat& flow) {
+    calcOpticalFlowFarneback(
+        prev, next,         // Input frames
+        flow,              // Output flow (CV_32FC2)
+        0.5,               // pyr_scale
+        3,                 // levels
+        15,                // winsize
+        3,                 // iterations
+        5,                 // poly_n
+        1.2,               // poly_sigma
+        0                  // flags
+    );
+}
+
+// Visualize flow
+Mat visualizeFlow(const Mat& flow) {
+    Mat flowParts[2];
+    split(flow, flowParts);
+    
+    Mat magnitude, angle;
+    cartToPolar(flowParts[0], flowParts[1], magnitude, angle, true);
+    
+    // Create HSV image
+    Mat hsv = Mat::zeros(flow.size(), CV_8UC3);
+    Mat hsvParts[3];
+    
+    // Hue = direction, Value = magnitude
+    angle.convertTo(hsvParts[0], CV_8U, 255.0/360.0);
+    hsvParts[1] = Mat::ones(flow.size(), CV_8U) * 255;
+    normalize(magnitude, hsvParts[2], 0, 255, NORM_MINMAX, CV_8U);
+    
+    merge(hsvParts, 3, hsv);
+    
+    Mat bgr;
+    cvtColor(hsv, bgr, COLOR_HSV2BGR);
+    return bgr;
+}
+
+int main() {
+    VideoCapture cap("video.mp4");
+    
+    Mat prevGray, gray, frame, flow;
+    cap >> frame;
+    cvtColor(frame, prevGray, COLOR_BGR2GRAY);
+    
+    while (cap.read(frame)) {
+        cvtColor(frame, gray, COLOR_BGR2GRAY);
+        
+        // Compute dense optical flow
+        computeDenseFlow(prevGray, gray, flow);
+        
+        // Visualize
+        Mat flowVis = visualizeFlow(flow);
+        imshow("Dense Optical Flow", flowVis);
+        
+        if (waitKey(30) >= 0) break;
+        
+        prevGray = gray;
+    }
+    
+    return 0;
+}
+```
+
+### Optical Flow Flags
+
+From tracking.hpp:59-62:
+
+```cpp
+enum OptFlowFlags {
+    OPTFLOW_USE_INITIAL_FLOW = 4,      // Use initial estimate
+    OPTFLOW_LK_GET_MIN_EIGENVALS = 8,  // Use eigenvalues for error
+    OPTFLOW_FARNEBACK_GAUSSIAN = 256   // Use Gaussian filter
+};
+```
+
+## Object Tracking
+
+### MeanShift Tracking
+
+From tracking.hpp:88-107, finds object center:
+
+```cpp
+#include <opencv2/video/tracking.hpp>
+
+int main() {
+    VideoCapture cap("video.mp4");
+    
+    Mat frame, hsv, backProj;
+    cap >> frame;
+    
+    // Select initial ROI
+    Rect trackWindow = selectROI(frame);
+    
+    // Calculate histogram of ROI
+    Mat roi = frame(trackWindow);
+    cvtColor(roi, hsv, COLOR_BGR2HSV);
+    
+    Mat hist;
+    int hbins = 30;
+    float hranges[] = {0, 180};
+    const float* ranges[] = {hranges};
+    int channels[] = {0};
+    
+    calcHist(&hsv, 1, channels, Mat(), hist,
+            1, &hbins, ranges);
+    normalize(hist, hist, 0, 255, NORM_MINMAX);
+    
+    // Track object
+    while (cap.read(frame)) {
+        cvtColor(frame, hsv, COLOR_BGR2HSV);
+        
+        // Calculate back projection
+        calcBackProject(&hsv, 1, channels, hist, backProj,
+                       ranges);
+        
+        // Apply MeanShift (tracking.hpp:107)
+        TermCriteria criteria(TermCriteria::EPS | TermCriteria::COUNT,
+                             10, 1);
+        meanShift(backProj, trackWindow, criteria);
+        
+        // Draw tracking rectangle
+        rectangle(frame, trackWindow, Scalar(0, 255, 0), 2);
+        
+        imshow("MeanShift Tracking", frame);
+        if (waitKey(30) >= 0) break;
+    }
+    
+    return 0;
+}
+```
+
+### CamShift Tracking
+
+From tracking.hpp:64-86, adaptive tracking with rotation:
+
+```cpp
+// CamShift adjusts window size and finds rotation
+while (cap.read(frame)) {
+    cvtColor(frame, hsv, COLOR_BGR2HSV);
+    calcBackProject(&hsv, 1, channels, hist, backProj, ranges);
+    
+    // CamShift returns rotated rectangle (tracking.hpp:82-83)
+    RotatedRect trackBox = CamShift(backProj, trackWindow, criteria);
+    
+    // Draw rotated box
+    Point2f vertices[4];
+    trackBox.points(vertices);
+    for (int i = 0; i < 4; i++) {
+        line(frame, vertices[i], vertices[(i+1)%4],
+             Scalar(0, 255, 0), 2);
+    }
+    
+    imshow("CamShift Tracking", frame);
+    if (waitKey(30) >= 0) break;
+}
+```
+
+## Background Subtraction
+
+From background_segm.hpp:55-97, separate foreground from background:
+
+### BackgroundSubtractor Base Class
+
+```cpp
+class BackgroundSubtractor : public Algorithm {
+public:
+    // Apply background subtraction
+    virtual void apply(InputArray image,
+                      OutputArray fgmask,
+                      double learningRate = -1) = 0;
+    
+    // Get background image
+    virtual void getBackgroundImage(OutputArray backgroundImage) const = 0;
+};
+```
+
+### MOG2 Background Subtractor
+
+From background_segm.hpp:100-150, Gaussian Mixture Model:
+
+```cpp
+#include <opencv2/video/background_segm.hpp>
+
+using namespace cv;
+
+int main() {
+    VideoCapture cap("video.mp4");
+    
+    // Create MOG2 background subtractor
+    Ptr<BackgroundSubtractorMOG2> pBackSub =
+        createBackgroundSubtractorMOG2();
+    
+    // Configure parameters
+    pBackSub->setHistory(500);           // Frames to use
+    pBackSub->setVarThreshold(16);       // Threshold
+    pBackSub->setDetectShadows(true);    // Detect shadows
+    
+    Mat frame, fgMask;
+    while (cap.read(frame)) {
+        // Apply background subtraction
+        pBackSub->apply(frame, fgMask);
+        
+        // Optional: remove shadows (value 127)
+        threshold(fgMask, fgMask, 200, 255, THRESH_BINARY);
+        
+        // Show results
+        imshow("Frame", frame);
+        imshow("Foreground Mask", fgMask);
+        
+        if (waitKey(30) >= 0) break;
+    }
+    
+    return 0;
+}
+```
+
+### KNN Background Subtractor
+
+```cpp
+// K-Nearest Neighbors background subtractor
+Ptr<BackgroundSubtractorKNN> pBackSub =
+    createBackgroundSubtractorKNN();
+
+pBackSub->setHistory(500);
+pBackSub->setDist2Threshold(400.0);
+pBackSub->setDetectShadows(true);
+
+Mat frame, fgMask;
+while (cap.read(frame)) {
+    pBackSub->apply(frame, fgMask);
+    imshow("KNN Foreground", fgMask);
+    if (waitKey(30) >= 0) break;
+}
+```
+
+### Extracting Foreground Objects
+
+```cpp
+Ptr<BackgroundSubtractorMOG2> pBackSub =
+    createBackgroundSubtractorMOG2();
+
+Mat frame, fgMask, foreground;
+while (cap.read(frame)) {
+    // Get foreground mask
+    pBackSub->apply(frame, fgMask);
+    
+    // Clean up mask
+    Mat kernel = getStructuringElement(MORPH_ELLIPSE, Size(5, 5));
+    morphologyEx(fgMask, fgMask, MORPH_OPEN, kernel);
+    morphologyEx(fgMask, fgMask, MORPH_CLOSE, kernel);
+    
+    // Extract foreground
+    frame.copyTo(foreground, fgMask);
+    
+    // Find contours
+    vector<vector<Point>> contours;
+    findContours(fgMask, contours, RETR_EXTERNAL,
+                CHAIN_APPROX_SIMPLE);
+    
+    // Draw bounding boxes around moving objects
+    Mat display = frame.clone();
+    for (const auto& contour : contours) {
+        double area = contourArea(contour);
+        if (area > 500) {  // Filter small detections
+            Rect bbox = boundingRect(contour);
+            rectangle(display, bbox, Scalar(0, 255, 0), 2);
+        }
+    }
+    
+    imshow("Detection", display);
+    imshow("Foreground", foreground);
+    
+    if (waitKey(30) >= 0) break;
+}
+```
+
+## Kalman Filter
+
+Predict and track object positions:
+
+```cpp
+#include <opencv2/video/tracking.hpp>
+
+// Initialize Kalman filter
+KalmanFilter KF(4, 2, 0);
+
+// State: [x, y, vx, vy]
+KF.transitionMatrix = (Mat_<float>(4, 4) <<
+    1, 0, 1, 0,   // x' = x + vx
+    0, 1, 0, 1,   // y' = y + vy
+    0, 0, 1, 0,   // vx' = vx
+    0, 0, 0, 1);  // vy' = vy
+
+// Measurement matrix: measure [x, y]
+KF.measurementMatrix = (Mat_<float>(2, 4) <<
+    1, 0, 0, 0,
+    0, 1, 0, 0);
+
+// Process and measurement noise
+setIdentity(KF.processNoiseCov, Scalar::all(1e-4));
+setIdentity(KF.measurementNoiseCov, Scalar::all(1e-1));
+setIdentity(KF.errorCovPost, Scalar::all(1));
+
+// Initial state
+KF.statePost.at<float>(0) = initialX;
+KF.statePost.at<float>(1) = initialY;
+
+// Tracking loop
+while (cap.read(frame)) {
+    // Predict next position
+    Mat prediction = KF.predict();
+    Point predictPt(prediction.at<float>(0),
+                   prediction.at<float>(1));
+    
+    // Get measurement (e.g., from detection)
+    Point measPt = detectObject(frame);
+    
+    // Update Kalman filter
+    Mat measurement = (Mat_<float>(2, 1) <<
+                      measPt.x, measPt.y);
+    KF.correct(measurement);
+    
+    // Visualize
+    circle(frame, measPt, 5, Scalar(0, 0, 255), -1);     // Red: measurement
+    circle(frame, predictPt, 5, Scalar(255, 0, 0), -1);  // Blue: prediction
+    
+    imshow("Kalman Filter", frame);
+    waitKey(30);
+}
+```
+
+## Practical Examples
+
+### Motion Detection System
+
+```cpp
+#include <opencv2/video.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
+
+using namespace cv;
+
+class MotionDetector {
+private:
+    Ptr<BackgroundSubtractorMOG2> pBackSub;
+    int minArea;
+    
+public:
+    MotionDetector(int minArea = 500)
+        : minArea(minArea) {
+        pBackSub = createBackgroundSubtractorMOG2();
+        pBackSub->setDetectShadows(false);
+    }
+    
+    vector<Rect> detect(const Mat& frame) {
+        Mat fgMask;
+        pBackSub->apply(frame, fgMask);
+        
+        // Clean up
+        Mat kernel = getStructuringElement(MORPH_ELLIPSE,
+                                          Size(5, 5));
+        morphologyEx(fgMask, fgMask, MORPH_OPEN, kernel);
+        dilate(fgMask, fgMask, kernel);
+        
+        // Find contours
+        vector<vector<Point>> contours;
+        findContours(fgMask, contours, RETR_EXTERNAL,
+                    CHAIN_APPROX_SIMPLE);
+        
+        // Filter and create bounding boxes
+        vector<Rect> detections;
+        for (const auto& cnt : contours) {
+            if (contourArea(cnt) >= minArea) {
+                detections.push_back(boundingRect(cnt));
+            }
+        }
+        
+        return detections;
+    }
+};
+
+int main() {
+    VideoCapture cap(0);  // Camera
+    MotionDetector detector(1000);
+    
+    Mat frame;
+    while (cap.read(frame)) {
+        auto boxes = detector.detect(frame);
+        
+        // Draw detections
+        for (const auto& box : boxes) {
+            rectangle(frame, box, Scalar(0, 255, 0), 2);
+            
+            string label = "Motion";
+            putText(frame, label,
+                   Point(box.x, box.y - 5),
+                   FONT_HERSHEY_SIMPLEX, 0.5,
+                   Scalar(0, 255, 0), 2);
+        }
+        
+        // Show count
+        string info = "Objects: " + to_string(boxes.size());
+        putText(frame, info, Point(10, 30),
+               FONT_HERSHEY_SIMPLEX, 1,
+               Scalar(0, 255, 0), 2);
+        
+        imshow("Motion Detection", frame);
+        
+        if (waitKey(30) >= 0) break;
+    }
+    
+    return 0;
+}
+```
+
+### People Counter
+
+```cpp
+class PeopleCounter {
+private:
+    Ptr<BackgroundSubtractorMOG2> pBackSub;
+    int lineY;  // Counting line position
+    map<int, Point> trackedObjects;
+    int enterCount = 0;
+    int exitCount = 0;
+    int nextID = 0;
+    
+public:
+    PeopleCounter(int linePosition)
+        : lineY(linePosition) {
+        pBackSub = createBackgroundSubtractorMOG2();
+    }
+    
+    void process(Mat& frame) {
+        Mat fgMask;
+        pBackSub->apply(frame, fgMask);
+        
+        // Find current objects
+        vector<vector<Point>> contours;
+        findContours(fgMask, contours, RETR_EXTERNAL,
+                    CHAIN_APPROX_SIMPLE);
+        
+        map<int, Point> currentObjects;
+        for (const auto& cnt : contours) {
+            if (contourArea(cnt) > 2000) {
+                Moments m = moments(cnt);
+                Point center(m.m10/m.m00, m.m01/m.m00);
+                
+                // Match with tracked objects or create new
+                int id = matchOrCreate(center);
+                currentObjects[id] = center;
+                
+                // Check line crossing
+                if (trackedObjects.count(id)) {
+                    Point prev = trackedObjects[id];
+                    
+                    if (prev.y < lineY && center.y >= lineY) {
+                        enterCount++;
+                    }
+                    else if (prev.y >= lineY && center.y < lineY) {
+                        exitCount++;
+                    }
+                }
+            }
+        }
+        
+        trackedObjects = currentObjects;
+        
+        // Draw counting line
+        line(frame, Point(0, lineY),
+            Point(frame.cols, lineY),
+            Scalar(0, 0, 255), 2);
+        
+        // Display counts
+        putText(frame, "In: " + to_string(enterCount),
+               Point(10, 30), FONT_HERSHEY_SIMPLEX, 1,
+               Scalar(0, 255, 0), 2);
+        putText(frame, "Out: " + to_string(exitCount),
+               Point(10, 70), FONT_HERSHEY_SIMPLEX, 1,
+               Scalar(0, 0, 255), 2);
+    }
+    
+private:
+    int matchOrCreate(const Point& center) {
+        // Simple nearest neighbor matching
+        double minDist = 50;
+        int matchedID = -1;
+        
+        for (const auto& [id, pos] : trackedObjects) {
+            double dist = norm(center - pos);
+            if (dist < minDist) {
+                minDist = dist;
+                matchedID = id;
+            }
+        }
+        
+        return (matchedID >= 0) ? matchedID : nextID++;
+    }
+};
+```
+
+## Best Practices
+
+<Note>
+**Optical Flow:**
+- Use sparse flow (Lucas-Kanade) when you need specific point tracking
+- Use dense flow (Farneback) for motion field visualization
+- Redetect features periodically to maintain good tracks
+</Note>
+
+<Note>
+**Background Subtraction:**
+- MOG2 is generally more robust than KNN
+- Adjust learning rate based on scene dynamics
+- Use morphological operations to clean up masks
+- Filter detections by minimum area to reduce noise
+</Note>
+
+<Note>
+**Performance:**
+```cpp
+// Resize frames for faster processing
+Mat small;
+resize(frame, small, Size(), 0.5, 0.5);
+pBackSub->apply(small, fgMask);
+
+// Use GPU acceleration if available
+Ptr<cuda::BackgroundSubtractorMOG2> gpu_mog =
+    cuda::createBackgroundSubtractorMOG2();
+```
+</Note>
+
+## Related Modules
+
+- [Video I/O](/modules/videoio) - Capture video streams
+- [Image Processing](/modules/imgproc) - Process frames
+- [Object Detection](/modules/objdetect) - Detect specific objects
+
+## Source Reference
+
+Key headers:
+- `~/workspace/source/modules/video/include/opencv2/video/tracking.hpp`
+- `~/workspace/source/modules/video/include/opencv2/video/background_segm.hpp`
+
+Examples:
+- `samples/cpp/lkdemo.cpp` - Lucas-Kanade optical flow
+- `samples/cpp/camshiftdemo.cpp` - CamShift tracking
+- `samples/cpp/bgfg_segm.cpp` - Background subtraction

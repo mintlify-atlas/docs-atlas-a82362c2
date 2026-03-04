@@ -1,0 +1,649 @@
+---
+title: Building OpenCV for Android
+description: Complete guide for integrating OpenCV into Android applications with NDK, building AAR packages, and using Gradle
+---
+
+OpenCV provides comprehensive Android support through native NDK libraries, prebuilt AAR packages, and Java/Kotlin bindings.
+
+## Quick Start
+
+Get started with OpenCV on Android in minutes:
+
+<Steps>
+  <Step title="Download Android SDK">
+    Download the prebuilt OpenCV Android SDK from the [releases page](https://github.com/opencv/opencv/releases):
+    
+    ```bash
+    # Extract the archive
+    unzip opencv-4.x.0-android-sdk.zip
+    ```
+    
+    The SDK includes:
+    - Native libraries for all Android ABIs
+    - Java bindings
+    - Sample applications
+  </Step>
+  
+  <Step title="Open Sample Project">
+    In Android Studio:
+    
+    1. Open **File → Open**
+    2. Navigate to `opencv-android-sdk/samples`
+    3. Select a sample (e.g., `15-puzzle`)
+    4. Wait for Gradle sync
+  </Step>
+  
+  <Step title="Run on Device">
+    1. Connect your Android device (USB debugging enabled)
+    2. Click **Run** (Shift+F10)
+    3. Select your device
+    
+    <Note>
+    Android 5.0 (API Level 21) or higher is required.
+    </Note>
+  </Step>
+</Steps>
+
+## Prerequisites
+
+For building OpenCV from source:
+
+<Tabs>
+  <Tab title="Ubuntu/Linux">
+    ```bash
+    # Install JDK
+    sudo apt install openjdk-17-jdk
+    
+    # Install build tools
+    sudo apt install git cmake ninja-build
+    
+    # Set environment variables
+    export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+    export ANDROID_HOME=~/Android/Sdk
+    export ANDROID_NDK=$ANDROID_HOME/ndk/25.2.9519653
+    ```
+  </Tab>
+  
+  <Tab title="Windows">
+    ```powershell
+    # Install Android Studio from official site
+    # It includes JDK, SDK, and NDK
+    
+    # Set environment variables
+    $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+    $env:ANDROID_HOME = "C:\Users\YourName\AppData\Local\Android\Sdk"
+    $env:ANDROID_NDK = "$env:ANDROID_HOME\ndk\25.2.9519653"
+    ```
+  </Tab>
+  
+  <Tab title="macOS">
+    ```bash
+    # Install Android Studio from official site
+    
+    # Set environment variables
+    export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+    export ANDROID_HOME=~/Library/Android/sdk
+    export ANDROID_NDK=$ANDROID_HOME/ndk/25.2.9519653
+    ```
+  </Tab>
+</Tabs>
+
+### Install Android SDK and NDK
+
+Using Android Studio:
+
+1. Open **Settings → Languages & Frameworks → Android SDK**
+2. Check **Show Package Details**
+3. Install:
+   - Android SDK Platform (API 21+)
+   - Android NDK (version 25.x recommended)
+   - CMake
+   - Build-Tools
+
+## Supported Architectures (ABIs)
+
+OpenCV for Android supports multiple architectures:
+
+| ABI | Architecture | Minimum API |
+|-----|-------------|-------------|
+| `armeabi-v7a` | ARM 32-bit with NEON | 21 |
+| `arm64-v8a` | ARM 64-bit | 21 |
+| `x86` | Intel 32-bit | 21 |
+| `x86_64` | Intel 64-bit | 21 |
+
+<Note>
+The default configuration in `platforms/android/default.config.py` builds for all four ABIs. Modern devices primarily use `arm64-v8a`.
+</Note>
+
+## Building OpenCV Android SDK
+
+### Using Python Build Script
+
+<Steps>
+  <Step title="Clone OpenCV">
+    ```bash
+    git clone https://github.com/opencv/opencv.git
+    cd opencv
+    ```
+  </Step>
+  
+  <Step title="Set Environment Variables">
+    ```bash
+    export ANDROID_HOME=~/Android/Sdk
+    export ANDROID_NDK=$ANDROID_HOME/ndk/25.2.9519653
+    ```
+  </Step>
+  
+  <Step title="Run Build Script">
+    ```bash
+    cd platforms/android
+    python3 build_sdk.py --ndk_path $ANDROID_NDK \
+                         --sdk_path $ANDROID_HOME \
+                         ../../build_android
+    ```
+    
+    <Tip>
+    Add `--config ndk-25.config.py` to use a specific NDK version configuration.
+    </Tip>
+  </Step>
+  
+  <Step title="Find Output">
+    The SDK will be in:
+    ```
+    build_android/
+      OpenCV-android-sdk/
+        sdk/
+          native/
+            libs/      # Native .so libraries
+            jni/       # C++ headers
+          java/        # Java sources
+    ```
+  </Step>
+</Steps>
+
+### Build Options
+
+```bash
+# Build with opencv_contrib modules
+python3 build_sdk.py --ndk_path $ANDROID_NDK \
+                     --sdk_path $ANDROID_HOME \
+                     --extra_modules_path ../../opencv_contrib/modules \
+                     ../../build_android
+
+# Build specific ABIs only
+python3 build_sdk.py --ndk_path $ANDROID_NDK \
+                     --sdk_path $ANDROID_HOME \
+                     --config ndk-25.config.py \
+                     --modules arm64-v8a \
+                     ../../build_android
+
+# Enable extra features
+python3 build_sdk.py --ndk_path $ANDROID_NDK \
+                     --sdk_path $ANDROID_HOME \
+                     --build_doc \
+                     ../../build_android
+```
+
+### Custom ABI Configuration
+
+Create a custom config file:
+
+```python
+# my_config.py
+ABIs = [
+    ABI("3", "arm64-v8a", None, 21),  # ARM 64-bit only
+]
+```
+
+Use it:
+```bash
+python3 build_sdk.py --config my_config.py \
+                     --ndk_path $ANDROID_NDK \
+                     ../../build_android
+```
+
+## Building AAR Packages
+
+AAR (Android Archive) packages can be imported as Gradle dependencies:
+
+### Java + Shared Library AAR
+
+```bash
+cd platforms/android
+
+# Set environment variables
+export JAVA_HOME="$HOME/Android Studio/jbr"
+export ANDROID_HOME="$HOME/Android/Sdk"
+
+# Build AAR
+python3 build_java_shared_aar.py "$HOME/opencv-4.x.0-android-sdk/OpenCV-android-sdk"
+
+# Output: outputs/*.aar and Maven repository
+```
+
+### Static Library AAR
+
+For apps that bundle all dependencies:
+
+```bash
+python3 build_static_aar.py "$HOME/opencv-4.x.0-android-sdk/OpenCV-android-sdk"
+```
+
+<Note>
+AAR packages include:
+- Compiled native libraries for all ABIs
+- Java wrapper classes
+- ProGuard rules
+- Manifest file
+</Note>
+
+## Integrating OpenCV into Android Apps
+
+### Method 1: Import OpenCV Module (Recommended)
+
+<Steps>
+  <Step title="Import OpenCV Module">
+    In Android Studio:
+    
+    1. **File → New → Import Module**
+    2. Select `opencv-android-sdk/sdk`
+    3. Click **Finish**
+  </Step>
+  
+  <Step title="Add Dependency">
+    In your app's `build.gradle`:
+    
+    ```groovy
+    dependencies {
+        implementation project(':sdk')
+    }
+    ```
+  </Step>
+  
+  <Step title="Update settings.gradle">
+    ```groovy
+    include ':app', ':sdk'
+    project(':sdk').projectDir = new File('opencv-android-sdk/sdk')
+    ```
+  </Step>
+</Steps>
+
+### Method 2: Use AAR Package
+
+```groovy
+// app/build.gradle
+dependencies {
+    implementation files('libs/opencv-4.x.0.aar')
+}
+```
+
+Or publish to local Maven repository:
+
+```groovy
+repositories {
+    maven { url "$rootDir/outputs/maven_repo" }
+}
+
+dependencies {
+    implementation 'org.opencv:opencv:4.x.0'
+}
+```
+
+### Method 3: CMake Integration
+
+For native C++ development:
+
+```cmake
+# app/CMakeLists.txt
+cmake_minimum_required(VERSION 3.6)
+
+project("myapp")
+
+# Set OpenCV path
+set(OpenCV_DIR "${CMAKE_SOURCE_DIR}/../opencv-android-sdk/sdk/native/jni")
+find_package(OpenCV REQUIRED)
+
+# Your native library
+add_library(myapp SHARED native-lib.cpp)
+
+# Link OpenCV
+target_link_libraries(myapp ${OpenCV_LIBS})
+```
+
+In `build.gradle`:
+
+```groovy
+android {
+    defaultConfig {
+        externalNativeBuild {
+            cmake {
+                cppFlags "-std=c++11"
+                arguments "-DOpenCV_DIR=${project.projectDir}/../opencv-android-sdk/sdk/native/jni"
+            }
+        }
+    }
+    
+    externalNativeBuild {
+        cmake {
+            path "CMakeLists.txt"
+        }
+    }
+}
+```
+
+## Using OpenCV in Code
+
+### Java/Kotlin
+
+<Tabs>
+  <Tab title="Kotlin">
+    ```kotlin
+    import org.opencv.android.OpenCVLoader
+    import org.opencv.core.Mat
+    import org.opencv.imgproc.Imgproc
+    
+    class MainActivity : AppCompatActivity() {
+        override fun onCreate(savedInstanceState: Bundle?) {
+            super.onCreate(savedInstanceState)
+            
+            // Initialize OpenCV
+            if (!OpenCVLoader.initDebug()) {
+                Log.e(TAG, "OpenCV initialization failed!")
+                return
+            }
+            
+            // Use OpenCV
+            val mat = Mat()
+            Imgproc.cvtColor(inputMat, mat, Imgproc.COLOR_RGBA2GRAY)
+        }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Java">
+    ```java
+    import org.opencv.android.OpenCVLoader;
+    import org.opencv.core.Mat;
+    import org.opencv.imgproc.Imgproc;
+    
+    public class MainActivity extends AppCompatActivity {
+        @Override
+        protected void onCreate(Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            
+            // Initialize OpenCV
+            if (!OpenCVLoader.initDebug()) {
+                Log.e(TAG, "OpenCV initialization failed!");
+                return;
+            }
+            
+            // Use OpenCV
+            Mat mat = new Mat();
+            Imgproc.cvtColor(inputMat, mat, Imgproc.COLOR_RGBA2GRAY);
+        }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Native C++ with JNI
+
+```cpp
+// native-lib.cpp
+#include <jni.h>
+#include <opencv2/opencv.hpp>
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_example_myapp_MainActivity_processImage(
+    JNIEnv* env,
+    jobject /* this */,
+    jlong matAddr) {
+    
+    cv::Mat& mat = *(cv::Mat*)matAddr;
+    cv::cvtColor(mat, mat, cv::COLOR_RGBA2GRAY);
+}
+```
+
+Java/Kotlin side:
+
+```kotlin
+external fun processImage(matAddr: Long)
+
+companion object {
+    init {
+        System.loadLibrary("myapp")
+    }
+}
+```
+
+## Camera Integration
+
+OpenCV provides `CameraBridgeViewBase` for easy camera access:
+
+```kotlin
+import org.opencv.android.CameraBridgeViewBase
+import org.opencv.android.JavaCameraView
+
+class MainActivity : AppCompatActivity(), CameraBridgeViewBase.CvCameraViewListener2 {
+    private lateinit var cameraBridgeViewBase: CameraBridgeViewBase
+    
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        cameraBridgeViewBase = findViewById(R.id.cameraView)
+        cameraBridgeViewBase.visibility = SurfaceView.VISIBLE
+        cameraBridgeViewBase.setCvCameraViewListener(this)
+    }
+    
+    override fun onCameraFrame(inputFrame: CameraBridgeViewBase.CvCameraViewFrame): Mat {
+        val mat = inputFrame.rgba()
+        // Process frame
+        Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGBA2GRAY)
+        return mat
+    }
+    
+    override fun onCameraViewStarted(width: Int, height: Int) {}
+    override fun onCameraViewStopped() {}
+}
+```
+
+Layout XML:
+
+```xml
+<org.opencv.android.JavaCameraView
+    android:id="@+id/cameraView"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" />
+```
+
+## Hardware Acceleration
+
+### OpenCL Support
+
+OpenCV can use OpenCL for GPU acceleration on Android:
+
+```kotlin
+import org.opencv.core.Core
+
+// Check OpenCL availability
+if (Core.useOpenCL()) {
+    Log.i(TAG, "OpenCL is available")
+} else {
+    Log.w(TAG, "OpenCL is not available")
+}
+
+// Use UMat for automatic OpenCL acceleration
+val umat = UMat()
+Imgproc.cvtColor(inputUMat, umat, Imgproc.COLOR_RGBA2GRAY)
+```
+
+### Qualcomm FastCV
+
+For Qualcomm devices, enable FastCV during build:
+
+```bash
+python3 build_sdk.py --config fastcv.config.py \
+                     --ndk_path $ANDROID_NDK \
+                     ../../build_android
+```
+
+### NNAPI (Neural Networks API)
+
+For DNN module on Android 8.1+:
+
+```kotlin
+import org.opencv.dnn.Net
+
+val net = Dnn.readNetFromTensorflow(modelPath)
+net.setPreferableBackend(Dnn.DNN_BACKEND_DEFAULT)
+net.setPreferableTarget(Dnn.DNN_TARGET_NNAPI)
+```
+
+## Permissions
+
+Add required permissions to `AndroidManifest.xml`:
+
+```xml
+<!-- Camera -->
+<uses-permission android:name="android.permission.CAMERA" />
+<uses-feature android:name="android.hardware.camera" />
+<uses-feature android:name="android.hardware.camera.autofocus" />
+
+<!-- Storage (for saving images) -->
+<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
+<!-- OpenCL -->
+<uses-permission android:name="android.permission.ACCESS_OPENCL" />
+```
+
+Request runtime permissions (Android 6.0+):
+
+```kotlin
+if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+    != PackageManager.PERMISSION_GRANTED) {
+    ActivityCompat.requestPermissions(this,
+        arrayOf(Manifest.permission.CAMERA), CAMERA_PERMISSION_CODE)
+}
+```
+
+## Sample Applications
+
+The Android SDK includes several sample applications:
+
+- **15-puzzle** - Interactive puzzle game
+- **camera-calibration** - Camera calibration tool
+- **color-blob-detection** - Color detection
+- **face-detection** - Face detection using Haar cascades
+- **image-manipulations** - Basic image operations
+- **mobilenet-objdetect** - Object detection using MobileNet
+- **qr-detection** - QR code detection
+
+Explore these in `opencv-android-sdk/samples/`.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="UnsatisfiedLinkError: Native libraries not found">
+    Ensure all ABIs are included in your APK:
+    
+    ```groovy
+    android {
+        defaultConfig {
+            ndk {
+                abiFilters 'armeabi-v7a', 'arm64-v8a'
+            }
+        }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="OpenCVLoader.initDebug() returns false">
+    1. Check OpenCV module is properly imported
+    2. Verify native libraries are in APK: Analyze APK → lib/
+    3. Try `OpenCVLoader.initAsync()` instead for Manager-based initialization
+  </Accordion>
+  
+  <Accordion title="Build fails with NDK errors">
+    ```bash
+    # Ensure correct NDK version
+    export ANDROID_NDK=$ANDROID_HOME/ndk/25.2.9519653
+    
+    # Clean and rebuild
+    rm -rf build_android/
+    python3 build_sdk.py --ndk_path $ANDROID_NDK ../../build_android
+    ```
+  </Accordion>
+  
+  <Accordion title="Camera preview shows wrong orientation">
+    Set camera orientation in CameraView:
+    
+    ```kotlin
+    cameraBridgeViewBase.setMaxFrameSize(1280, 720)
+    cameraBridgeViewBase.setCameraPermissionGranted()
+    ```
+    
+    Or rotate Mat manually:
+    ```kotlin
+    Core.rotate(mat, mat, Core.ROTATE_90_CLOCKWISE)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## App Size Optimization
+
+### Include Only Needed ABIs
+
+```groovy
+android {
+    defaultConfig {
+        ndk {
+            abiFilters 'arm64-v8a'  // Modern devices only
+        }
+    }
+}
+```
+
+### Enable APK Splits
+
+```groovy
+android {
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'armeabi-v7a', 'arm64-v8a'
+            universalApk true
+        }
+    }
+}
+```
+
+### ProGuard/R8 Configuration
+
+Add to `proguard-rules.pro`:
+
+```proguard
+-keep class org.opencv.** { *; }
+-keep interface org.opencv.** { *; }
+-keepclassmembers class * {
+    native <methods>;
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Camera Integration" icon="camera" href="/android/camera">
+    Learn camera processing techniques
+  </Card>
+  <Card title="DNN on Android" icon="brain" href="/dnn/android">
+    Deploy deep learning models
+  </Card>
+  <Card title="Sample Apps" icon="mobile" href="/examples/android">
+    Explore example applications
+  </Card>
+  <Card title="Performance Tips" icon="bolt" href="/optimization/android">
+    Optimize Android performance
+  </Card>
+</CardGroup>

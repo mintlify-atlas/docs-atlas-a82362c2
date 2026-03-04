@@ -1,0 +1,404 @@
+---
+title: "Computational Photography Module"
+description: "Image inpainting, denoising, HDR imaging, and seamless cloning"
+---
+
+## Overview
+
+The Photo module provides advanced computational photography algorithms:
+- Image inpainting
+- Denoising
+- HDR (High Dynamic Range) imaging
+- Seamless cloning
+- Non-photorealistic rendering
+
+## Image Inpainting
+
+### Overview
+
+Inpainting restores missing or damaged regions in images using information from surrounding areas.
+
+### Basic Inpainting
+
+```cpp
+#include <opencv2/photo.hpp>
+
+// Load image and mask
+Mat img = imread("damaged.jpg");
+Mat mask = imread("mask.jpg", IMREAD_GRAYSCALE);
+// White pixels (255) indicate areas to inpaint
+
+Mat result;
+inpaint(
+    img,                // Source image
+    mask,               // Inpainting mask
+    result,             // Output
+    3.0,                // Inpaint radius
+    INPAINT_TELEA       // Algorithm
+);
+
+imwrite("restored.jpg", result);
+```
+
+### Inpainting Methods
+
+**INPAINT_NS** (Navier-Stokes):
+- Based on fluid dynamics
+- Better for textured regions
+
+**INPAINT_TELEA**:
+- Fast Marching Method
+- Better for smooth regions
+
+```cpp
+// Try both methods
+inpaint(img, mask, result1, 3, INPAINT_NS);
+inpaint(img, mask, result2, 3, INPAINT_TELEA);
+```
+
+## Image Denoising
+
+### Non-Local Means Denoising
+
+#### Grayscale Images
+
+```cpp
+Mat noisy = imread("noisy.jpg", IMREAD_GRAYSCALE);
+Mat denoised;
+
+fastNlMeansDenoising(
+    noisy,
+    denoised,
+    3.0,        // h: filter strength
+    7,          // templateWindowSize
+    21          // searchWindowSize
+);
+```
+
+#### Color Images
+
+```cpp
+Mat noisyColor = imread("noisy.jpg");
+Mat denoisedColor;
+
+fastNlMeansDenoisingColored(
+    noisyColor,
+    denoisedColor,
+    3.0,        // h: luminance filter strength
+    3.0,        // hColor: color filter strength  
+    7,          // templateWindowSize
+    21          // searchWindowSize
+);
+```
+
+### Video Denoising
+
+```cpp
+// Denoise video frames
+std::vector<Mat> frames;
+for(int i = 0; i < videoFrames.size(); i++) {
+    frames.push_back(videoFrames[i]);
+}
+
+Mat denoised;
+fastNlMeansDenoisingMulti(
+    frames,
+    denoised,
+    2,          // imgToDenoiseIndex (target frame)
+    5,          // temporalWindowSize
+    3.0,        // h
+    7,          // templateWindowSize
+    21          // searchWindowSize
+);
+```
+
+### Parameters
+
+- **h**: Filter strength (3-10 typical)
+  - Higher = more denoising, more blur
+  - Lower = less denoising, preserves detail
+- **templateWindowSize**: Usually 7
+- **searchWindowSize**: Usually 21
+  - Larger = better quality, slower
+
+## HDR Imaging
+
+### Capture HDR from Multiple Exposures
+
+```cpp
+// Load images with different exposures
+std::vector<Mat> images;
+images.push_back(imread("exposure1.jpg"));
+images.push_back(imread("exposure2.jpg"));
+images.push_back(imread("exposure3.jpg"));
+
+// Exposure times (in seconds)
+std::vector<float> times = {1.0/30, 1.0/15, 1.0/8};
+
+// Merge to HDR
+Ptr<MergeDebevec> merge = createMergeDebevec();
+Mat hdr;
+merge->process(images, hdr, times);
+```
+
+### Tone Mapping
+
+Convert HDR to displayable LDR (8-bit):
+
+```cpp
+// Drago tonemapping
+Ptr<TonemapDrago> tonemap = createTonemapDrago(
+    1.0f,       // gamma
+    1.0f,       // saturation
+    0.85f       // bias
+);
+
+Mat ldr;
+tonemap->process(hdr, ldr);
+
+// Scale to 8-bit
+ldr = ldr * 255;
+ldr.convertTo(ldr, CV_8UC3);
+imwrite("tonemapped.jpg", ldr);
+```
+
+### Tone Mapping Algorithms
+
+#### Reinhard
+
+```cpp
+Ptr<TonemapReinhard> tonemap = createTonemapReinhard(
+    1.0f,       // gamma
+    0.0f,       // intensity [-8, 8]
+    1.0f,       // light_adapt [0, 1]
+    0.0f        // color_adapt [0, 1]
+);
+```
+
+#### Mantiuk
+
+```cpp
+Ptr<TonemapMantiuk> tonemap = createTonemapMantiuk(
+    1.0f,       // gamma  
+    0.7f,       // scale
+    1.0f        // saturation
+);
+```
+
+### Exposure Alignment
+
+```cpp
+// Align images before merging
+Ptr<AlignMTB> align = createAlignMTB();
+std::vector<Mat> alignedImages;
+align->process(images, alignedImages);
+
+// Now merge aligned images
+Ptr<MergeDebevec> merge = createMergeDebevec();
+Mat hdr;
+merge->process(alignedImages, hdr, times);
+```
+
+## Seamless Cloning
+
+### Paste Object Seamlessly
+
+```cpp
+// Source: object to paste
+Mat src = imread("object.jpg");
+
+// Destination: background
+Mat dst = imread("background.jpg");
+
+// Mask: white region defines object
+Mat mask = imread("mask.jpg", IMREAD_GRAYSCALE);
+
+// Center point in destination
+Point center(dst.cols/2, dst.rows/2);
+
+Mat result;
+seamlessClone(
+    src,
+    dst,
+    mask,
+    center,
+    result,
+    NORMAL_CLONE       // or MIXED_CLONE, MONOCHROME_TRANSFER
+);
+
+imwrite("seamless.jpg", result);
+```
+
+### Cloning Modes
+
+**NORMAL_CLONE**:
+- Standard seamless cloning
+- Preserves source texture
+
+**MIXED_CLONE**:
+- Mixes source and destination
+- Better for transparent objects
+
+**MONOCHROME_TRANSFER**:
+- Transfer only colors
+- Preserves destination texture
+
+### Illumination Change
+
+```cpp
+// Adjust lighting in specific region
+Mat mask = Mat::zeros(img.size(), CV_8U);
+circle(mask, Point(x, y), radius, 255, -1);
+
+Mat result;
+illuminationChange(
+    img,
+    mask,
+    result,
+    0.9f,       // alpha
+    0.1f        // beta
+);
+```
+
+## Non-Photorealistic Rendering
+
+### Edge Preserving Filter
+
+```cpp
+Mat filtered;
+edgePreservingFilter(
+    img,
+    filtered,
+    RECURS_FILTER,  // or NORMCONV_FILTER
+    60,             // sigma_s
+    0.4             // sigma_r
+);
+```
+
+### Detail Enhancement
+
+```cpp
+Mat enhanced;
+detailEnhance(
+    img,
+    enhanced,
+    10,             // sigma_s
+    0.15            // sigma_r
+);
+```
+
+### Pencil Sketch
+
+```cpp
+Mat sketch, colorSketch;
+pencilSketch(
+    img,
+    sketch,         // Grayscale sketch
+    colorSketch,    // Color sketch
+    60,             // sigma_s
+    0.07,           // sigma_r
+    0.02            // shade_factor
+);
+```
+
+### Stylization
+
+```cpp
+Mat stylized;
+stylization(
+    img,
+    stylized,
+    60,             // sigma_s
+    0.45            // sigma_r
+);
+```
+
+## Complete Example: HDR Processing
+
+```cpp
+#include <opencv2/opencv.hpp>
+#include <opencv2/photo.hpp>
+
+using namespace cv;
+
+int main() {
+    // Load exposure sequence
+    std::vector<Mat> images;
+    std::vector<float> times;
+    
+    images.push_back(imread("img_0.33.jpg"));
+    images.push_back(imread("img_0.25.jpg"));
+    images.push_back(imread("img_0.125.jpg"));
+    times = {1.0/3, 1.0/4, 1.0/8};
+    
+    // Align images
+    Ptr<AlignMTB> align = createAlignMTB();
+    std::vector<Mat> aligned;
+    align->process(images, aligned);
+    
+    // Merge to HDR
+    Ptr<MergeDebevec> merge = createMergeDebevec();
+    Mat hdr;
+    merge->process(aligned, hdr, times);
+    
+    // Save HDR
+    imwrite("hdr.hdr", hdr);
+    
+    // Tone map for display
+    Ptr<TonemapDrago> tonemap = 
+        createTonemapDrago(1.0, 1.0, 0.85);
+    Mat ldr;
+    tonemap->process(hdr, ldr);
+    
+    // Convert to 8-bit
+    ldr = 3 * ldr;
+    ldr.convertTo(ldr, CV_8UC3, 255);
+    
+    imwrite("ldr.jpg", ldr);
+    
+    return 0;
+}
+```
+
+## Performance Tips
+
+<CardGroup cols={2}>
+<Card title="Reduce Resolution" icon="compress">
+Downscale for faster denoising/HDR
+</Card>
+
+<Card title="Adjust Parameters" icon="sliders">
+Smaller search windows = faster processing
+</Card>
+
+<Card title="GPU Acceleration" icon="microchip">
+Use cv::cuda for compatible functions
+</Card>
+
+<Card title="ROI Processing" icon="crop">
+Process only regions of interest
+</Card>
+</CardGroup>
+
+## Best Practices
+
+### Denoising
+- Start with h=3, increase if needed
+- Use colored version for color images
+- Multi-frame for video (better quality)
+
+### HDR
+- Use 3-5 exposures with 1-2 EV spacing
+- Align images before merging
+- Experiment with tone mapping algorithms
+
+### Seamless Cloning
+- Create accurate masks
+- Position carefully for best results
+- Try different cloning modes
+
+## See Also
+
+- [ImgProc Module](/modules/imgproc) - Basic image processing
+- [Core Module](/modules/core) - Matrix operations
+- [Photo Tutorials](https://docs.opencv.org/master/d0/d86/tutorial_py_image_arithmetics.html)

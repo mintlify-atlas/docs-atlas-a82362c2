@@ -1,0 +1,668 @@
+---
+title: Deep Learning with OpenCV DNN Module
+description: Learn how to load and run neural networks including YOLO, SSD, and other deep learning models in OpenCV
+---
+
+# Deep Learning with OpenCV DNN Module
+
+Learn how to use OpenCV's DNN (Deep Neural Networks) module to load and run pre-trained models for object detection, classification, and more.
+
+## Introduction to OpenCV DNN
+
+OpenCV's DNN module allows you to:
+- Load models from TensorFlow, PyTorch, Caffe, ONNX, and Darknet
+- Run inference without installing deep learning frameworks
+- Deploy on CPU, GPU (CUDA), or OpenVINO backends
+- Use pre-trained models for various tasks
+
+### Supported Frameworks
+
+<Accordion title="Supported Model Formats">
+  - **ONNX** (.onnx) - Universal format, recommended
+  - **TensorFlow** (.pb, .pbtxt)
+  - **PyTorch** (via ONNX export)
+  - **Caffe** (.caffemodel, .prototxt)
+  - **Darknet** (.weights, .cfg) - YOLO models
+  - **TensorFlow Lite** (.tflite)
+</Accordion>
+
+## Loading and Running Models
+
+### Basic Model Loading
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    # Load a model (example: ONNX format)
+    net = cv.dnn.readNet('model.onnx')
+
+    # Or load specific formats:
+    # net = cv.dnn.readNetFromTensorflow('model.pb', 'model.pbtxt')
+    # net = cv.dnn.readNetFromCaffe('deploy.prototxt', 'model.caffemodel')
+    # net = cv.dnn.readNetFromDarknet('yolov3.cfg', 'yolov3.weights')
+
+    # Set computation backend and target
+    net.setPreferableBackend(cv.dnn.DNN_BACKEND_OPENCV)
+    net.setPreferableTarget(cv.dnn.DNN_TARGET_CPU)
+
+    # For GPU acceleration:
+    # net.setPreferableBackend(cv.dnn.DNN_BACKEND_CUDA)
+    # net.setPreferableTarget(cv.dnn.DNN_TARGET_CUDA)
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/dnn.hpp>
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+    using namespace cv::dnn;
+
+    int main() {
+        // Load model
+        Net net = readNet("model.onnx");
+        
+        // Or specific formats:
+        // Net net = readNetFromTensorflow("model.pb", "model.pbtxt");
+        // Net net = readNetFromCaffe("deploy.prototxt", "model.caffemodel");
+        // Net net = readNetFromDarknet("yolov3.cfg", "yolov3.weights");
+        
+        // Set backend and target
+        net.setPreferableBackend(DNN_BACKEND_OPENCV);
+        net.setPreferableTarget(DNN_TARGET_CPU);
+        
+        // For GPU:
+        // net.setPreferableBackend(DNN_BACKEND_CUDA);
+        // net.setPreferableTarget(DNN_TARGET_CUDA);
+        
+        return 0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## YOLO Object Detection
+
+YOLO (You Only Look Once) is a popular real-time object detection system.
+
+### YOLOv3/YOLOv4 Detection
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    # Load YOLO network
+    net = cv.dnn.readNetFromDarknet('yolov4.cfg', 'yolov4.weights')
+    net.setPreferableBackend(cv.dnn.DNN_BACKEND_OPENCV)
+    net.setPreferableTarget(cv.dnn.DNN_TARGET_CPU)
+
+    # Load class names
+    with open('coco.names', 'r') as f:
+        classes = [line.strip() for line in f.readlines()]
+
+    # Load image
+    img = cv.imread('street.jpg')
+    height, width = img.shape[:2]
+
+    # Create blob from image
+    blob = cv.dnn.blobFromImage(img, 1/255.0, (416, 416), 
+                               swapRB=True, crop=False)
+
+    # Set input and run forward pass
+    net.setInput(blob)
+    
+    # Get output layer names
+    output_layers = net.getUnconnectedOutLayersNames()
+    
+    # Forward pass
+    outputs = net.forward(output_layers)
+
+    # Process detections
+    boxes = []
+    confidences = []
+    class_ids = []
+
+    for output in outputs:
+        for detection in output:
+            scores = detection[5:]
+            class_id = np.argmax(scores)
+            confidence = scores[class_id]
+            
+            if confidence > 0.5:
+                # Scale bounding box back to image size
+                center_x = int(detection[0] * width)
+                center_y = int(detection[1] * height)
+                w = int(detection[2] * width)
+                h = int(detection[3] * height)
+                
+                # Get top-left corner
+                x = int(center_x - w / 2)
+                y = int(center_y - h / 2)
+                
+                boxes.append([x, y, w, h])
+                confidences.append(float(confidence))
+                class_ids.append(class_id)
+
+    # Apply Non-Maximum Suppression
+    indices = cv.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)
+
+    # Draw detections
+    if len(indices) > 0:
+        for i in indices.flatten():
+            x, y, w, h = boxes[i]
+            label = f"{classes[class_ids[i]]}: {confidences[i]:.2f}"
+            color = (0, 255, 0)
+            
+            cv.rectangle(img, (x, y), (x+w, y+h), color, 2)
+            cv.putText(img, label, (x, y-10), 
+                      cv.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+    cv.imshow('YOLO Detection', img)
+    cv.waitKey(0)
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/dnn.hpp>
+    #include <opencv2/opencv.hpp>
+    #include <fstream>
+    using namespace cv;
+    using namespace cv::dnn;
+    using namespace std;
+
+    int main() {
+        // Load network
+        Net net = readNetFromDarknet("yolov4.cfg", "yolov4.weights");
+        net.setPreferableBackend(DNN_BACKEND_OPENCV);
+        net.setPreferableTarget(DNN_TARGET_CPU);
+        
+        // Load class names
+        vector<string> classes;
+        ifstream ifs("coco.names");
+        string line;
+        while(getline(ifs, line)) classes.push_back(line);
+        
+        // Load image
+        Mat img = imread("street.jpg");
+        
+        // Create blob
+        Mat blob;
+        blobFromImage(img, blob, 1/255.0, Size(416, 416), 
+                     Scalar(), true, false);
+        
+        net.setInput(blob);
+        
+        // Get output layers
+        vector<String> outNames = net.getUnconnectedOutLayersNames();
+        vector<Mat> outs;
+        net.forward(outs, outNames);
+        
+        // Process detections
+        vector<int> classIds;
+        vector<float> confidences;
+        vector<Rect> boxes;
+        
+        for(size_t i = 0; i < outs.size(); ++i) {
+            float* data = (float*)outs[i].data;
+            for(int j = 0; j < outs[i].rows; ++j, data += outs[i].cols) {
+                Mat scores = outs[i].row(j).colRange(5, outs[i].cols);
+                Point classIdPoint;
+                double confidence;
+                minMaxLoc(scores, 0, &confidence, 0, &classIdPoint);
+                
+                if(confidence > 0.5) {
+                    int centerX = (int)(data[0] * img.cols);
+                    int centerY = (int)(data[1] * img.rows);
+                    int width = (int)(data[2] * img.cols);
+                    int height = (int)(data[3] * img.rows);
+                    int left = centerX - width / 2;
+                    int top = centerY - height / 2;
+                    
+                    classIds.push_back(classIdPoint.x);
+                    confidences.push_back((float)confidence);
+                    boxes.push_back(Rect(left, top, width, height));
+                }
+            }
+        }
+        
+        // NMS
+        vector<int> indices;
+        NMSBoxes(boxes, confidences, 0.5, 0.4, indices);
+        
+        // Draw
+        for(size_t i = 0; i < indices.size(); ++i) {
+            int idx = indices[i];
+            Rect box = boxes[idx];
+            rectangle(img, box, Scalar(0, 255, 0), 2);
+            
+            string label = classes[classIds[idx]] + ": " + 
+                          format("%.2f", confidences[idx]);
+            putText(img, label, Point(box.x, box.y - 10),
+                   FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 255, 0), 2);
+        }
+        
+        imshow("YOLO Detection", img);
+        waitKey(0);
+        return 0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### YOLOv8 with ONNX
+
+Modern YOLO versions export to ONNX format:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    # Load YOLOv8 model (ONNX format)
+    net = cv.dnn.readNetFromONNX('yolov8n.onnx')
+    net.setPreferableBackend(cv.dnn.DNN_BACKEND_OPENCV)
+    net.setPreferableTarget(cv.dnn.DNN_TARGET_CPU)
+
+    # Load image
+    img = cv.imread('image.jpg')
+    original_height, original_width = img.shape[:2]
+
+    # Preprocess
+    input_size = 640
+    blob = cv.dnn.blobFromImage(img, 1/255.0, (input_size, input_size),
+                               swapRB=True, crop=False)
+
+    # Run inference
+    net.setInput(blob)
+    output = net.forward()
+
+    # YOLOv8 outputs shape: [1, 84, 8400] for COCO
+    # Format: [x, y, w, h, class_scores...]
+    output = output[0].transpose()  # [8400, 84]
+
+    # Process detections
+    boxes = []
+    confidences = []
+    class_ids = []
+
+    img_height, img_width = img.shape[:2]
+    x_scale = img_width / input_size
+    y_scale = img_height / input_size
+
+    for detection in output:
+        # Extract box coordinates
+        x, y, w, h = detection[:4]
+        
+        # Get class scores and find max
+        class_scores = detection[4:]
+        class_id = np.argmax(class_scores)
+        confidence = class_scores[class_id]
+        
+        if confidence > 0.5:
+            # Scale back to original image
+            x = int((x - w/2) * x_scale)
+            y = int((y - h/2) * y_scale)
+            w = int(w * x_scale)
+            h = int(h * y_scale)
+            
+            boxes.append([x, y, w, h])
+            confidences.append(float(confidence))
+            class_ids.append(class_id)
+
+    # Apply NMS
+    indices = cv.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)
+
+    # Draw results
+    for i in indices.flatten():
+        x, y, w, h = boxes[i]
+        cv.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+        label = f"Class {class_ids[i]}: {confidences[i]:.2f}"
+        cv.putText(img, label, (x, y-10),
+                  cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+    cv.imshow('YOLOv8 Detection', img)
+    cv.waitKey(0)
+    ```
+  </Tab>
+</Tabs>
+
+## SSD Object Detection
+
+SSD (Single Shot MultiBox Detector) for faster detection:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    # Load MobileNet-SSD model
+    net = cv.dnn.readNetFromCaffe(
+        'MobileNetSSD_deploy.prototxt',
+        'MobileNetSSD_deploy.caffemodel'
+    )
+
+    # COCO class names
+    classes = ["background", "aeroplane", "bicycle", "bird", "boat",
+               "bottle", "bus", "car", "cat", "chair", "cow",
+               "diningtable", "dog", "horse", "motorbike", "person",
+               "pottedplant", "sheep", "sofa", "train", "tvmonitor"]
+
+    # Load image
+    img = cv.imread('image.jpg')
+    height, width = img.shape[:2]
+
+    # Prepare input
+    blob = cv.dnn.blobFromImage(img, 0.007843, (300, 300), 127.5)
+
+    # Run detection
+    net.setInput(blob)
+    detections = net.forward()
+
+    # Process detections
+    for i in range(detections.shape[2]):
+        confidence = detections[0, 0, i, 2]
+        
+        if confidence > 0.5:
+            class_id = int(detections[0, 0, i, 1])
+            
+            # Get box coordinates
+            box = detections[0, 0, i, 3:7] * np.array([width, height, width, height])
+            (x1, y1, x2, y2) = box.astype("int")
+            
+            # Draw detection
+            label = f"{classes[class_id]}: {confidence:.2f}"
+            cv.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv.putText(img, label, (x1, y1-10),
+                      cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+    cv.imshow('SSD Detection', img)
+    cv.waitKey(0)
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/dnn.hpp>
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+    using namespace cv::dnn;
+
+    int main() {
+        Net net = readNetFromCaffe(
+            "MobileNetSSD_deploy.prototxt",
+            "MobileNetSSD_deploy.caffemodel"
+        );
+        
+        Mat img = imread("image.jpg");
+        
+        Mat blob;
+        blobFromImage(img, blob, 0.007843, Size(300, 300), 
+                     Scalar(127.5, 127.5, 127.5));
+        
+        net.setInput(blob);
+        Mat detections = net.forward();
+        
+        Mat detectionMat(detections.size[2], detections.size[3], 
+                        CV_32F, detections.ptr<float>());
+        
+        for(int i = 0; i < detectionMat.rows; i++) {
+            float confidence = detectionMat.at<float>(i, 2);
+            
+            if(confidence > 0.5) {
+                int x1 = detectionMat.at<float>(i, 3) * img.cols;
+                int y1 = detectionMat.at<float>(i, 4) * img.rows;
+                int x2 = detectionMat.at<float>(i, 5) * img.cols;
+                int y2 = detectionMat.at<float>(i, 6) * img.rows;
+                
+                rectangle(img, Point(x1, y1), Point(x2, y2),
+                         Scalar(0, 255, 0), 2);
+            }
+        }
+        
+        imshow("SSD Detection", img);
+        waitKey(0);
+        return 0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Image Classification
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    # Load ResNet model
+    net = cv.dnn.readNetFromCaffe(
+        'ResNet-50-deploy.prototxt',
+        'ResNet-50-model.caffemodel'
+    )
+
+    # Load ImageNet class labels
+    with open('imagenet_classes.txt', 'r') as f:
+        classes = [line.strip() for line in f.readlines()]
+
+    # Load and preprocess image
+    img = cv.imread('dog.jpg')
+    
+    # Create blob (ResNet expects 224x224 input)
+    blob = cv.dnn.blobFromImage(img, 1.0, (224, 224),
+                               (104, 117, 123), swapRB=False, crop=False)
+
+    # Run inference
+    net.setInput(blob)
+    predictions = net.forward()
+
+    # Get top 5 predictions
+    top5_indices = np.argsort(predictions[0])[::-1][:5]
+
+    print("Top 5 predictions:")
+    for i, idx in enumerate(top5_indices):
+        label = classes[idx]
+        confidence = predictions[0][idx]
+        print(f"{i+1}. {label}: {confidence*100:.2f}%")
+
+    # Display result
+    top_label = classes[top5_indices[0]]
+    cv.putText(img, top_label, (10, 30),
+              cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    cv.imshow('Classification', img)
+    cv.waitKey(0)
+    ```
+  </Tab>
+</Tabs>
+
+## Face Detection with DNN
+
+Deep learning-based face detection (more accurate than Haar cascades):
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    # Load face detection model
+    net = cv.dnn.readNetFromCaffe(
+        'deploy.prototxt',
+        'res10_300x300_ssd_iter_140000.caffemodel'
+    )
+
+    # Load image
+    img = cv.imread('faces.jpg')
+    height, width = img.shape[:2]
+
+    # Preprocess
+    blob = cv.dnn.blobFromImage(img, 1.0, (300, 300),
+                               (104.0, 177.0, 123.0))
+
+    # Detect faces
+    net.setInput(blob)
+    detections = net.forward()
+
+    # Draw detections
+    for i in range(detections.shape[2]):
+        confidence = detections[0, 0, i, 2]
+        
+        if confidence > 0.5:
+            box = detections[0, 0, i, 3:7] * np.array([width, height, width, height])
+            (x1, y1, x2, y2) = box.astype("int")
+            
+            # Draw box and confidence
+            text = f"{confidence*100:.2f}%"
+            cv.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv.putText(img, text, (x1, y1-10),
+                      cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+    cv.imshow('Face Detection', img)
+    cv.waitKey(0)
+    ```
+  </Tab>
+</Tabs>
+
+## Video Processing with DNN
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import time
+
+    # Load model
+    net = cv.dnn.readNetFromCaffe(
+        'MobileNetSSD_deploy.prototxt',
+        'MobileNetSSD_deploy.caffemodel'
+    )
+
+    # Open video
+    cap = cv.VideoCapture('video.mp4')
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        height, width = frame.shape[:2]
+        
+        # Prepare input
+        blob = cv.dnn.blobFromImage(frame, 0.007843, (300, 300), 127.5)
+        
+        # Measure inference time
+        start = time.time()
+        net.setInput(blob)
+        detections = net.forward()
+        end = time.time()
+        
+        # Process detections
+        for i in range(detections.shape[2]):
+            confidence = detections[0, 0, i, 2]
+            
+            if confidence > 0.5:
+                box = detections[0, 0, i, 3:7] * np.array([width, height, width, height])
+                (x1, y1, x2, y2) = box.astype("int")
+                cv.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        
+        # Display FPS
+        fps = 1 / (end - start)
+        cv.putText(frame, f'FPS: {fps:.1f}', (10, 30),
+                  cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        
+        cv.imshow('Detection', frame)
+        
+        if cv.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv.destroyAllWindows()
+    ```
+  </Tab>
+</Tabs>
+
+## Performance Optimization
+
+<Accordion title="Using GPU Acceleration">
+  ```python
+  import cv2 as cv
+
+  net = cv.dnn.readNet('model.onnx')
+
+  # CUDA backend (requires OpenCV built with CUDA)
+  net.setPreferableBackend(cv.dnn.DNN_BACKEND_CUDA)
+  net.setPreferableTarget(cv.dnn.DNN_TARGET_CUDA)
+
+  # Or CUDA with FP16 (faster, slightly less accurate)
+  net.setPreferableTarget(cv.dnn.DNN_TARGET_CUDA_FP16)
+  ```
+</Accordion>
+
+<Accordion title="OpenVINO Backend">
+  ```python
+  # Intel OpenVINO for optimized inference on Intel hardware
+  net.setPreferableBackend(cv.dnn.DNN_BACKEND_INFERENCE_ENGINE)
+  net.setPreferableTarget(cv.dnn.DNN_TARGET_CPU)
+
+  # Or use Intel GPU
+  net.setPreferableTarget(cv.dnn.DNN_TARGET_OPENCL)
+  ```
+</Accordion>
+
+<Accordion title="Batch Processing">
+  ```python
+  # Process multiple images at once
+  images = [img1, img2, img3, img4]
+  
+  # Create batch blob
+  blob = cv.dnn.blobFromImages(images, 1/255.0, (640, 640))
+  
+  net.setInput(blob)
+  outputs = net.forward()
+  ```
+</Accordion>
+
+<Note>
+Backend and target options:
+- `DNN_BACKEND_OPENCV` + `DNN_TARGET_CPU`: Default, works everywhere
+- `DNN_BACKEND_CUDA` + `DNN_TARGET_CUDA`: NVIDIA GPU acceleration
+- `DNN_BACKEND_INFERENCE_ENGINE` + `DNN_TARGET_CPU`: Intel OpenVINO
+- `DNN_TARGET_OPENCL`: OpenCL acceleration
+- `DNN_TARGET_CUDA_FP16`: Half-precision for faster inference
+</Note>
+
+<Warning>
+Common issues:
+- Model input size must match the size used during training
+- Check if the model expects RGB or BGR input (use `swapRB` parameter)
+- Normalize input values correctly (typically 0-1 or mean subtraction)
+- Ensure OpenCV is built with the desired backend support
+</Warning>
+
+## Downloading Pre-trained Models
+
+OpenCV provides scripts to download common models:
+
+```bash
+# Download YOLOv3
+python opencv/samples/dnn/download_models.py --name yolo
+
+# Download all models
+python opencv/samples/dnn/download_models.py --all
+```
+
+Common model sources:
+- [OpenCV Model Zoo](https://github.com/opencv/opencv_zoo)
+- [ONNX Model Zoo](https://github.com/onnx/models)
+- [TensorFlow Hub](https://tfhub.dev/)
+- [PyTorch Hub](https://pytorch.org/hub/)
+
+## Next Steps
+
+- Explore the [OpenCV Model Zoo](https://github.com/opencv/opencv_zoo) for more pre-trained models
+- Learn about [Camera Calibration](/tutorials/camera-calibration) for 3D vision tasks
+- Combine with [Video Processing](/tutorials/video-processing) for real-time applications

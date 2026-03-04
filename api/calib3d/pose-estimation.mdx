@@ -1,0 +1,560 @@
+---
+title: Pose Estimation
+description: Functions for estimating camera pose from 3D-2D point correspondences using PnP (Perspective-n-Point) algorithms
+---
+
+## Overview
+
+Pose estimation determines the transformation (rotation and translation) from the object coordinate system to the camera coordinate system. This is essential for:
+- Augmented reality applications
+- Robot navigation and manipulation
+- 3D scene reconstruction
+- Object tracking and localization
+
+## Core Functions
+
+### solvePnP
+
+Finds an object pose from 3D-2D point correspondences.
+
+```cpp
+bool cv::solvePnP(
+    InputArray objectPoints,
+    InputArray imagePoints,
+    InputArray cameraMatrix,
+    InputArray distCoeffs,
+    OutputArray rvec,
+    OutputArray tvec,
+    bool useExtrinsicGuess = false,
+    int flags = SOLVEPNP_ITERATIVE
+)
+```
+
+<ParamField path="objectPoints" type="InputArray" required>
+  Array of object points in the object coordinate space, Nx3 1-channel or 1xN/Nx1 3-channel, where N is the number of points. `vector<Point3d>` can also be passed.
+</ParamField>
+
+<ParamField path="imagePoints" type="InputArray" required>
+  Array of corresponding image points in pixel coordinates, Nx2 1-channel or 1xN/Nx1 2-channel. `vector<Point2d>` can also be passed.
+</ParamField>
+
+<ParamField path="cameraMatrix" type="InputArray" required>
+  Input camera intrinsic matrix (3x3).
+</ParamField>
+
+<ParamField path="distCoeffs" type="InputArray" required>
+  Input vector of distortion coefficients. If the vector is NULL/empty, zero distortion coefficients are assumed.
+</ParamField>
+
+<ParamField path="rvec" type="OutputArray" required>
+  Output rotation vector (see Rodrigues) that, together with tvec, brings points from the model coordinate system to the camera coordinate system.
+</ParamField>
+
+<ParamField path="tvec" type="OutputArray" required>
+  Output translation vector.
+</ParamField>
+
+<ParamField path="useExtrinsicGuess" type="bool" default="false">
+  If true, the function uses the provided rvec and tvec values as initial approximations and further optimizes them (used with SOLVEPNP_ITERATIVE).
+</ParamField>
+
+<ParamField path="flags" type="int" default="SOLVEPNP_ITERATIVE">
+  Method for solving the PnP problem (see SolvePnP Methods below).
+</ParamField>
+
+**Returns:** True if a solution is found, false otherwise.
+
+<Note>
+**Coordinate Systems:**
+- Input objectPoints: 3D points in **world coordinate frame**
+- Output rvec/tvec: Transformation from world to **camera coordinate frame**
+- The transformation `Xc = R * Xw + t` brings world points to camera coordinates
+</Note>
+
+### SolvePnP Methods
+
+| Method | Value | Description | Requirements |
+|--------|-------|-------------|-------------|
+| `SOLVEPNP_ITERATIVE` | 0 | Levenberg-Marquardt optimization. DLT for non-planar (≥6 pts), homography for planar (≥4 pts) | ≥4 points |
+| `SOLVEPNP_EPNP` | 1 | Efficient PnP based on Lepetit et al. 2009 | ≥4 points |
+| `SOLVEPNP_P3P` | 2 | P3P algorithm based on Ding et al. 2023 | Exactly 4 points (3 for estimation, 1 for validation) |
+| `SOLVEPNP_DLS` | 3 | **Broken - fallback to EPnP** | Not recommended |
+| `SOLVEPNP_UPNP` | 4 | **Broken - fallback to EPnP** | Not recommended |
+| `SOLVEPNP_AP3P` | 5 | Efficient algebraic solution by Ke & Roumeliotis 2017 | Exactly 4 points |
+| `SOLVEPNP_IPPE` | 6 | Infinitesimal Plane-Based Pose Estimation | ≥4 coplanar points |
+| `SOLVEPNP_IPPE_SQUARE` | 7 | IPPE for square markers (returns 2 solutions) | Exactly 4 coplanar points in specific order |
+| `SOLVEPNP_SQPNP` | 8 | SQPnP: Fast and globally optimal solution | ≥3 points |
+
+<Warning>
+For SOLVEPNP_IPPE_SQUARE, object points must be defined in this exact order:
+- point 0: `[-squareLength/2,  squareLength/2, 0]`
+- point 1: `[ squareLength/2,  squareLength/2, 0]`
+- point 2: `[ squareLength/2, -squareLength/2, 0]`
+- point 3: `[-squareLength/2, -squareLength/2, 0]`
+</Warning>
+
+**Example:**
+```cpp
+// Define object points (e.g., 3D corners of a marker)
+vector<Point3f> objectPoints = {
+    {-0.05f,  0.05f, 0.0f},
+    { 0.05f,  0.05f, 0.0f},
+    { 0.05f, -0.05f, 0.0f},
+    {-0.05f, -0.05f, 0.0f}
+};
+
+// Corresponding 2D image points (detected in image)
+vector<Point2f> imagePoints = {
+    {234.5f, 156.3f},
+    {456.2f, 167.8f},
+    {443.1f, 389.4f},
+    {221.7f, 378.9f}
+};
+
+Mat cameraMatrix = ...; // 3x3 camera intrinsic matrix
+Mat distCoeffs = ...;   // Distortion coefficients
+
+Mat rvec, tvec;
+bool success = solvePnP(objectPoints, imagePoints, 
+                        cameraMatrix, distCoeffs,
+                        rvec, tvec, false, SOLVEPNP_IPPE_SQUARE);
+```
+
+### solvePnPRansac
+
+Finds object pose from 3D-2D point correspondences using RANSAC to handle outliers.
+
+```cpp
+bool cv::solvePnPRansac(
+    InputArray objectPoints,
+    InputArray imagePoints,
+    InputArray cameraMatrix,
+    InputArray distCoeffs,
+    OutputArray rvec,
+    OutputArray tvec,
+    bool useExtrinsicGuess = false,
+    int iterationsCount = 100,
+    float reprojectionError = 8.0,
+    double confidence = 0.99,
+    OutputArray inliers = noArray(),
+    int flags = SOLVEPNP_ITERATIVE
+)
+```
+
+<ParamField path="iterationsCount" type="int" default="100">
+  Number of RANSAC iterations.
+</ParamField>
+
+<ParamField path="reprojectionError" type="float" default="8.0">
+  Inlier threshold value in pixels. The maximum allowed distance between observed and computed point projections to consider it an inlier.
+</ParamField>
+
+<ParamField path="confidence" type="double" default="0.99">
+  The probability that the algorithm produces a useful result (typically 0.99).
+</ParamField>
+
+<ParamField path="inliers" type="OutputArray">
+  Output vector that contains indices of inliers in objectPoints and imagePoints.
+</ParamField>
+
+**Returns:** True if a solution is found.
+
+This function estimates an object pose and is resistant to outliers using RANSAC. The algorithm:
+1. Randomly selects minimal subsets of points
+2. Estimates pose for each subset
+3. Counts inliers (points within reprojectionError threshold)
+4. Refines final pose using all inliers
+
+<Note>
+**Minimal Sample Sets:**
+- Default method uses SOLVEPNP_EPNP for minimal sample estimation
+- If you choose SOLVEPNP_P3P or SOLVEPNP_AP3P, these methods are used
+- If exactly 4 input points, SOLVEPNP_P3P is automatically used
+- Final pose is refined using all inliers with the method specified in flags (unless P3P/AP3P, then EPNP is used)
+</Note>
+
+### USAC-based solvePnPRansac
+
+Advanced robust estimation using USAC (Universal RANSAC) framework.
+
+```cpp
+bool cv::solvePnPRansac(
+    InputArray objectPoints,
+    InputArray imagePoints,
+    InputOutputArray cameraMatrix,
+    InputArray distCoeffs,
+    OutputArray rvec,
+    OutputArray tvec,
+    OutputArray inliers,
+    const UsacParams& params = UsacParams()
+)
+```
+
+USAC provides several advanced RANSAC variants with configurable parameters for better performance and accuracy.
+
+### solvePnPGeneric
+
+Returns all possible solutions for pose estimation (multiple solutions from P3P methods).
+
+```cpp
+int cv::solvePnPGeneric(
+    InputArray objectPoints,
+    InputArray imagePoints,
+    InputArray cameraMatrix,
+    InputArray distCoeffs,
+    OutputArrayOfArrays rvecs,
+    OutputArrayOfArrays tvecs,
+    bool useExtrinsicGuess = false,
+    SolvePnPMethod flags = SOLVEPNP_ITERATIVE,
+    InputArray rvec = noArray(),
+    InputArray tvec = noArray(),
+    OutputArray reprojectionError = noArray()
+)
+```
+
+<ParamField path="rvecs" type="OutputArrayOfArrays" required>
+  Vector of output rotation vectors. P3P methods return 0-4 solutions, SOLVEPNP_IPPE returns 2 solutions, others return 1 solution.
+</ParamField>
+
+<ParamField path="tvecs" type="OutputArrayOfArrays" required>
+  Vector of output translation vectors corresponding to rvecs.
+</ParamField>
+
+<ParamField path="reprojectionError" type="OutputArray">
+  Optional output array of reprojection error (RMSE) for each solution.
+</ParamField>
+
+**Returns:** Number of solutions found.
+
+<Note>
+P3P solutions are sorted by reprojection errors (lowest to highest).
+</Note>
+
+### solveP3P
+
+Finds an object pose from 3 3D-2D point correspondences.
+
+```cpp
+int cv::solveP3P(
+    InputArray objectPoints,
+    InputArray imagePoints,
+    InputArray cameraMatrix,
+    InputArray distCoeffs,
+    OutputArrayOfArrays rvecs,
+    OutputArrayOfArrays tvecs,
+    int flags
+)
+```
+
+<ParamField path="objectPoints" type="InputArray" required>
+  Array of object points, 3x3 1-channel or 1x3/3x1 3-channel. Exactly 3 points required.
+</ParamField>
+
+<ParamField path="imagePoints" type="InputArray" required>
+  Array of corresponding image points, 3x2 1-channel or 1x3/3x1 2-channel. Exactly 3 points required.
+</ParamField>
+
+<ParamField path="flags" type="int" required>
+  Method for solving P3P:
+  - `SOLVEPNP_P3P`: Based on Ding et al. 2023
+  - `SOLVEPNP_AP3P`: Based on Ke & Roumeliotis 2017
+</ParamField>
+
+**Returns:** Number of solutions (0-4). Solutions are sorted by reprojection errors.
+
+## Pose Refinement
+
+### solvePnPRefineLM
+
+Refines a pose using Levenberg-Marquardt optimization.
+
+```cpp
+void cv::solvePnPRefineLM(
+    InputArray objectPoints,
+    InputArray imagePoints,
+    InputArray cameraMatrix,
+    InputArray distCoeffs,
+    InputOutputArray rvec,
+    InputOutputArray tvec,
+    TermCriteria criteria = TermCriteria(TermCriteria::EPS + TermCriteria::COUNT, 20, FLT_EPSILON)
+)
+```
+
+<ParamField path="rvec" type="InputOutputArray" required>
+  Input/Output rotation vector. Input values used as initial solution.
+</ParamField>
+
+<ParamField path="tvec" type="InputOutputArray" required>
+  Input/Output translation vector. Input values used as initial solution.
+</ParamField>
+
+<ParamField path="criteria" type="TermCriteria" default="TermCriteria(EPS+COUNT, 20, FLT_EPSILON)">
+  Termination criteria for the iterative optimization algorithm.
+</ParamField>
+
+Minimizes projection error using Levenberg-Marquardt iterative minimization. Requires at least 3 object points and an initial pose estimate.
+
+### solvePnPRefineVVS
+
+Refines a pose using Virtual Visual Servoing (VVS).
+
+```cpp
+void cv::solvePnPRefineVVS(
+    InputArray objectPoints,
+    InputArray imagePoints,
+    InputArray cameraMatrix,
+    InputArray distCoeffs,
+    InputOutputArray rvec,
+    InputOutputArray tvec,
+    TermCriteria criteria = TermCriteria(TermCriteria::EPS + TermCriteria::COUNT, 20, FLT_EPSILON),
+    double VVSlambda = 1
+)
+```
+
+<ParamField path="VVSlambda" type="double" default="1">
+  Gain for the virtual visual servoing control law, equivalent to the α gain in the Damped Gauss-Newton formulation.
+</ParamField>
+
+Minimizes projection error using Virtual Visual Servoing scheme (Chaumette 2006, Marchand 2016).
+
+## Homography-Based Methods
+
+### findHomography
+
+Finds a perspective transformation between two planes.
+
+```cpp
+Mat cv::findHomography(
+    InputArray srcPoints,
+    InputArray dstPoints,
+    int method = 0,
+    double ransacReprojThreshold = 3,
+    OutputArray mask = noArray(),
+    const int maxIters = 2000,
+    const double confidence = 0.995
+)
+```
+
+<ParamField path="srcPoints" type="InputArray" required>
+  Coordinates of points in the original plane, CV_32FC2 or `vector<Point2f>`.
+</ParamField>
+
+<ParamField path="dstPoints" type="InputArray" required>
+  Coordinates of points in the target plane, CV_32FC2 or `vector<Point2f>`.
+</ParamField>
+
+<ParamField path="method" type="int" default="0">
+  Method for computing homography:
+  - 0: Regular method using all points (least squares)
+  - `RANSAC` (8): RANSAC-based robust method
+  - `LMEDS` (4): Least-Median robust method
+  - `RHO` (16): PROSAC-based robust method
+</ParamField>
+
+<ParamField path="ransacReprojThreshold" type="double" default="3">
+  Maximum allowed reprojection error to treat a point pair as an inlier (pixels). Used in RANSAC and RHO methods.
+</ParamField>
+
+<ParamField path="mask" type="OutputArray">
+  Optional output mask set by robust methods. Input mask values are ignored.
+</ParamField>
+
+<ParamField path="maxIters" type="int" default="2000">
+  Maximum number of RANSAC iterations.
+</ParamField>
+
+<ParamField path="confidence" type="double" default="0.995">
+  Confidence level, between 0 and 1.
+</ParamField>
+
+**Returns:** The 3x3 homography matrix H such that:
+
+```
+s_i [x'_i, y'_i, 1]^T ≈ H [x_i, y_i, 1]^T
+```
+
+The function finds the perspective transformation between source and destination planes. Useful for:
+- Finding initial intrinsic and extrinsic matrices
+- Planar object tracking
+- Image rectification
+
+<Note>
+If H cannot be estimated, an empty matrix is returned.
+</Note>
+
+### USAC-based findHomography
+
+```cpp
+Mat cv::findHomography(
+    InputArray srcPoints,
+    InputArray dstPoints,
+    OutputArray mask,
+    const UsacParams& params
+)
+```
+
+Uses USAC framework for robust homography estimation with configurable parameters.
+
+## Decomposition Methods
+
+### decomposeProjectionMatrix
+
+Decomposes a projection matrix into rotation matrix and camera intrinsic matrix.
+
+```cpp
+void cv::decomposeProjectionMatrix(
+    InputArray projMatrix,
+    OutputArray cameraMatrix,
+    OutputArray rotMatrix,
+    OutputArray transVect,
+    OutputArray rotMatrixX = noArray(),
+    OutputArray rotMatrixY = noArray(),
+    OutputArray rotMatrixZ = noArray(),
+    OutputArray eulerAngles = noArray()
+)
+```
+
+<ParamField path="projMatrix" type="InputArray" required>
+  3x4 input projection matrix P.
+</ParamField>
+
+<ParamField path="cameraMatrix" type="OutputArray" required>
+  Output 3x3 camera intrinsic matrix.
+</ParamField>
+
+<ParamField path="rotMatrix" type="OutputArray" required>
+  Output 3x3 external rotation matrix R.
+</ParamField>
+
+<ParamField path="transVect" type="OutputArray" required>
+  Output 4x1 translation vector T.
+</ParamField>
+
+<ParamField path="rotMatrixX" type="OutputArray">
+  Optional 3x3 rotation matrix around x-axis.
+</ParamField>
+
+<ParamField path="rotMatrixY" type="OutputArray">
+  Optional 3x3 rotation matrix around y-axis.
+</ParamField>
+
+<ParamField path="rotMatrixZ" type="OutputArray">
+  Optional 3x3 rotation matrix around z-axis.
+</ParamField>
+
+<ParamField path="eulerAngles" type="OutputArray">
+  Optional three-element vector containing three Euler angles of rotation in degrees.
+</ParamField>
+
+Decomposes a projection matrix into calibration and rotation matrix and the position of a camera. Based on RQDecomp3x3.
+
+### RQDecomp3x3
+
+Computes an RQ decomposition of 3x3 matrices.
+
+```cpp
+Vec3d cv::RQDecomp3x3(
+    InputArray src,
+    OutputArray mtxR,
+    OutputArray mtxQ,
+    OutputArray Qx = noArray(),
+    OutputArray Qy = noArray(),
+    OutputArray Qz = noArray()
+)
+```
+
+<ParamField path="src" type="InputArray" required>
+  3x3 input matrix.
+</ParamField>
+
+<ParamField path="mtxR" type="OutputArray" required>
+  Output 3x3 upper-triangular matrix.
+</ParamField>
+
+<ParamField path="mtxQ" type="OutputArray" required>
+  Output 3x3 orthogonal matrix.
+</ParamField>
+
+**Returns:** Three Euler angles in degrees.
+
+Used in decomposeProjectionMatrix to decompose the left 3x3 submatrix of a projection matrix.
+
+## Helper Functions
+
+### projectPoints
+
+Projects 3D points to an image plane.
+
+```cpp
+void cv::projectPoints(
+    InputArray objectPoints,
+    InputArray rvec,
+    InputArray tvec,
+    InputArray cameraMatrix,
+    InputArray distCoeffs,
+    OutputArray imagePoints,
+    OutputArray jacobian = noArray(),
+    double aspectRatio = 0
+)
+```
+
+<ParamField path="objectPoints" type="InputArray" required>
+  Array of object points in world coordinate frame, 3xN/Nx3 1-channel or 1xN/Nx1 3-channel.
+</ParamField>
+
+<ParamField path="rvec" type="InputArray" required>
+  Rotation vector (Rodrigues) that performs change of basis from world to camera coordinate system.
+</ParamField>
+
+<ParamField path="tvec" type="InputArray" required>
+  Translation vector.
+</ParamField>
+
+<ParamField path="imagePoints" type="OutputArray" required>
+  Output array of image points in **pixel coordinates**, 1xN/Nx1 2-channel, or `vector<Point2f>`.
+</ParamField>
+
+<ParamField path="jacobian" type="OutputArray">
+  Optional output 2Nx(10+numDistCoeffs) Jacobian matrix of derivatives of image points with respect to rotation, translation, focal lengths, principal point, and distortion coefficients.
+</ParamField>
+
+<ParamField path="aspectRatio" type="double" default="0">
+  Optional fixed aspect ratio parameter. If not 0, the function assumes aspect ratio (fx/fy) is fixed.
+</ParamField>
+
+Computes 2D projections of 3D points given intrinsic and extrinsic camera parameters. Used during optimization in calibrateCamera, solvePnP, and stereoCalibrate.
+
+### drawFrameAxes
+
+Draws axes of the world/object coordinate system from pose estimation.
+
+```cpp
+void cv::drawFrameAxes(
+    InputOutputArray image,
+    InputArray cameraMatrix,
+    InputArray distCoeffs,
+    InputArray rvec,
+    InputArray tvec,
+    float length,
+    int thickness = 3
+)
+```
+
+<ParamField path="length" type="float" required>
+  Length of the painted axes in the same unit as tvec (usually meters).
+</ParamField>
+
+<ParamField path="thickness" type="int" default="3">
+  Line thickness of the painted axes.
+</ParamField>
+
+Draws the world/object coordinate system axes w.r.t. the camera frame:
+- OX is drawn in red
+- OY is drawn in green
+- OZ is drawn in blue
+
+## See Also
+
+- [Camera Calibration](/api/calib3d/calibration) - calibrateCamera for obtaining camera intrinsics
+- [Stereo Vision](/api/calib3d/stereo) - Stereo calibration and rectification
+- OpenCV samples: `plane_ar.py` (planar augmented reality)

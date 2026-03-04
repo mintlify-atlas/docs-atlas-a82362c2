@@ -1,0 +1,556 @@
+---
+title: Drawing Functions
+description: Functions for drawing geometric shapes and text on images
+---
+
+Drawing functions work with matrices/images of arbitrary depth. The boundaries of shapes can be rendered with antialiasing (implemented only for 8-bit images for now).
+
+## Color Convention
+
+For color images, the channel ordering is normally Blue, Green, Red (BGR). This is what imshow, imread, and imwrite expect. If you form a color using the Scalar constructor, it should look like:
+
+```cpp
+Scalar(blue_component, green_component, red_component[, alpha_component])
+```
+
+## Line Drawing
+
+### line
+
+Draws a line segment connecting two points.
+
+```cpp
+void line(InputOutputArray img, Point pt1, Point pt2, const Scalar& color,
+          int thickness = 1, int lineType = LINE_8, int shift = 0);
+```
+
+<ParamField path="img" type="InputOutputArray">
+  Image.
+</ParamField>
+
+<ParamField path="pt1" type="Point">
+  First point of the line segment.
+</ParamField>
+
+<ParamField path="pt2" type="Point">
+  Second point of the line segment.
+</ParamField>
+
+<ParamField path="color" type="Scalar">
+  Line color.
+</ParamField>
+
+<ParamField path="thickness" type="int" default="1">
+  Line thickness.
+</ParamField>
+
+<ParamField path="lineType" type="int" default="LINE_8">
+  Type of the line. See LineTypes.
+</ParamField>
+
+<ParamField path="shift" type="int" default="0">
+  Number of fractional bits in the point coordinates.
+</ParamField>
+
+The function line draws the line segment between pt1 and pt2 points in the image. The line is clipped by the image boundaries.
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    Mat img = Mat::zeros(400, 400, CV_8UC3);
+    line(img, Point(50, 50), Point(350, 350), Scalar(0, 255, 0), 2);
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    img = np.zeros((400, 400, 3), dtype=np.uint8)
+    cv2.line(img, (50, 50), (350, 350), (0, 255, 0), 2)
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+### arrowedLine
+
+Draws an arrow segment pointing from the first point to the second one.
+
+```cpp
+void arrowedLine(InputOutputArray img, Point pt1, Point pt2, const Scalar& color,
+                 int thickness=1, int line_type=8, int shift=0, double tipLength=0.1);
+```
+
+<ParamField path="img" type="InputOutputArray">
+  Image.
+</ParamField>
+
+<ParamField path="pt1" type="Point">
+  The point the arrow starts from.
+</ParamField>
+
+<ParamField path="pt2" type="Point">
+  The point the arrow points to.
+</ParamField>
+
+<ParamField path="color" type="Scalar">
+  Line color.
+</ParamField>
+
+<ParamField path="thickness" type="int" default="1">
+  Line thickness.
+</ParamField>
+
+<ParamField path="line_type" type="int" default="8">
+  Type of the line. See LineTypes.
+</ParamField>
+
+<ParamField path="shift" type="int" default="0">
+  Number of fractional bits in the point coordinates.
+</ParamField>
+
+<ParamField path="tipLength" type="double" default="0.1">
+  The length of the arrow tip in relation to the arrow length.
+</ParamField>
+
+---
+
+## Shape Drawing
+
+### rectangle
+
+Draws a simple, thick, or filled up-right rectangle.
+
+```cpp
+void rectangle(InputOutputArray img, Point pt1, Point pt2,
+               const Scalar& color, int thickness = 1,
+               int lineType = LINE_8, int shift = 0);
+
+void rectangle(InputOutputArray img, Rect rec,
+               const Scalar& color, int thickness = 1,
+               int lineType = LINE_8, int shift = 0);
+```
+
+<ParamField path="img" type="InputOutputArray">
+  Image.
+</ParamField>
+
+<ParamField path="pt1" type="Point">
+  Vertex of the rectangle.
+</ParamField>
+
+<ParamField path="pt2" type="Point">
+  Vertex of the rectangle opposite to pt1.
+</ParamField>
+
+<ParamField path="rec" type="Rect">
+  Alternative rectangle specification.
+</ParamField>
+
+<ParamField path="color" type="Scalar">
+  Rectangle color or brightness (grayscale image).
+</ParamField>
+
+<ParamField path="thickness" type="int" default="1">
+  Thickness of lines that make up the rectangle. Negative values, like FILLED, mean that the function has to draw a filled rectangle.
+</ParamField>
+
+<ParamField path="lineType" type="int" default="LINE_8">
+  Type of the line. See LineTypes.
+</ParamField>
+
+<ParamField path="shift" type="int" default="0">
+  Number of fractional bits in the point coordinates.
+</ParamField>
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    // Draw rectangle outline
+    rectangle(img, Point(100, 100), Point(300, 200), Scalar(255, 0, 0), 2);
+    
+    // Draw filled rectangle
+    rectangle(img, Rect(50, 250, 200, 100), Scalar(0, 0, 255), FILLED);
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    # Draw rectangle outline
+    cv2.rectangle(img, (100, 100), (300, 200), (255, 0, 0), 2)
+    
+    # Draw filled rectangle
+    cv2.rectangle(img, (50, 250, 200, 100), (0, 0, 255), cv2.FILLED)
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+### circle
+
+Draws a circle.
+
+```cpp
+void circle(InputOutputArray img, Point center, int radius,
+            const Scalar& color, int thickness = 1,
+            int lineType = LINE_8, int shift = 0);
+```
+
+<ParamField path="img" type="InputOutputArray">
+  Image where the circle is drawn.
+</ParamField>
+
+<ParamField path="center" type="Point">
+  Center of the circle.
+</ParamField>
+
+<ParamField path="radius" type="int">
+  Radius of the circle.
+</ParamField>
+
+<ParamField path="color" type="Scalar">
+  Circle color.
+</ParamField>
+
+<ParamField path="thickness" type="int" default="1">
+  Thickness of the circle outline, if positive. Negative values, like FILLED, mean that a filled circle is to be drawn.
+</ParamField>
+
+<ParamField path="lineType" type="int" default="LINE_8">
+  Type of the circle boundary. See LineTypes.
+</ParamField>
+
+<ParamField path="shift" type="int" default="0">
+  Number of fractional bits in the coordinates of the center and in the radius value.
+</ParamField>
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    circle(img, Point(200, 200), 50, Scalar(0, 255, 255), 3);
+    circle(img, Point(300, 300), 75, Scalar(255, 255, 0), FILLED);
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    cv2.circle(img, (200, 200), 50, (0, 255, 255), 3)
+    cv2.circle(img, (300, 300), 75, (255, 255, 0), cv2.FILLED)
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+### ellipse
+
+Draws a simple or thick elliptic arc or fills an ellipse sector.
+
+```cpp
+void ellipse(InputOutputArray img, Point center, Size axes,
+             double angle, double startAngle, double endAngle,
+             const Scalar& color, int thickness = 1,
+             int lineType = LINE_8, int shift = 0);
+
+void ellipse(InputOutputArray img, const RotatedRect& box, const Scalar& color,
+             int thickness = 1, int lineType = LINE_8);
+```
+
+<ParamField path="img" type="InputOutputArray">
+  Image.
+</ParamField>
+
+<ParamField path="center" type="Point">
+  Center of the ellipse.
+</ParamField>
+
+<ParamField path="axes" type="Size">
+  Half of the size of the ellipse main axes.
+</ParamField>
+
+<ParamField path="angle" type="double">
+  Ellipse rotation angle in degrees.
+</ParamField>
+
+<ParamField path="startAngle" type="double">
+  Starting angle of the elliptic arc in degrees.
+</ParamField>
+
+<ParamField path="endAngle" type="double">
+  Ending angle of the elliptic arc in degrees.
+</ParamField>
+
+<ParamField path="box" type="RotatedRect">
+  Alternative ellipse representation via RotatedRect. This means that the function draws an ellipse inscribed in the rotated rectangle.
+</ParamField>
+
+<ParamField path="color" type="Scalar">
+  Ellipse color.
+</ParamField>
+
+<ParamField path="thickness" type="int" default="1">
+  Thickness of the ellipse arc outline, if positive. Otherwise, this indicates that a filled ellipse sector is to be drawn.
+</ParamField>
+
+<ParamField path="lineType" type="int" default="LINE_8">
+  Type of the ellipse boundary. See LineTypes.
+</ParamField>
+
+<ParamField path="shift" type="int" default="0">
+  Number of fractional bits in the coordinates of the center and values of axes.
+</ParamField>
+
+To draw the whole ellipse, not an arc, pass startAngle=0 and endAngle=360. If startAngle is greater than endAngle, they are swapped.
+
+---
+
+## Polygon Drawing
+
+### polylines
+
+Draws several polygonal curves.
+
+```cpp
+void polylines(InputOutputArray img, InputArrayOfArrays pts,
+               bool isClosed, const Scalar& color,
+               int thickness = 1, int lineType = LINE_8, int shift = 0);
+```
+
+<ParamField path="img" type="InputOutputArray">
+  Image.
+</ParamField>
+
+<ParamField path="pts" type="InputArrayOfArrays">
+  Array of polygonal curves.
+</ParamField>
+
+<ParamField path="isClosed" type="bool">
+  Flag indicating whether the drawn polylines are closed or not. If they are closed, the function draws a line from the last vertex of each curve to its first vertex.
+</ParamField>
+
+<ParamField path="color" type="Scalar">
+  Polyline color.
+</ParamField>
+
+<ParamField path="thickness" type="int" default="1">
+  Thickness of the polyline edges.
+</ParamField>
+
+<ParamField path="lineType" type="int" default="LINE_8">
+  Type of the line segments. See LineTypes.
+</ParamField>
+
+<ParamField path="shift" type="int" default="0">
+  Number of fractional bits in the vertex coordinates.
+</ParamField>
+
+---
+
+### fillPoly
+
+Fills the area bounded by one or more polygons.
+
+```cpp
+void fillPoly(InputOutputArray img, InputArrayOfArrays pts,
+              const Scalar& color, int lineType = LINE_8, int shift = 0,
+              Point offset = Point());
+```
+
+<ParamField path="img" type="InputOutputArray">
+  Image.
+</ParamField>
+
+<ParamField path="pts" type="InputArrayOfArrays">
+  Array of polygons where each polygon is represented as an array of points.
+</ParamField>
+
+<ParamField path="color" type="Scalar">
+  Polygon color.
+</ParamField>
+
+<ParamField path="lineType" type="int" default="LINE_8">
+  Type of the polygon boundaries. See LineTypes.
+</ParamField>
+
+<ParamField path="shift" type="int" default="0">
+  Number of fractional bits in the vertex coordinates.
+</ParamField>
+
+<ParamField path="offset" type="Point" default="Point()">
+  Optional offset of all points of the contours.
+</ParamField>
+
+The function fillPoly fills an area bounded by several polygonal contours. The function can fill complex areas, for example, areas with holes, contours with self-intersections, and so forth.
+
+---
+
+### fillConvexPoly
+
+Fills a convex polygon.
+
+```cpp
+void fillConvexPoly(InputOutputArray img, InputArray points,
+                    const Scalar& color, int lineType = LINE_8,
+                    int shift = 0);
+```
+
+<ParamField path="img" type="InputOutputArray">
+  Image.
+</ParamField>
+
+<ParamField path="points" type="InputArray">
+  Polygon vertices.
+</ParamField>
+
+<ParamField path="color" type="Scalar">
+  Polygon color.
+</ParamField>
+
+<ParamField path="lineType" type="int" default="LINE_8">
+  Type of the polygon boundaries. See LineTypes.
+</ParamField>
+
+<ParamField path="shift" type="int" default="0">
+  Number of fractional bits in the vertex coordinates.
+</ParamField>
+
+This function is much faster than fillPoly. It can fill not only convex polygons but any monotonic polygon without self-intersections.
+
+---
+
+## Text Rendering
+
+### putText
+
+Draws a text string.
+
+```cpp
+void putText(InputOutputArray img, const String& text, Point org,
+             int fontFace, double fontScale, Scalar color,
+             int thickness = 1, int lineType = LINE_8,
+             bool bottomLeftOrigin = false);
+```
+
+<ParamField path="img" type="InputOutputArray">
+  Image.
+</ParamField>
+
+<ParamField path="text" type="String">
+  Text string to be drawn.
+</ParamField>
+
+<ParamField path="org" type="Point">
+  Bottom-left corner of the text string in the image.
+</ParamField>
+
+<ParamField path="fontFace" type="int">
+  Font type. See HersheyFonts.
+</ParamField>
+
+<ParamField path="fontScale" type="double">
+  Font scale factor that is multiplied by the font-specific base size.
+</ParamField>
+
+<ParamField path="color" type="Scalar">
+  Text color.
+</ParamField>
+
+<ParamField path="thickness" type="int" default="1">
+  Thickness of the lines used to draw a text.
+</ParamField>
+
+<ParamField path="lineType" type="int" default="LINE_8">
+  Line type. See LineTypes.
+</ParamField>
+
+<ParamField path="bottomLeftOrigin" type="bool" default="false">
+  When true, the image data origin is at the bottom-left corner. Otherwise, it is at the top-left corner.
+</ParamField>
+
+The function putText renders the specified text string in the image. Symbols that cannot be rendered using the specified font are replaced by question marks.
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    putText(img, "OpenCV", Point(50, 100), 
+            FONT_HERSHEY_SIMPLEX, 1.5, Scalar(255, 255, 255), 2);
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    cv2.putText(img, 'OpenCV', (50, 100), 
+                cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 2)
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+### getTextSize
+
+Calculates the width and height of a text string.
+
+```cpp
+Size getTextSize(const String& text, int fontFace,
+                 double fontScale, int thickness,
+                 int* baseLine);
+```
+
+<ParamField path="text" type="String">
+  Input text string.
+</ParamField>
+
+<ParamField path="fontFace" type="int">
+  Font to use. See HersheyFonts.
+</ParamField>
+
+<ParamField path="fontScale" type="double">
+  Font scale factor that is multiplied by the font-specific base size.
+</ParamField>
+
+<ParamField path="thickness" type="int">
+  Thickness of lines used to render the text.
+</ParamField>
+
+<ParamField path="baseLine" type="int*">
+  y-coordinate of the baseline relative to the bottom-most text point.
+</ParamField>
+
+The function calculates and returns the size of a box that contains the specified text.
+
+---
+
+## Enumerations
+
+### LineTypes
+
+Types of line:
+
+- `FILLED` (-1) - Filled shape
+- `LINE_4` (4) - 4-connected line
+- `LINE_8` (8) - 8-connected line
+- `LINE_AA` (16) - Antialiased line
+
+### HersheyFonts
+
+Hershey font types:
+
+- `FONT_HERSHEY_SIMPLEX` (0) - Normal size sans-serif font
+- `FONT_HERSHEY_PLAIN` (1) - Small size sans-serif font
+- `FONT_HERSHEY_DUPLEX` (2) - Normal size sans-serif font (more complex than SIMPLEX)
+- `FONT_HERSHEY_COMPLEX` (3) - Normal size serif font
+- `FONT_HERSHEY_TRIPLEX` (4) - Normal size serif font (more complex than COMPLEX)
+- `FONT_HERSHEY_COMPLEX_SMALL` (5) - Smaller version of COMPLEX
+- `FONT_HERSHEY_SCRIPT_SIMPLEX` (6) - Hand-writing style font
+- `FONT_HERSHEY_SCRIPT_COMPLEX` (7) - More complex variant of SCRIPT_SIMPLEX
+- `FONT_ITALIC` (16) - Flag for italic font
+
+### MarkerTypes
+
+Marker types used for the drawMarker function:
+
+- `MARKER_CROSS` (0) - A crosshair marker shape
+- `MARKER_TILTED_CROSS` (1) - A 45 degree tilted crosshair marker shape
+- `MARKER_STAR` (2) - A star marker shape
+- `MARKER_DIAMOND` (3) - A diamond marker shape
+- `MARKER_SQUARE` (4) - A square marker shape
+- `MARKER_TRIANGLE_UP` (5) - An upwards pointing triangle marker shape
+- `MARKER_TRIANGLE_DOWN` (6) - A downwards pointing triangle marker shape

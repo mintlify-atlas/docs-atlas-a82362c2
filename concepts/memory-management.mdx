@@ -1,0 +1,269 @@
+---
+title: "Memory Management"
+description: "Understanding OpenCV's automatic memory management and reference counting"
+---
+
+## Overview
+
+OpenCV uses **automatic memory management** with reference counting for Mat objects. This eliminates most manual memory management while providing efficiency through shallow copying.
+
+## Reference Counting
+
+### How It Works
+
+Each Mat object has:
+- **Header**: Small, cheap to copy (~100 bytes)
+- **Data block**: Large, expensive to copy
+- **Reference counter**: Tracks how many Mat objects share the data
+
+```cpp
+Mat A(100, 100, CV_8UC1);  // Allocates data, refcount = 1
+Mat B = A;                  // Shares data, refcount = 2
+Mat C = A;                  // Shares data, refcount = 3
+// When C goes out of scope, refcount = 2
+// When B goes out of scope, refcount = 1  
+// When A goes out of scope, refcount = 0, data freed
+```
+
+### Shallow vs Deep Copy
+
+**Shallow Copy** (default):
+```cpp
+Mat A = imread("image.jpg");
+Mat B = A;              // Only header copied
+B.at<uchar>(0,0) = 0;  // Modifies A too!
+```
+
+**Deep Copy**:
+```cpp
+Mat A = imread("image.jpg");
+Mat B = A.clone();     // Data copied
+B.at<uchar>(0,0) = 0;  // A unchanged
+
+// Alternative
+Mat C;
+A.copyTo(C);
+```
+
+## Memory Allocation
+
+### Automatic Allocation
+
+```cpp
+// create() allocates only if needed
+Mat A;
+A.create(100, 100, CV_8UC3);  // Allocates
+A.create(100, 100, CV_8UC3);  // No reallocation (same size/type)
+A.create(200, 200, CV_8UC3);  // Reallocates (different size)
+```
+
+### Constructor Allocation
+
+```cpp
+// Allocates on construction
+Mat A(480, 640, CV_8UC3);
+Mat B(Size(640, 480), CV_8UC3, Scalar(0));
+
+// No allocation
+Mat C;  // Empty matrix
+```
+
+## UMat and Memory Allocators
+
+### MatAllocator
+
+Custom memory allocation through `MatAllocator` class:
+
+```cpp
+class CV_EXPORTS MatAllocator {
+public:
+    virtual UMatData* allocate(int dims, const int* sizes, 
+                               int type, void* data, 
+                               size_t* step, AccessFlag flags, 
+                               UMatUsageFlags usageFlags) const = 0;
+    virtual bool allocate(UMatData* data, AccessFlag accessflags, 
+                         UMatUsageFlags usageFlags) const = 0;
+    virtual void deallocate(UMatData* data) const = 0;
+};
+```
+
+### Memory Pools
+
+OpenCV supports buffer pooling for frequent allocations:
+
+```cpp
+// Get buffer pool controller
+BufferPoolController* pool = 
+    allocator->getBufferPoolController();
+```
+
+## Best Practices
+
+### Avoid Unnecessary Copies
+
+<CodeGroup>
+```cpp Good
+void processImage(const Mat& img) {
+    // Use reference, no copy
+    Mat result;
+    filter2D(img, result, -1, kernel);
+    return result;
+}
+```
+
+```cpp Bad
+void processImage(Mat img) {  // Copies header
+    // Process...
+}
+```
+</CodeGroup>
+
+### Return Values
+
+```cpp
+// Efficient: No copy due to return value optimization
+Mat createImage() {
+    Mat img(480, 640, CV_8UC3);
+    // ... initialize
+    return img;  // No actual copy
+}
+
+Mat result = createImage();  // Moves or shallow copy
+```
+
+### Pre-allocation
+
+```cpp
+// Pre-allocate output
+Mat dst;
+dst.create(src.size(), src.type());
+
+// OpenCV functions allocate if needed
+cvtColor(src, dst, COLOR_BGR2GRAY);  // Will allocate dst if needed
+```
+
+## Manual Memory Management
+
+### External Data
+
+Wrap user-allocated memory:
+
+```cpp
+// User manages memory
+unsigned char* data = new unsigned char[640*480*3];
+
+// OpenCV wraps it (no copy, no ownership)
+Mat img(480, 640, CV_8UC3, data);
+
+// Process with OpenCV
+cvtColor(img, gray, COLOR_BGR2GRAY);
+
+// User must free
+delete[] data;
+```
+
+### Release Memory
+
+```cpp
+Mat A(1000, 1000, CV_8UC3);
+
+// Manually release (rarely needed)
+A.release();  // Decrements refcount, frees if zero
+
+// Check if empty
+if(A.empty()) {
+    // A has no data
+}
+```
+
+## Memory Continuity
+
+### Continuous Storage
+
+```cpp
+// Check if continuous (no padding between rows)
+if(img.isContinuous()) {
+    // Can treat as 1D array
+    size_t total = img.total() * img.elemSize();
+    processData(img.ptr<uchar>(), total);
+}
+```
+
+### ROI and Continuity
+
+```cpp
+Mat img = imread("image.jpg");  // Continuous
+
+Mat roi = img(Rect(10, 10, 100, 100));  // NOT continuous
+
+// Make continuous
+Mat roiCopy = roi.clone();  // Now continuous
+```
+
+## Common Pitfalls
+
+<Warning>
+**Dangling Pointers**
+
+```cpp
+Mat getROI() {
+    Mat img(480, 640, CV_8UC3);
+    return img(Rect(0, 0, 100, 100));  // Dangerous!
+}  // img destroyed, ROI points to freed memory
+
+Mat roi = getROI();  // roi is invalid!
+```
+
+Fix: Return a clone or the full image.
+</Warning>
+
+<Warning>
+**Shared Data Modification**
+
+```cpp
+Mat A = imread("img.jpg");
+Mat B = A;  // Shares data
+
+GaussianBlur(B, B, Size(5,5), 0);  // Modifies A too!
+```
+
+Fix: Use `B = A.clone()` if independent data needed.
+</Warning>
+
+## Performance Considerations
+
+<CardGroup cols={2}>
+<Card title="Pass by Reference" icon="arrow-right">
+Always pass Mat as const reference to avoid header copies
+</Card>
+
+<Card title="Use ROI" icon="crop">
+ROI creates header only, no data copy
+</Card>
+
+<Card title="Avoid clone()" icon="copy">
+Use shallow copies when possible
+</Card>
+
+<Card title="Pre-allocate" icon="memory">
+Reuse matrices in loops to avoid reallocation
+</Card>
+</CardGroup>
+
+## Memory Debugging
+
+```cpp
+// Check properties
+std::cout << "Size: " << img.total() * img.elemSize() << " bytes\n";
+std::cout << "Continuous: " << img.isContinuous() << "\n";
+std::cout << "Submatrix: " << img.isSubmatrix() << "\n";
+
+// Check reference count (internal)
+// Mat doesn't expose refcount directly
+```
+
+## See Also
+
+- [Matrices](/concepts/matrices) - Understanding Mat class
+- [Image Basics](/concepts/image-basics) - Working with images
+- [Core Module](/modules/core) - Core data structures

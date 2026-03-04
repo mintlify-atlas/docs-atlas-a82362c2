@@ -1,0 +1,383 @@
+---
+title: Geometric Image Transformations
+description: Functions for performing geometric transformations of 2D images
+---
+
+The functions in this module perform various geometrical transformations of 2D images. They do not change the image content but deform the pixel grid and map this deformed grid to the destination image.
+
+## Image Resizing
+
+### resize
+
+Resizes an image.
+
+```cpp
+void resize(InputArray src, OutputArray dst,
+            Size dsize, double fx = 0, double fy = 0,
+            int interpolation = INTER_LINEAR);
+```
+
+<ParamField path="src" type="InputArray">
+  Input image.
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Output image; it has the size dsize (when it is non-zero) or the size computed from src.size(), fx, and fy; the type of dst is the same as of src.
+</ParamField>
+
+<ParamField path="dsize" type="Size">
+  Output image size; if it equals zero, it is computed as dsize = Size(round(fx*src.cols), round(fy*src.rows)). Either dsize or both fx and fy must be non-zero.
+</ParamField>
+
+<ParamField path="fx" type="double" default="0">
+  Scale factor along the horizontal axis; when it equals 0, it is computed as (double)dsize.width/src.cols.
+</ParamField>
+
+<ParamField path="fy" type="double" default="0">
+  Scale factor along the vertical axis; when it equals 0, it is computed as (double)dsize.height/src.rows.
+</ParamField>
+
+<ParamField path="interpolation" type="int" default="INTER_LINEAR">
+  Interpolation method. See InterpolationFlags.
+</ParamField>
+
+The function resize resizes the image src down to or up to the specified size.
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    // Explicitly specify dsize
+    resize(src, dst, Size(640, 480), 0, 0, INTER_LINEAR);
+    
+    // Specify fx and fy
+    resize(src, dst, Size(), 0.5, 0.5, INTER_AREA);
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    # Explicitly specify dsize
+    dst = cv2.resize(src, (640, 480), interpolation=cv2.INTER_LINEAR)
+    
+    # Specify fx and fy
+    dst = cv2.resize(src, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  To shrink an image, it will generally look best with INTER_AREA interpolation, whereas to enlarge an image, it will generally look best with INTER_CUBIC (slow) or INTER_LINEAR (faster but still looks OK).
+</Note>
+
+---
+
+## Affine Transformations
+
+### warpAffine
+
+Applies an affine transformation to an image.
+
+```cpp
+void warpAffine(InputArray src, OutputArray dst,
+                InputArray M, Size dsize,
+                int flags = INTER_LINEAR,
+                int borderMode = BORDER_CONSTANT,
+                const Scalar& borderValue = Scalar());
+```
+
+<ParamField path="src" type="InputArray">
+  Input image.
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Output image that has the size dsize and the same type as src.
+</ParamField>
+
+<ParamField path="M" type="InputArray">
+  2×3 transformation matrix.
+</ParamField>
+
+<ParamField path="dsize" type="Size">
+  Size of the output image.
+</ParamField>
+
+<ParamField path="flags" type="int" default="INTER_LINEAR">
+  Combination of interpolation methods (see InterpolationFlags) and the optional flag WARP_INVERSE_MAP that means that M is the inverse transformation.
+</ParamField>
+
+<ParamField path="borderMode" type="int" default="BORDER_CONSTANT">
+  Pixel extrapolation method; when borderMode=BORDER_TRANSPARENT, it means that the pixels in the destination image corresponding to the "outliers" in the source image are not modified by the function.
+</ParamField>
+
+<ParamField path="borderValue" type="Scalar" default="Scalar()">
+  Value used in case of a constant border; by default, it is 0.
+</ParamField>
+
+The function warpAffine transforms the source image using the specified matrix:
+
+$$
+\texttt{dst}(x,y) = \texttt{src}(M_{11} x + M_{12} y + M_{13}, M_{21} x + M_{22} y + M_{23})
+$$
+
+when the flag WARP_INVERSE_MAP is set. Otherwise, the transformation is first inverted with invertAffineTransform.
+
+<Note>
+  The function cannot operate in-place.
+</Note>
+
+---
+
+### getRotationMatrix2D
+
+Calculates an affine matrix of 2D rotation.
+
+```cpp
+Mat getRotationMatrix2D(Point2f center, double angle, double scale);
+```
+
+<ParamField path="center" type="Point2f">
+  Center of the rotation in the source image.
+</ParamField>
+
+<ParamField path="angle" type="double">
+  Rotation angle in degrees. Positive values mean counter-clockwise rotation (the coordinate origin is assumed to be the top-left corner).
+</ParamField>
+
+<ParamField path="scale" type="double">
+  Isotropic scale factor.
+</ParamField>
+
+The function calculates the 2×3 rotation matrix. The transformation maps the rotation center to itself. If this is not the target, adjust the shift.
+
+---
+
+### getAffineTransform
+
+Calculates an affine transform from three pairs of the corresponding points.
+
+```cpp
+Mat getAffineTransform(const Point2f src[], const Point2f dst[]);
+Mat getAffineTransform(InputArray src, InputArray dst);
+```
+
+<ParamField path="src" type="Point2f[]">  
+  Coordinates of triangle vertices in the source image.
+</ParamField>
+
+<ParamField path="dst" type="Point2f[]">
+  Coordinates of the corresponding triangle vertices in the destination image.
+</ParamField>
+
+The function calculates the 2 × 3 matrix of an affine transform so that the three source points are mapped to the three destination points.
+
+---
+
+### invertAffineTransform
+
+Inverts an affine transformation.
+
+```cpp
+void invertAffineTransform(InputArray M, OutputArray iM);
+```
+
+<ParamField path="M" type="InputArray">
+  Original affine transformation.
+</ParamField>
+
+<ParamField path="iM" type="OutputArray">
+  Output reverse affine transformation.
+</ParamField>
+
+The function computes an inverse affine transformation represented by 2 × 3 matrix M.
+
+---
+
+## Perspective Transformations
+
+### warpPerspective
+
+Applies a perspective transformation to an image.
+
+```cpp
+void warpPerspective(InputArray src, OutputArray dst,
+                     InputArray M, Size dsize,
+                     int flags = INTER_LINEAR,
+                     int borderMode = BORDER_CONSTANT,
+                     const Scalar& borderValue = Scalar());
+```
+
+<ParamField path="src" type="InputArray">
+  Input image.
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Output image that has the size dsize and the same type as src.
+</ParamField>
+
+<ParamField path="M" type="InputArray">
+  3×3 transformation matrix.
+</ParamField>
+
+<ParamField path="dsize" type="Size">
+  Size of the output image.
+</ParamField>
+
+<ParamField path="flags" type="int" default="INTER_LINEAR">
+  Combination of interpolation methods (INTER_LINEAR or INTER_NEAREST) and the optional flag WARP_INVERSE_MAP.
+</ParamField>
+
+<ParamField path="borderMode" type="int" default="BORDER_CONSTANT">
+  Pixel extrapolation method (BORDER_CONSTANT or BORDER_REPLICATE).
+</ParamField>
+
+<ParamField path="borderValue" type="Scalar" default="Scalar()">
+  Value used in case of a constant border; by default, it equals 0.
+</ParamField>
+
+The function warpPerspective transforms the source image using the specified matrix:
+
+$$
+\texttt{dst}(x,y) = \texttt{src}\left(\frac{M_{11} x + M_{12} y + M_{13}}{M_{31} x + M_{32} y + M_{33}}, \frac{M_{21} x + M_{22} y + M_{23}}{M_{31} x + M_{32} y + M_{33}}\right)
+$$
+
+when the flag WARP_INVERSE_MAP is set.
+
+<Note>
+  The function cannot operate in-place.
+</Note>
+
+---
+
+### getPerspectiveTransform
+
+Calculates a perspective transform from four pairs of the corresponding points.
+
+```cpp
+Mat getPerspectiveTransform(InputArray src, InputArray dst, int solveMethod = DECOMP_LU);
+Mat getPerspectiveTransform(const Point2f src[], const Point2f dst[], int solveMethod = DECOMP_LU);
+```
+
+<ParamField path="src" type="Point2f[]">
+  Coordinates of quadrangle vertices in the source image.
+</ParamField>
+
+<ParamField path="dst" type="Point2f[]">
+  Coordinates of the corresponding quadrangle vertices in the destination image.
+</ParamField>
+
+<ParamField path="solveMethod" type="int" default="DECOMP_LU">
+  Method passed to cv::solve.
+</ParamField>
+
+The function calculates the 3 × 3 matrix of a perspective transform so that the four source points are mapped to the four destination points.
+
+---
+
+## Generic Remapping
+
+### remap
+
+Applies a generic geometrical transformation to an image.
+
+```cpp
+void remap(InputArray src, OutputArray dst,
+           InputArray map1, InputArray map2,
+           int interpolation, int borderMode = BORDER_CONSTANT,
+           const Scalar& borderValue = Scalar());
+```
+
+<ParamField path="src" type="InputArray">
+  Source image.
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Destination image. It has the same size as map1 and the same type as src.
+</ParamField>
+
+<ParamField path="map1" type="InputArray">
+  The first map of either (x,y) points or just x values having the type CV_16SC2, CV_32FC1, or CV_32FC2.
+</ParamField>
+
+<ParamField path="map2" type="InputArray">
+  The second map of y values having the type CV_16UC1, CV_32FC1, or none (empty map if map1 is (x,y) points), respectively.
+</ParamField>
+
+<ParamField path="interpolation" type="int">
+  Interpolation method. The methods INTER_AREA, INTER_LINEAR_EXACT and INTER_NEAREST_EXACT are not supported by this function.
+</ParamField>
+
+<ParamField path="borderMode" type="int" default="BORDER_CONSTANT">
+  Pixel extrapolation method. When borderMode=BORDER_TRANSPARENT, it means that the pixels in the destination image that corresponds to the "outliers" in the source image are not modified by the function.
+</ParamField>
+
+<ParamField path="borderValue" type="Scalar" default="Scalar()">
+  Value used in case of a constant border. By default, it is 0.
+</ParamField>
+
+The function remap transforms the source image using the specified map:
+
+$$
+\texttt{dst}(x,y) = \texttt{src}(\texttt{map}_x(x,y), \texttt{map}_y(x,y))
+$$
+
+<Note>
+  This function cannot operate in-place. Due to current implementation limitations the size of an input and output images should be less than 32767x32767.
+</Note>
+
+---
+
+### getRectSubPix
+
+Retrieves a pixel rectangle from an image with sub-pixel accuracy.
+
+```cpp
+void getRectSubPix(InputArray image, Size patchSize,
+                   Point2f center, OutputArray patch, int patchType = -1);
+```
+
+<ParamField path="image" type="InputArray">
+  Source image.
+</ParamField>
+
+<ParamField path="patchSize" type="Size">
+  Size of the extracted patch.
+</ParamField>
+
+<ParamField path="center" type="Point2f">
+  Floating point coordinates of the center of the extracted rectangle within the source image. The center must be inside the image.
+</ParamField>
+
+<ParamField path="patch" type="OutputArray">
+  Extracted patch that has the size patchSize and the same number of channels as src.
+</ParamField>
+
+<ParamField path="patchType" type="int" default="-1">
+  Depth of the extracted pixels. By default, they have the same depth as src.
+</ParamField>
+
+The function getRectSubPix extracts pixels from src using bilinear interpolation. While the center of the rectangle must be inside the image, parts of the rectangle may be outside.
+
+---
+
+## Enumerations
+
+### InterpolationFlags
+
+Interpolation algorithm:
+
+- `INTER_NEAREST` - Nearest neighbor interpolation
+- `INTER_LINEAR` - Bilinear interpolation
+- `INTER_CUBIC` - Bicubic interpolation
+- `INTER_AREA` - Resampling using pixel area relation (preferred for image decimation)
+- `INTER_LANCZOS4` - Lanczos interpolation over 8x8 neighborhood
+- `INTER_LINEAR_EXACT` - Bit exact bilinear interpolation
+- `INTER_NEAREST_EXACT` - Bit exact nearest neighbor interpolation
+- `INTER_MAX` - Mask for interpolation codes
+- `WARP_FILL_OUTLIERS` - Flag, fills all of the destination image pixels
+- `WARP_INVERSE_MAP` - Flag, inverse transformation
+
+### WarpPolarMode
+
+Polar mapping mode:
+
+- `WARP_POLAR_LINEAR` - Remaps an image to/from polar space
+- `WARP_POLAR_LOG` - Remaps an image to/from semilog-polar space

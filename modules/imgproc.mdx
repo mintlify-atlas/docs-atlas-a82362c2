@@ -1,0 +1,519 @@
+---
+title: Image Processing Module
+description: Comprehensive image processing functions including filtering, transforms, color conversions, and feature detection
+---
+
+The Image Processing (imgproc) module provides a comprehensive suite of image processing functions for filtering, geometric transformations, color space conversions, and feature detection.
+
+## Overview
+
+From opencv2/imgproc.hpp:48-52:
+
+> This module offers a comprehensive suite of image processing functions, enabling tasks such as filtering, geometric transformations, color space conversions, histograms, structural analysis, and feature detection.
+
+<CardGroup cols={2}>
+  <Card title="Filtering" icon="filter">
+    Linear and non-linear image filtering operations
+  </Card>
+  <Card title="Transforms" icon="rotate">
+    Geometric transformations like resize, rotate, warp
+  </Card>
+  <Card title="Color Spaces" icon="palette">
+    Conversions between BGR, HSV, Lab, and other formats
+  </Card>
+  <Card title="Feature Detection" icon="magnifying-glass">
+    Edge detection, corner detection, and shape analysis
+  </Card>
+</CardGroup>
+
+## Image Filtering
+
+From imgproc.hpp:54-84, OpenCV provides various filtering operations:
+
+### Linear Filters
+
+```cpp
+#include <opencv2/imgproc.hpp>
+using namespace cv;
+
+// Gaussian blur
+GaussianBlur(src, dst, Size(5, 5), 1.5);
+
+// Box filter (average)
+boxFilter(src, dst, -1, Size(5, 5));
+blur(src, dst, Size(5, 5));
+
+// Median filter (non-linear)
+medianBlur(src, dst, 5);
+
+// Bilateral filter (edge-preserving)
+bilateralFilter(src, dst, 9, 75, 75);
+
+// Custom filter with kernel
+Mat kernel = (Mat_<float>(3,3) << -1, -1, -1,
+                                   -1,  9, -1,
+                                   -1, -1, -1);
+filter2D(src, dst, -1, kernel);
+```
+
+### Morphological Operations
+
+From imgproc.hpp:216-241:
+
+```cpp
+// Morphological operation types
+enum MorphTypes {
+    MORPH_ERODE = 0,    // Erosion
+    MORPH_DILATE = 1,   // Dilation
+    MORPH_OPEN = 2,     // Opening: dilate(erode(src))
+    MORPH_CLOSE = 3,    // Closing: erode(dilate(src))
+    MORPH_GRADIENT = 4, // Morphological gradient
+    MORPH_TOPHAT = 5,   // Top hat
+    MORPH_BLACKHAT = 6, // Black hat
+    MORPH_HITMISS = 7   // Hit-or-miss
+};
+
+// Create structuring element
+Mat element = getStructuringElement(
+    MORPH_RECT,     // Shape: RECT, CROSS, ELLIPSE
+    Size(5, 5),     // Size
+    Point(-1, -1)   // Anchor point
+);
+
+// Apply morphological operations
+erode(src, dst, element);
+dilate(src, dst, element);
+morphologyEx(src, dst, MORPH_OPEN, element);
+morphologyEx(src, dst, MORPH_CLOSE, element);
+```
+
+### Derivatives and Gradients
+
+```cpp
+// Sobel derivatives
+Sobel(src, dst, CV_16S, 1, 0);  // x-derivative
+Sobel(src, dst, CV_16S, 0, 1);  // y-derivative
+
+// Scharr (more accurate for 3x3)
+Scharr(src, dx, CV_16S, 1, 0);
+Scharr(src, dy, CV_16S, 0, 1);
+
+// Laplacian
+Laplacian(src, dst, CV_16S, 3);
+
+// Canny edge detector
+Canny(src, edges, 50, 150, 3);
+```
+
+## Geometric Transformations
+
+From imgproc.hpp:90-127, geometric transformations deform the pixel grid:
+
+### Resizing and Interpolation
+
+```cpp
+// Interpolation flags (imgproc.hpp:249-280)
+enum InterpolationFlags {
+    INTER_NEAREST = 0,        // Nearest neighbor
+    INTER_LINEAR = 1,         // Bilinear interpolation
+    INTER_CUBIC = 2,          // Bicubic interpolation
+    INTER_AREA = 3,           // Area interpolation (best for decimation)
+    INTER_LANCZOS4 = 4,       // Lanczos interpolation over 8x8
+    INTER_LINEAR_EXACT = 5,   // Bit exact bilinear
+    INTER_NEAREST_EXACT = 6   // Bit exact nearest neighbor
+};
+
+// Resize image
+resize(src, dst, Size(640, 480), 0, 0, INTER_LINEAR);
+resize(src, dst, Size(), 0.5, 0.5, INTER_AREA);  // Scale by 0.5
+
+// Pyramid operations
+pyrDown(src, dst);  // Downsample
+pyrUp(src, dst);    // Upsample
+```
+
+### Affine Transformations
+
+```cpp
+// Rotation
+Point2f center(width/2.0, height/2.0);
+Mat rotMat = getRotationMatrix2D(center, 45, 1.0);  // 45° rotation
+warpAffine(src, dst, rotMat, src.size());
+
+// Translation
+Mat transMat = (Mat_<double>(2,3) << 1, 0, 50,  // tx=50
+                                      0, 1, 30); // ty=30
+warpAffine(src, dst, transMat, src.size());
+
+// Affine from 3 points
+Point2f srcPts[3], dstPts[3];
+// ... set points ...
+Mat affineMat = getAffineTransform(srcPts, dstPts);
+warpAffine(src, dst, affineMat, src.size());
+```
+
+### Perspective Transformations
+
+```cpp
+// Perspective transform from 4 points
+Point2f srcQuad[4], dstQuad[4];
+// ... define source and destination points ...
+Mat perspMat = getPerspectiveTransform(srcQuad, dstQuad);
+warpPerspective(src, dst, perspMat, dst.size());
+
+// Find homography from point correspondences
+vector<Point2f> srcPoints, dstPoints;
+// ... fill points ...
+Mat H = findHomography(srcPoints, dstPoints, RANSAC);
+warpPerspective(src, dst, H, dst.size());
+```
+
+### Remapping
+
+```cpp
+// General remapping
+Mat mapX, mapY;
+// ... create mapping functions ...
+remap(src, dst, mapX, mapY, INTER_LINEAR);
+
+// Polar transformations
+linearPolar(src, dst, center, maxRadius, INTER_LINEAR);
+logPolar(src, dst, center, M, INTER_LINEAR);
+```
+
+## Color Space Conversions
+
+From imgproc.hpp:158-172:
+
+```cpp
+// Common color conversions
+cvtColor(src, dst, COLOR_BGR2GRAY);     // BGR to Grayscale
+cvtColor(src, dst, COLOR_BGR2HSV);      // BGR to HSV
+cvtColor(src, dst, COLOR_BGR2Lab);      // BGR to Lab
+cvtColor(src, dst, COLOR_BGR2YCrCb);    // BGR to YCrCb
+cvtColor(src, dst, COLOR_GRAY2BGR);     // Grayscale to BGR
+cvtColor(src, dst, COLOR_HSV2BGR);      // HSV to BGR
+
+// RGB vs BGR
+cvtColor(src, dst, COLOR_BGR2RGB);      // Swap R and B channels
+
+// Alpha channel
+cvtColor(src, dst, COLOR_BGR2BGRA);     // Add alpha channel
+cvtColor(src, dst, COLOR_BGRA2BGR);     // Remove alpha channel
+```
+
+## Thresholding
+
+```cpp
+// Simple thresholding
+threshold(src, dst, 127, 255, THRESH_BINARY);
+threshold(src, dst, 127, 255, THRESH_BINARY_INV);
+threshold(src, dst, 127, 255, THRESH_TRUNC);
+threshold(src, dst, 127, 255, THRESH_TOZERO);
+
+// Otsu's method (automatic threshold)
+threshold(src, dst, 0, 255, THRESH_BINARY | THRESH_OTSU);
+
+// Adaptive thresholding
+adaptiveThreshold(src, dst, 255,
+                  ADAPTIVE_THRESH_MEAN_C,
+                  THRESH_BINARY, 11, 2);
+                  
+adaptiveThreshold(src, dst, 255,
+                  ADAPTIVE_THRESH_GAUSSIAN_C,
+                  THRESH_BINARY, 11, 2);
+```
+
+## Edge Detection
+
+Example from samples/cpp/edge.cpp:
+
+```cpp
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
+
+Mat image, gray, blurImage, edges;
+
+// Load and convert to grayscale
+image = imread("image.jpg");
+cvtColor(image, gray, COLOR_BGR2GRAY);
+
+// Blur to reduce noise (edge.cpp:22)
+blur(gray, blurImage, Size(3, 3));
+
+// Canny edge detection (edge.cpp:25)
+int threshold1 = 50;
+int threshold2 = 150;
+Canny(blurImage, edges, threshold1, threshold2, 3);
+
+// Using Scharr gradient (edge.cpp:32-35)
+Mat dx, dy;
+Scharr(blurImage, dx, CV_16S, 1, 0);
+Scharr(blurImage, dy, CV_16S, 0, 1);
+Canny(dx, dy, edges, threshold1, threshold2);
+```
+
+## Histograms
+
+```cpp
+// Calculate histogram
+Mat hist;
+int histSize = 256;
+float range[] = {0, 256};
+const float* histRange = {range};
+calcHist(&src, 1, 0, Mat(), hist, 1, &histSize, &histRange);
+
+// Histogram equalization
+equalizeHist(src, dst);
+
+// CLAHE (Contrast Limited Adaptive Histogram Equalization)
+Ptr<CLAHE> clahe = createCLAHE();
+clahe->setClipLimit(4.0);
+clahe->apply(src, dst);
+
+// Back projection
+Mat backProj;
+calcBackProject(&src, 1, channels, hist, backProj, ranges);
+```
+
+## Contours and Shapes
+
+```cpp
+// Find contours
+vector<vector<Point>> contours;
+vector<Vec4i> hierarchy;
+findContours(binary, contours, hierarchy,
+             RETR_TREE, CHAIN_APPROX_SIMPLE);
+
+// Draw contours
+Mat drawing = Mat::zeros(binary.size(), CV_8UC3);
+for (size_t i = 0; i < contours.size(); i++) {
+    drawContours(drawing, contours, i, Scalar(0, 255, 0), 2);
+}
+
+// Contour properties
+double area = contourArea(contours[0]);
+double perimeter = arcLength(contours[0], true);
+
+// Approximate contour
+vector<Point> approx;
+approxPolyDP(contours[0], approx, epsilon, true);
+
+// Convex hull
+vector<Point> hull;
+convexHull(contours[0], hull);
+
+// Bounding shapes
+Rect bbox = boundingRect(contours[0]);
+RotatedRect minRect = minAreaRect(contours[0]);
+Point2f center;
+float radius;
+minEnclosingCircle(contours[0], center, radius);
+```
+
+## Drawing Functions
+
+From imgproc.hpp:130-156:
+
+```cpp
+// Lines
+line(img, pt1, pt2, Scalar(0, 255, 0), 2);
+
+// Arrows
+arrowedLine(img, pt1, pt2, Scalar(255, 0, 0), 2);
+
+// Rectangles
+rectangle(img, pt1, pt2, Scalar(0, 0, 255), 2);
+rectangle(img, rect, Scalar(0, 255, 255), -1);  // Filled
+
+// Circles
+circle(img, center, radius, Scalar(255, 255, 0), 2);
+
+// Ellipses
+ellipse(img, center, Size(100, 50), 45, 0, 360,
+        Scalar(255, 0, 255), 2);
+
+// Polygons
+vector<Point> pts = {Point(10,10), Point(100,50), Point(50,100)};
+polylines(img, pts, true, Scalar(0, 255, 0), 2);
+fillPoly(img, pts, Scalar(255, 255, 255));
+
+// Text
+putText(img, "OpenCV", Point(50, 50),
+        FONT_HERSHEY_SIMPLEX, 1.0, Scalar(0, 0, 0), 2);
+```
+
+## Distance Transform
+
+```cpp
+// Distance to nearest zero pixel
+Mat dist;
+distanceTransform(binary, dist, DIST_L2, 5);
+
+// Distance transform with labels
+Mat labels;
+distanceTransform(binary, dist, labels, DIST_L2, 5, LABEL_CCOMP);
+```
+
+## Connected Components
+
+```cpp
+// Label connected components
+Mat labels;
+int nLabels = connectedComponents(binary, labels);
+
+// With statistics
+Mat stats, centroids;
+int nLabels = connectedComponentsWithStats(binary, labels,
+                                            stats, centroids);
+
+// Access statistics
+for (int i = 1; i < nLabels; i++) {
+    int area = stats.at<int>(i, CC_STAT_AREA);
+    int left = stats.at<int>(i, CC_STAT_LEFT);
+    int top = stats.at<int>(i, CC_STAT_TOP);
+    int width = stats.at<int>(i, CC_STAT_WIDTH);
+    int height = stats.at<int>(i, CC_STAT_HEIGHT);
+    double cx = centroids.at<double>(i, 0);
+    double cy = centroids.at<double>(i, 1);
+}
+```
+
+## Image Moments
+
+```cpp
+// Calculate moments
+Moments m = moments(contour);
+
+// Centroid
+double cx = m.m10 / m.m00;
+double cy = m.m01 / m.m00;
+
+// Hu moments (rotation invariant)
+double hu[7];
+HuMoments(m, hu);
+```
+
+## Hough Transforms
+
+```cpp
+// Hough Line Transform
+vector<Vec2f> lines;
+HoughLines(edges, lines, 1, CV_PI/180, 100);
+
+// Probabilistic Hough Line Transform
+vector<Vec4i> linesP;
+HoughLinesP(edges, linesP, 1, CV_PI/180, 50, 50, 10);
+
+// Hough Circle Transform
+vector<Vec3f> circles;
+HoughCircles(gray, circles, HOUGH_GRADIENT,
+             1, 50, 200, 100, 0, 0);
+```
+
+## Watershed Segmentation
+
+```cpp
+// Prepare markers
+Mat markers;
+// ... initialize markers ...
+
+// Apply watershed
+watershed(image, markers);
+
+// Markers now contain segment labels
+// -1 indicates boundaries between segments
+```
+
+## Template Matching
+
+```cpp
+// Match template
+Mat result;
+matchTemplate(image, templ, result, TM_CCOEFF_NORMED);
+
+// Find best match
+double minVal, maxVal;
+Point minLoc, maxLoc;
+minMaxLoc(result, &minVal, &maxVal, &minLoc, &maxLoc);
+
+// Draw rectangle at match location
+rectangle(image, maxLoc,
+          Point(maxLoc.x + templ.cols, maxLoc.y + templ.rows),
+          Scalar(0, 255, 0), 2);
+```
+
+## Practical Example: Image Enhancement
+
+```cpp
+#include <opencv2/imgproc.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/highgui.hpp>
+
+using namespace cv;
+
+int main() {
+    // Load image
+    Mat img = imread("photo.jpg");
+    Mat result;
+    
+    // Denoise
+    fastNlMeansDenoisingColored(img, result, 10, 10, 7, 21);
+    
+    // Convert to Lab for better color processing
+    Mat lab;
+    cvtColor(result, lab, COLOR_BGR2Lab);
+    
+    // Split channels
+    vector<Mat> channels;
+    split(lab, channels);
+    
+    // Apply CLAHE to L channel
+    Ptr<CLAHE> clahe = createCLAHE(2.0, Size(8, 8));
+    clahe->apply(channels[0], channels[0]);
+    
+    // Merge and convert back
+    merge(channels, lab);
+    cvtColor(lab, result, COLOR_Lab2BGR);
+    
+    // Sharpen
+    Mat blurred;
+    GaussianBlur(result, blurred, Size(0, 0), 3);
+    addWeighted(result, 1.5, blurred, -0.5, 0, result);
+    
+    // Save result
+    imwrite("enhanced.jpg", result);
+    
+    return 0;
+}
+```
+
+## Best Practices
+
+<Note>
+**Border Handling:**
+Most filtering functions need to extrapolate pixels outside image boundaries. Choose the appropriate border type:
+- `BORDER_REPLICATE` - Good for most filtering
+- `BORDER_REFLECT_101` - Better for derivatives
+- `BORDER_CONSTANT` - When you need specific padding values
+</Note>
+
+<Note>
+**Interpolation:**
+Choose interpolation based on your needs:
+- `INTER_NEAREST` - Fastest, but lowest quality
+- `INTER_LINEAR` - Good balance of speed and quality
+- `INTER_AREA` - Best for downsampling
+- `INTER_CUBIC` - Best quality for upsampling
+- `INTER_LANCZOS4` - Highest quality, slowest
+</Note>
+
+## Related Modules
+
+- [Core Module](/modules/core) - Provides Mat and basic operations
+- [Image I/O](/modules/imgcodecs) - Reading and writing images
+- [Feature Detection](/modules/features2d) - Advanced feature detection
+
+## Source Reference
+
+Key header: `~/workspace/source/modules/imgproc/include/opencv2/imgproc.hpp`

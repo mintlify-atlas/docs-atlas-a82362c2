@@ -1,0 +1,187 @@
+---
+title: "Introduction to OpenCV"
+description: "Learn about OpenCV, the world's leading open-source computer vision library, its capabilities, and real-world applications"
+---
+
+## What is OpenCV?
+
+OpenCV (Open Source Computer Vision Library) is an open-source computer vision and machine learning software library. It provides a comprehensive set of tools and algorithms for real-time computer vision applications, image processing, and AI development.
+
+<Note>
+OpenCV is released under the Apache 2 License and is free for both academic and commercial use.
+</Note>
+
+## Key Features
+
+OpenCV offers extensive functionality across multiple domains:
+
+<Tabs>
+  <Tab title="Core Operations">
+    - **Matrix Operations**: Efficient data structures and operations for image manipulation
+    - **Image Processing**: Filtering, morphological operations, color space conversions
+    - **Feature Detection**: SIFT, SURF, ORB, and other feature extractors
+    - **Object Detection**: Haar cascades, HOG descriptors, DNN-based detection
+  </Tab>
+  
+  <Tab title="Advanced Features">
+    - **Machine Learning**: Support for various ML algorithms including SVM, decision trees, neural networks
+    - **Deep Learning**: Integration with TensorFlow, PyTorch, and other frameworks
+    - **Video Analysis**: Optical flow, background subtraction, object tracking
+    - **Camera Calibration**: 3D reconstruction, stereo vision, pose estimation
+  </Tab>
+  
+  <Tab title="Performance">
+    - **Hardware Acceleration**: CUDA, OpenCL, Intel IPP support
+    - **Parallel Processing**: TBB (Threading Building Blocks) integration
+    - **Optimized Algorithms**: Hand-tuned implementations for maximum performance
+    - **Cross-Platform**: Runs on Windows, Linux, macOS, iOS, and Android
+  </Tab>
+</Tabs>
+
+## Use Cases
+
+OpenCV powers computer vision applications across diverse industries:
+
+### Robotics and Automation
+- Vision-guided robots for manufacturing and warehouses
+- Autonomous navigation and obstacle detection
+- Quality control and defect inspection
+
+### Medical Imaging
+- Medical image analysis and diagnosis
+- Surgical assistance and planning
+- Pathology image processing
+
+### Security and Surveillance
+- Face recognition and detection
+- License plate recognition
+- Intrusion detection and monitoring
+
+### Augmented Reality
+- Marker-based and markerless AR
+- Real-time object tracking
+- 3D pose estimation
+
+### Automotive
+- Advanced driver assistance systems (ADAS)
+- Lane detection and traffic sign recognition
+- Pedestrian detection
+
+## Library Architecture
+
+OpenCV is organized into multiple modules, each focused on specific functionality:
+
+```cpp
+// Core modules included in most applications
+#include <opencv2/core.hpp>      // Basic data structures and operations
+#include <opencv2/imgcodecs.hpp> // Image file reading and writing
+#include <opencv2/imgproc.hpp>   // Image processing functions
+#include <opencv2/highgui.hpp>   // GUI and display functions
+```
+
+### Main Modules
+
+- **core**: Basic data structures (Mat, Vec, etc.) and fundamental operations
+- **imgproc**: Image processing (filtering, geometric transformations, color space conversions)
+- **imgcodecs**: Image file I/O (JPEG, PNG, TIFF, etc.)
+- **videoio**: Video capture and encoding
+- **highgui**: UI creation and display functions
+- **video**: Video analysis (optical flow, background subtraction, tracking)
+- **calib3d**: Camera calibration and 3D reconstruction
+- **features2d**: Feature detection and description
+- **objdetect**: Object detection (face, pedestrian, etc.)
+- **dnn**: Deep neural networks module
+- **ml**: Machine learning algorithms
+
+<Tip>
+You can extend OpenCV's functionality by building with the **opencv_contrib** repository, which contains experimental and non-free algorithms.
+</Tip>
+
+## Language Bindings
+
+OpenCV supports multiple programming languages:
+
+<CodeGroup>
+```python Python
+import cv2 as cv
+import numpy as np
+
+# Load and display an image
+img = cv.imread('image.jpg')
+cv.imshow('Image', img)
+cv.waitKey(0)
+```
+
+```cpp C++
+#include <opencv2/opencv.hpp>
+using namespace cv;
+
+int main() {
+    // Load and display an image
+    Mat img = imread("image.jpg");
+    imshow("Image", img);
+    waitKey(0);
+    return 0;
+}
+```
+
+```java Java
+import org.opencv.core.Core;
+import org.opencv.core.Mat;
+import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.highgui.HighGui;
+
+public class Main {
+    public static void main(String[] args) {
+        System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+        Mat img = Imgcodecs.imread("image.jpg");
+        HighGui.imshow("Image", img);
+        HighGui.waitKey();
+    }
+}
+```
+</CodeGroup>
+
+## History and Community
+
+OpenCV was initially developed by Intel in 1999 and has grown into one of the most widely-used computer vision libraries:
+
+- **1999**: Initial release by Intel Research
+- **2006**: First stable release (OpenCV 1.0)
+- **2009**: OpenCV 2.0 with C++ API
+- **2012**: Non-profit OpenCV Foundation established
+- **2015**: OpenCV 3.0 with refactored architecture
+- **2018**: OpenCV 4.0 with C++11 baseline
+- **Present**: Active development with regular releases
+
+### Community Resources
+
+<CardGroup cols={2}>
+  <Card title="Documentation" icon="book" href="https://docs.opencv.org">
+    Comprehensive API reference and tutorials
+  </Card>
+  
+  <Card title="Forum" icon="comments" href="https://forum.opencv.org">
+    Q&A forum for community support
+  </Card>
+  
+  <Card title="GitHub" icon="github" href="https://github.com/opencv/opencv">
+    Source code and issue tracking
+  </Card>
+  
+  <Card title="Courses" icon="graduation-cap" href="https://opencv.org/courses">
+    Official training and certification
+  </Card>
+</CardGroup>
+
+<Warning>
+OpenCV is actively maintained with regular updates. Always check the [official website](https://opencv.org) for the latest releases and security updates.
+</Warning>
+
+## Next Steps
+
+Ready to get started with OpenCV? Continue to the installation guide to set up OpenCV on your system.
+
+<Card title="Installation Guide" icon="download" href="/installation">
+  Learn how to install OpenCV on Linux, Windows, or macOS
+</Card>

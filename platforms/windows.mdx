@@ -1,0 +1,500 @@
+---
+title: Building OpenCV on Windows
+description: Complete guide for building and installing OpenCV on Windows using Visual Studio, MinGW, and other toolchains
+---
+
+OpenCV provides full support for Windows platforms with Visual Studio, MinGW, and other compilers. Pre-built binaries are also available for quick setup.
+
+## Quick Start with Pre-built Libraries
+
+The fastest way to get started with OpenCV on Windows:
+
+<Steps>
+  <Step title="Download Pre-built Package">
+    Download the Windows installer from the [OpenCV releases page](https://opencv.org/releases/):
+    
+    ```powershell
+    # Example: opencv-4.x.0-windows.exe
+    ```
+    
+    <Note>
+    Pre-built packages include binaries for Visual Studio 2015-2022 (x86 and x64).
+    </Note>
+  </Step>
+  
+  <Step title="Extract Archive">
+    Run the self-extracting archive. It will create a directory structure:
+    
+    ```
+    C:\opencv\
+      build\
+        x64\          # 64-bit binaries
+          vc15\       # Visual Studio 2017
+          vc16\       # Visual Studio 2019
+          vc17\       # Visual Studio 2022
+        x86\          # 32-bit binaries
+      sources\        # Source code
+    ```
+  </Step>
+  
+  <Step title="Set Environment Variables">
+    Add OpenCV to your system path:
+    
+    ```powershell
+    # Set OpenCV_DIR (adjust version as needed)
+    setx OpenCV_DIR C:\opencv\build\x64\vc17
+    
+    # Add bin directory to PATH
+    setx PATH "%PATH%;%OpenCV_DIR%\bin"
+    ```
+    
+    <Warning>
+    Restart your terminal or IDE after setting environment variables.
+    </Warning>
+  </Step>
+</Steps>
+
+## Building from Source
+
+For the latest features or custom configurations, build OpenCV from source.
+
+### Prerequisites
+
+<Tabs>
+  <Tab title="Visual Studio">
+    **Required:**
+    - [Visual Studio 2015 or later](https://visualstudio.microsoft.com/) (Community Edition is free)
+      - Install "Desktop development with C++" workload
+    - [CMake 3.5.1 or later](https://cmake.org/download/)
+    - [Git for Windows](https://git-scm.com/download/win) (optional but recommended)
+    
+    **Optional:**
+    - [Python 3.6+](https://www.python.org/downloads/windows/) for Python bindings
+    - [NumPy](https://numpy.org/) for Python interface
+  </Tab>
+  
+  <Tab title="MinGW">
+    **Required:**
+    - [MinGW-w64](https://www.mingw-w64.org/downloads/)
+    - [CMake 3.5.1 or later](https://cmake.org/download/)
+    - [Git for Windows](https://git-scm.com/download/win) (optional)
+    
+    <Note>
+    MinGW builds may have limited compatibility with some third-party libraries.
+    </Note>
+  </Tab>
+</Tabs>
+
+### Build Steps with Visual Studio
+
+<Steps>
+  <Step title="Clone Repository">
+    Open Git Bash or Command Prompt:
+    
+    ```bash
+    cd C:\
+    git clone https://github.com/opencv/opencv.git
+    cd opencv
+    ```
+    
+    Or download and extract a release archive.
+  </Step>
+  
+  <Step title="Create Build Directory">
+    ```bash
+    mkdir build
+    cd build
+    ```
+  </Step>
+  
+  <Step title="Configure with CMake GUI">
+    Launch CMake GUI:
+    
+    1. Set **Source code** to: `C:/opencv`
+    2. Set **Build binaries** to: `C:/opencv/build`
+    3. Click **Configure**
+    4. Select your Visual Studio version and platform (x64 recommended)
+    5. Click **Finish**
+    
+    <Tip>
+    Enable "Grouped" view for easier navigation of CMake options.
+    </Tip>
+  </Step>
+  
+  <Step title="Adjust Build Options">
+    Key CMake options to consider:
+    
+    ```cmake
+    BUILD_EXAMPLES=ON           # Build example applications
+    BUILD_TESTS=OFF             # Skip tests for faster build
+    BUILD_PERF_TESTS=OFF        # Skip performance tests
+    BUILD_opencv_world=ON       # Build single combined library
+    BUILD_SHARED_LIBS=ON        # Build DLLs (not static libs)
+    WITH_CUDA=OFF               # Enable if you have NVIDIA GPU
+    WITH_TBB=ON                 # Enable Intel TBB
+    ```
+    
+    Click **Configure** again after changes.
+  </Step>
+  
+  <Step title="Generate Project Files">
+    Once configuration completes without errors:
+    
+    1. Click **Generate**
+    2. Click **Open Project** to launch Visual Studio
+  </Step>
+  
+  <Step title="Build in Visual Studio">
+    In Visual Studio:
+    
+    1. Select **Release** configuration (or Debug)
+    2. Right-click **ALL_BUILD** project → **Build**
+    3. Wait for compilation (15-60 minutes depending on options)
+    
+    <Note>
+    Build both **Release** and **Debug** configurations if you need both.
+    </Note>
+  </Step>
+  
+  <Step title="Install (Optional)">
+    Right-click **INSTALL** project → **Build**
+    
+    This copies files to the install directory (default: `C:/Program Files/opencv`).
+  </Step>
+</Steps>
+
+### Build Steps with Command Line
+
+For automated builds or CI/CD pipelines:
+
+```powershell
+# Clone repository
+git clone https://github.com/opencv/opencv.git
+cd opencv
+mkdir build
+cd build
+
+# Configure
+cmake -G "Visual Studio 17 2022" -A x64 ^
+      -DCMAKE_BUILD_TYPE=Release ^
+      -DBUILD_EXAMPLES=ON ^
+      -DBUILD_opencv_world=ON ^
+      ..
+
+# Build Release
+cmake --build . --config Release --target ALL_BUILD -j 8
+
+# Build Debug
+cmake --build . --config Debug --target ALL_BUILD -j 8
+
+# Install
+cmake --build . --config Release --target INSTALL
+```
+
+<Tabs>
+  <Tab title="Visual Studio 2022">
+    ```powershell
+    cmake -G "Visual Studio 17 2022" -A x64 ..
+    ```
+  </Tab>
+  
+  <Tab title="Visual Studio 2019">
+    ```powershell
+    cmake -G "Visual Studio 16 2019" -A x64 ..
+    ```
+  </Tab>
+  
+  <Tab title="Visual Studio 2017">
+    ```powershell
+    cmake -G "Visual Studio 15 2017 Win64" ..
+    ```
+  </Tab>
+  
+  <Tab title="Ninja (Faster)">
+    ```powershell
+    # From Visual Studio Developer Command Prompt
+    cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ..
+    ninja
+    ```
+  </Tab>
+</Tabs>
+
+## Using Git Bash for Automated Build
+
+A complete build script using Git Bash:
+
+```bash
+#!/bin/bash -e
+myRepo=$(pwd)
+CMAKE_GENERATOR_OPTIONS=-G"Visual Studio 17 2022"
+
+# Clone repositories
+if [ ! -d "$myRepo/opencv" ]; then
+    echo "Cloning opencv"
+    git clone https://github.com/opencv/opencv.git
+else
+    cd opencv && git pull --rebase && cd ..
+fi
+
+if [ ! -d "$myRepo/opencv_contrib" ]; then
+    echo "Cloning opencv_contrib"
+    git clone https://github.com/opencv/opencv_contrib.git
+else
+    cd opencv_contrib && git pull --rebase && cd ..
+fi
+
+# Build
+mkdir -p build_opencv
+cd build_opencv
+
+CMAKE_OPTIONS=(
+    -DBUILD_PERF_TESTS:BOOL=OFF
+    -DBUILD_TESTS:BOOL=OFF
+    -DBUILD_DOCS:BOOL=OFF
+    -DWITH_CUDA:BOOL=OFF
+    -DBUILD_EXAMPLES:BOOL=OFF
+    -DINSTALL_CREATE_DISTRIB=ON
+    -DOPENCV_EXTRA_MODULES_PATH="$myRepo/opencv_contrib/modules"
+    -DCMAKE_INSTALL_PREFIX="$myRepo/install/opencv"
+)
+
+cmake "${CMAKE_GENERATOR_OPTIONS[@]}" "${CMAKE_OPTIONS[@]}" "$myRepo/opencv"
+
+# Build both configurations
+cmake --build . --config Debug
+cmake --build . --config Release
+
+# Install
+cmake --build . --target install --config Release
+cmake --build . --target install --config Debug
+```
+
+## Building with opencv_contrib
+
+To include extra modules from opencv_contrib:
+
+```powershell
+# Clone opencv_contrib alongside opencv
+cd C:\
+git clone https://github.com/opencv/opencv.git
+git clone https://github.com/opencv/opencv_contrib.git
+
+cd opencv\build
+
+# Configure with contrib modules
+cmake -G "Visual Studio 17 2022" -A x64 ^
+      -DOPENCV_EXTRA_MODULES_PATH=C:/opencv_contrib/modules ^
+      ..
+```
+
+## Optional Dependencies
+
+### Intel Threading Building Blocks (TBB)
+
+For improved parallel processing performance:
+
+1. Download TBB from [Intel oneAPI](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit.html)
+2. Extract to `C:\opencv\dep\tbb`
+3. Add CMake option: `-DWITH_TBB=ON -DTBB_DIR=C:/opencv/dep/tbb`
+
+### CUDA (NVIDIA GPU Acceleration)
+
+<Steps>
+  <Step title="Install CUDA Toolkit">
+    Download from [NVIDIA CUDA Downloads](https://developer.nvidia.com/cuda-downloads)
+    
+    Install with default options.
+  </Step>
+  
+  <Step title="Configure OpenCV with CUDA">
+    ```powershell
+    cmake -G "Visual Studio 17 2022" -A x64 ^
+          -DWITH_CUDA=ON ^
+          -DCUDA_ARCH_BIN="6.0 6.1 7.0 7.5 8.0 8.6 8.9" ^
+          ..
+    ```
+    
+    <Note>
+    Set `CUDA_ARCH_BIN` to match your GPU's compute capability. Build time increases significantly with CUDA enabled.
+    </Note>
+  </Step>
+</Steps>
+
+### Python Support
+
+```powershell
+# Install Python and NumPy
+pip install numpy
+
+# CMake will auto-detect Python
+# Or specify explicitly:
+cmake -DPYTHON3_EXECUTABLE="C:/Python311/python.exe" ^
+      -DPYTHON3_INCLUDE_DIR="C:/Python311/include" ^
+      -DPYTHON3_NUMPY_INCLUDE_DIRS="C:/Python311/Lib/site-packages/numpy/core/include" ^
+      ..
+```
+
+## Build Configuration Options
+
+### Recommended Settings for Development
+
+```cmake
+BUILD_EXAMPLES=ON                    # Sample applications
+BUILD_opencv_world=ON                # Single library file
+BUILD_SHARED_LIBS=ON                 # DLL files
+ENABLE_SOLUTION_FOLDERS=ON           # Organize VS projects
+BUILD_TESTS=OFF                      # Skip tests
+BUILD_PERF_TESTS=OFF                 # Skip perf tests
+WITH_TBB=ON                          # Parallel processing
+WITH_OPENGL=ON                       # OpenGL support
+```
+
+### Minimal Build for Distribution
+
+```cmake
+BUILD_EXAMPLES=OFF
+BUILD_TESTS=OFF
+BUILD_PERF_TESTS=OFF
+BUILD_DOCS=OFF
+BUILD_opencv_apps=OFF
+BUILD_opencv_world=ON                # Recommended for easier deployment
+INSTALL_CREATE_DISTRIB=ON
+```
+
+## Setting Up Your Development Environment
+
+### Using OpenCV in Visual Studio Projects
+
+<Steps>
+  <Step title="Set Environment Variable">
+    ```powershell
+    setx OpenCV_DIR "C:\opencv\build\x64\vc17"
+    ```
+  </Step>
+  
+  <Step title="Add to System PATH">
+    ```powershell
+    setx PATH "%PATH%;%OpenCV_DIR%\bin"
+    ```
+    
+    Or manually add `C:\opencv\build\x64\vc17\bin` to System PATH via Control Panel.
+  </Step>
+  
+  <Step title="Configure Your Project">
+    In your project's CMakeLists.txt:
+    
+    ```cmake
+    find_package(OpenCV REQUIRED)
+    include_directories(${OpenCV_INCLUDE_DIRS})
+    target_link_libraries(your_target ${OpenCV_LIBS})
+    ```
+    
+    Or manually configure Include Directories and Library Directories in Visual Studio project properties.
+  </Step>
+</Steps>
+
+## Verification
+
+Test your OpenCV installation:
+
+<Tabs>
+  <Tab title="Command Prompt">
+    ```powershell
+    # Check Python binding
+    python -c "import cv2; print(cv2.__version__)"
+    
+    # Run example application
+    cd C:\opencv\build\bin\Release
+    opencv_version.exe
+    ```
+  </Tab>
+  
+  <Tab title="PowerShell">
+    ```powershell
+    # List built libraries
+    Get-ChildItem C:\opencv\build\lib\Release
+    
+    # List executables
+    Get-ChildItem C:\opencv\build\bin\Release\*.exe
+    ```
+  </Tab>
+</Tabs>
+
+## Package Manager Installation
+
+### vcpkg
+
+For dependency management:
+
+```powershell
+# Install vcpkg
+git clone https://github.com/Microsoft/vcpkg.git
+cd vcpkg
+.\bootstrap-vcpkg.bat
+
+# Install OpenCV
+.\vcpkg install opencv[contrib,cuda]:x64-windows
+
+# Integrate with Visual Studio
+.\vcpkg integrate install
+```
+
+### Conan
+
+```powershell
+# Install Conan
+pip install conan
+
+# Install OpenCV
+conan install opencv/4.5.5@
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="CMake cannot find Visual Studio">
+    - Ensure Visual Studio is installed with C++ tools
+    - Use "Developer Command Prompt for VS" to run CMake
+    - Specify generator explicitly: `-G "Visual Studio 17 2022"`
+  </Accordion>
+  
+  <Accordion title="Missing DLL errors when running applications">
+    Add OpenCV bin directory to PATH:
+    
+    ```powershell
+    setx PATH "%PATH%;C:\opencv\build\x64\vc17\bin"
+    ```
+    
+    Or copy DLL files next to your executable.
+  </Accordion>
+  
+  <Accordion title="Python cannot import cv2">
+    - Verify NumPy is installed: `pip install numpy`
+    - Check Python version matches (32/64-bit)
+    - Verify cv2.pyd is in Python's site-packages
+    - Try rebuilding with correct Python paths
+  </Accordion>
+  
+  <Accordion title="Build errors with CUDA">
+    - Ensure CUDA Toolkit version matches VS version compatibility
+    - Update GPU drivers
+    - Reduce `CUDA_ARCH_BIN` to only your GPU's compute capability
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Visual Studio Integration" icon="code" href="/getting-started/visual-studio">
+    Set up OpenCV in Visual Studio projects
+  </Card>
+  <Card title="CMake Configuration" icon="gear" href="/configuration/cmake-options">
+    Explore all configuration options
+  </Card>
+  <Card title="Getting Started" icon="rocket" href="/getting-started/quickstart">
+    Write your first OpenCV application
+  </Card>
+  <Card title="Python Bindings" icon="python" href="/python/installation">
+    Use OpenCV with Python
+  </Card>
+</CardGroup>

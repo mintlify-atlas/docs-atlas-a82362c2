@@ -1,0 +1,602 @@
+---
+title: Video Processing
+description: Learn how to read, write, and process video files and camera streams frame-by-frame in OpenCV
+---
+
+# Video Processing
+
+Learn how to capture video from files and cameras, process frames in real-time, and write processed video to disk.
+
+## Video Capture Basics
+
+### Capturing from Camera
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    # Create VideoCapture object for default camera (0)
+    cap = cv.VideoCapture(0)
+    
+    # Check if camera opened successfully
+    if not cap.isOpened():
+        print("Error: Cannot open camera")
+        exit()
+    
+    # Read and display frames
+    while True:
+        ret, frame = cap.read()
+        
+        if not ret:
+            print("Can't receive frame. Exiting...")
+            break
+        
+        cv.imshow('Camera', frame)
+        
+        # Press 'q' to quit
+        if cv.waitKey(1) & 0xFF == ord('q'):
+            break
+    
+    # Release resources
+    cap.release()
+    cv.destroyAllWindows()
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    #include <iostream>
+    using namespace cv;
+    using namespace std;
+
+    int main() {
+        // Create VideoCapture object
+        VideoCapture cap(0);
+        
+        if (!cap.isOpened()) {
+            cout << "Error: Cannot open camera" << endl;
+            return -1;
+        }
+        
+        Mat frame;
+        while (true) {
+            cap >> frame;
+            
+            if (frame.empty()) {
+                cout << "Can't receive frame" << endl;
+                break;
+            }
+            
+            imshow("Camera", frame);
+            
+            // Press ESC to quit
+            if (waitKey(1) == 27)
+                break;
+        }
+        
+        cap.release();
+        destroyAllWindows();
+        return 0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+Camera indices start at 0. If you have multiple cameras:
+- 0: Default camera (usually built-in webcam)
+- 1, 2, 3...: Additional cameras
+</Note>
+
+### Reading Video Files
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    # Open video file
+    cap = cv.VideoCapture('video.mp4')
+    
+    if not cap.isOpened():
+        print("Error: Cannot open video file")
+        exit()
+    
+    # Get video properties
+    fps = cap.get(cv.CAP_PROP_FPS)
+    width = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
+    frame_count = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
+    
+    print(f"FPS: {fps}, Size: {width}x{height}, Frames: {frame_count}")
+    
+    while True:
+        ret, frame = cap.read()
+        
+        if not ret:
+            break
+        
+        cv.imshow('Video', frame)
+        
+        # Wait time to match video FPS (ESC to exit)
+        if cv.waitKey(int(1000/fps)) & 0xFF == 27:
+            break
+    
+    cap.release()
+    cv.destroyAllWindows()
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    #include <iostream>
+    using namespace cv;
+    using namespace std;
+
+    int main() {
+        VideoCapture cap("video.mp4");
+        
+        if (!cap.isOpened()) {
+            cout << "Error: Cannot open video file" << endl;
+            return -1;
+        }
+        
+        // Get video properties
+        double fps = cap.get(CAP_PROP_FPS);
+        int width = cap.get(CAP_PROP_FRAME_WIDTH);
+        int height = cap.get(CAP_PROP_FRAME_HEIGHT);
+        int frame_count = cap.get(CAP_PROP_FRAME_COUNT);
+        
+        cout << "FPS: " << fps << ", Size: " << width << "x" << height 
+             << ", Frames: " << frame_count << endl;
+        
+        Mat frame;
+        while (cap.read(frame)) {
+            imshow("Video", frame);
+            
+            if (waitKey(1000/fps) == 27)
+                break;
+        }
+        
+        return 0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Writing Video Files
+
+### Basic Video Writer
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    # Open camera
+    cap = cv.VideoCapture(0)
+    
+    # Get video properties from source
+    width = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
+    fps = 20.0
+    
+    # Define codec and create VideoWriter
+    fourcc = cv.VideoWriter_fourcc(*'mp4v')
+    out = cv.VideoWriter('output.mp4', fourcc, fps, (width, height))
+    
+    if not out.isOpened():
+        print("Error: Cannot open video writer")
+        exit()
+    
+    while True:
+        ret, frame = cap.read()
+        
+        if not ret:
+            break
+        
+        # Write frame to output video
+        out.write(frame)
+        
+        cv.imshow('Recording', frame)
+        
+        if cv.waitKey(1) & 0xFF == ord('q'):
+            break
+    
+    cap.release()
+    out.release()
+    cv.destroyAllWindows()
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    int main() {
+        VideoCapture cap(0);
+        
+        if (!cap.isOpened())
+            return -1;
+        
+        int width = cap.get(CAP_PROP_FRAME_WIDTH);
+        int height = cap.get(CAP_PROP_FRAME_HEIGHT);
+        double fps = 20.0;
+        
+        // Define codec and create VideoWriter
+        int fourcc = VideoWriter::fourcc('m','p','4','v');
+        VideoWriter out("output.mp4", fourcc, fps, Size(width, height));
+        
+        if (!out.isOpened())
+            return -1;
+        
+        Mat frame;
+        while (cap.read(frame)) {
+            out.write(frame);
+            
+            imshow("Recording", frame);
+            
+            if (waitKey(1) == 'q')
+                break;
+        }
+        
+        return 0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+Common video codecs (FourCC codes):
+- `'mp4v'`: MPEG-4 (good compatibility)
+- `'XVID'`: Xvid codec
+- `'H264'` or `'X264'`: H.264 (best compression)
+- `'MJPG'`: Motion JPEG (larger files, faster encoding)
+</Note>
+
+## Frame-by-Frame Processing
+
+### Edge Detection on Video
+
+Based on OpenCV's edge.py sample:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    def nothing(x):
+        pass
+
+    # Create window with trackbars
+    cv.namedWindow('edge')
+    cv.createTrackbar('threshold1', 'edge', 2000, 5000, nothing)
+    cv.createTrackbar('threshold2', 'edge', 4000, 5000, nothing)
+
+    cap = cv.VideoCapture(0)
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        # Convert to grayscale
+        gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+        
+        # Get threshold values from trackbars
+        thrs1 = cv.getTrackbarPos('threshold1', 'edge')
+        thrs2 = cv.getTrackbarPos('threshold2', 'edge')
+        
+        # Apply Canny edge detection
+        edges = cv.Canny(gray, thrs1, thrs2, apertureSize=5)
+        
+        # Create visualization
+        vis = frame.copy()
+        vis = np.uint8(vis / 2.0)  # Darken original
+        vis[edges != 0] = (0, 255, 0)  # Highlight edges in green
+        
+        cv.imshow('edge', vis)
+        
+        if cv.waitKey(5) & 0xFF == 27:
+            break
+
+    cap.release()
+    cv.destroyAllWindows()
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    int main() {
+        VideoCapture cap(0);
+        if (!cap.isOpened())
+            return -1;
+        
+        namedWindow("edge");
+        int threshold1 = 2000, threshold2 = 4000;
+        createTrackbar("threshold1", "edge", &threshold1, 5000);
+        createTrackbar("threshold2", "edge", &threshold2, 5000);
+        
+        Mat frame, gray, edges, vis;
+        while (cap.read(frame)) {
+            cvtColor(frame, gray, COLOR_BGR2GRAY);
+            
+            // Apply Canny edge detection
+            Canny(gray, edges, threshold1, threshold2, 5);
+            
+            // Create visualization
+            frame.copyTo(vis);
+            vis = vis / 2;  // Darken
+            vis.setTo(Scalar(0, 255, 0), edges);  // Highlight edges
+            
+            imshow("edge", vis);
+            
+            if (waitKey(5) == 27)
+                break;
+        }
+        
+        return 0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Video Processing Pipeline
+
+Complete example with multiple processing steps:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    def process_frame(frame):
+        """Apply multiple processing steps to a frame"""
+        # Resize for faster processing
+        frame = cv.resize(frame, (640, 480))
+        
+        # Apply Gaussian blur
+        blurred = cv.GaussianBlur(frame, (5, 5), 0)
+        
+        # Convert to HSV for better color detection
+        hsv = cv.cvtColor(blurred, cv.COLOR_BGR2HSV)
+        
+        # Define color range (example: detect blue objects)
+        lower_blue = np.array([100, 50, 50])
+        upper_blue = np.array([130, 255, 255])
+        
+        # Create mask
+        mask = cv.inRange(hsv, lower_blue, upper_blue)
+        
+        # Apply morphological operations
+        kernel = np.ones((5, 5), np.uint8)
+        mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel)
+        mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
+        
+        # Apply mask to original frame
+        result = cv.bitwise_and(frame, frame, mask=mask)
+        
+        return result, mask
+
+    # Main processing loop
+    cap = cv.VideoCapture('input.mp4')
+    
+    # Setup video writer
+    width = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv.CAP_PROP_FPS)
+    
+    fourcc = cv.VideoWriter_fourcc(*'mp4v')
+    out = cv.VideoWriter('processed.mp4', fourcc, fps, (640, 480))
+
+    frame_count = 0
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        # Process frame
+        processed, mask = process_frame(frame)
+        
+        # Write to output
+        out.write(processed)
+        
+        # Display
+        cv.imshow('Original', cv.resize(frame, (640, 480)))
+        cv.imshow('Processed', processed)
+        cv.imshow('Mask', mask)
+        
+        frame_count += 1
+        if frame_count % 30 == 0:
+            print(f"Processed {frame_count} frames")
+        
+        if cv.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    print(f"Total frames processed: {frame_count}")
+    cap.release()
+    out.release()
+    cv.destroyAllWindows()
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    #include <iostream>
+    using namespace cv;
+    using namespace std;
+
+    Mat processFrame(Mat& frame) {
+        Mat blurred, hsv, mask, result;
+        
+        // Resize for faster processing
+        resize(frame, frame, Size(640, 480));
+        
+        // Apply Gaussian blur
+        GaussianBlur(frame, blurred, Size(5, 5), 0);
+        
+        // Convert to HSV
+        cvtColor(blurred, hsv, COLOR_BGR2HSV);
+        
+        // Detect blue objects
+        Scalar lower_blue(100, 50, 50);
+        Scalar upper_blue(130, 255, 255);
+        inRange(hsv, lower_blue, upper_blue, mask);
+        
+        // Morphological operations
+        Mat kernel = getStructuringElement(MORPH_RECT, Size(5, 5));
+        morphologyEx(mask, mask, MORPH_CLOSE, kernel);
+        morphologyEx(mask, mask, MORPH_OPEN, kernel);
+        
+        // Apply mask
+        bitwise_and(frame, frame, result, mask);
+        
+        return result;
+    }
+
+    int main() {
+        VideoCapture cap("input.mp4");
+        if (!cap.isOpened())
+            return -1;
+        
+        double fps = cap.get(CAP_PROP_FPS);
+        int fourcc = VideoWriter::fourcc('m','p','4','v');
+        VideoWriter out("processed.mp4", fourcc, fps, Size(640, 480));
+        
+        Mat frame;
+        int frame_count = 0;
+        
+        while (cap.read(frame)) {
+            Mat processed = processFrame(frame);
+            
+            out.write(processed);
+            
+            imshow("Original", frame);
+            imshow("Processed", processed);
+            
+            frame_count++;
+            if (frame_count % 30 == 0)
+                cout << "Processed " << frame_count << " frames" << endl;
+            
+            if (waitKey(1) == 'q')
+                break;
+        }
+        
+        cout << "Total frames: " << frame_count << endl;
+        return 0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Advanced Video Capture
+
+<Accordion title="Setting Camera Properties">
+  ```python
+  cap = cv.VideoCapture(0)
+  
+  # Set resolution
+  cap.set(cv.CAP_PROP_FRAME_WIDTH, 1280)
+  cap.set(cv.CAP_PROP_FRAME_HEIGHT, 720)
+  
+  # Set FPS
+  cap.set(cv.CAP_PROP_FPS, 30)
+  
+  # Set brightness, contrast, etc.
+  cap.set(cv.CAP_PROP_BRIGHTNESS, 0.5)
+  cap.set(cv.CAP_PROP_CONTRAST, 0.5)
+  ```
+</Accordion>
+
+<Accordion title="Reading Specific Frames">
+  ```python
+  cap = cv.VideoCapture('video.mp4')
+  
+  # Jump to frame 100
+  cap.set(cv.CAP_PROP_POS_FRAMES, 100)
+  ret, frame = cap.read()
+  
+  # Get current frame number
+  current_frame = cap.get(cv.CAP_PROP_POS_FRAMES)
+  ```
+</Accordion>
+
+<Accordion title="Multi-threaded Video Capture">
+  For better performance with slow cameras:
+  
+  ```python
+  import cv2 as cv
+  from threading import Thread
+  from queue import Queue
+
+  class VideoCapture:
+      def __init__(self, src):
+          self.cap = cv.VideoCapture(src)
+          self.q = Queue(maxsize=3)
+          self.stopped = False
+          
+      def start(self):
+          Thread(target=self.update, daemon=True).start()
+          return self
+          
+      def update(self):
+          while not self.stopped:
+              if not self.q.full():
+                  ret, frame = self.cap.read()
+                  if not ret:
+                      self.stopped = True
+                      return
+                  self.q.put(frame)
+                  
+      def read(self):
+          return self.q.get()
+          
+      def stop(self):
+          self.stopped = True
+          self.cap.release()
+
+  # Usage
+  cap = VideoCapture(0).start()
+  while True:
+      frame = cap.read()
+      cv.imshow('Frame', frame)
+      if cv.waitKey(1) & 0xFF == ord('q'):
+          break
+  cap.stop()
+  ```
+</Accordion>
+
+<Warning>
+When writing videos, ensure the frame size matches the size specified in VideoWriter. Mismatched sizes will result in errors or corrupted output.
+</Warning>
+
+## Performance Tips
+
+<Steps>
+  <Step title="Reduce Resolution">
+    Process at lower resolution for real-time applications, then upscale if needed.
+  </Step>
+  
+  <Step title="Limit FPS">
+    For non-real-time processing, you don't need to match the original video FPS.
+  </Step>
+  
+  <Step title="Use Efficient Codecs">
+    H.264 provides best compression but slower encoding. MJPEG is faster but larger files.
+  </Step>
+  
+  <Step title="Release Resources">
+    Always call `cap.release()` and `out.release()` when done to free resources.
+  </Step>
+</Steps>
+
+## Next Steps
+
+- Apply [Face Detection](/tutorials/face-detection) to video streams
+- Learn [Object Detection](/tutorials/object-detection) for tracking objects in video
+- Explore [Deep Learning](/tutorials/deep-learning) for advanced video analysis

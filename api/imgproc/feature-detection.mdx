@@ -1,0 +1,540 @@
+---
+title: Feature Detection
+description: Functions for detecting edges, corners, lines, and circles in images
+---
+
+This module provides functions for detecting various features in images, including edges, corners, lines, and circles.
+
+## Edge Detection
+
+### Canny
+
+Finds edges in an image using the Canny algorithm.
+
+```cpp
+void Canny(InputArray image, OutputArray edges,
+           double threshold1, double threshold2,
+           int apertureSize = 3, bool L2gradient = false);
+
+void Canny(InputArray dx, InputArray dy,
+           OutputArray edges,
+           double threshold1, double threshold2,
+           bool L2gradient = false);
+```
+
+<ParamField path="image" type="InputArray">
+  8-bit input image.
+</ParamField>
+
+<ParamField path="dx" type="InputArray">
+  16-bit x derivative of input image (CV_16SC1 or CV_16SC3).
+</ParamField>
+
+<ParamField path="dy" type="InputArray">
+  16-bit y derivative of input image (same type as dx).
+</ParamField>
+
+<ParamField path="edges" type="OutputArray">
+  Output edge map; single channels 8-bit image, which has the same size as image.
+</ParamField>
+
+<ParamField path="threshold1" type="double">
+  First threshold for the hysteresis procedure.
+</ParamField>
+
+<ParamField path="threshold2" type="double">
+  Second threshold for the hysteresis procedure.
+</ParamField>
+
+<ParamField path="apertureSize" type="int" default="3">
+  Aperture size for the Sobel operator.
+</ParamField>
+
+<ParamField path="L2gradient" type="bool" default="false">
+  A flag, indicating whether a more accurate L2 norm should be used to calculate the image gradient magnitude (L2gradient=true), or whether the default L1 norm is enough (L2gradient=false).
+</ParamField>
+
+The function finds edges in the input image and marks them in the output map edges using the Canny algorithm. The smallest value between threshold1 and threshold2 is used for edge linking. The largest value is used to find initial segments of strong edges.
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    Mat src = imread("image.jpg", IMREAD_GRAYSCALE);
+    Mat edges;
+    Canny(src, edges, 50, 150);
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    src = cv2.imread('image.jpg', cv2.IMREAD_GRAYSCALE)
+    edges = cv2.Canny(src, 50, 150)
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Derivatives and Gradients
+
+### Sobel
+
+Calculates the first, second, third, or mixed image derivatives using an extended Sobel operator.
+
+```cpp
+void Sobel(InputArray src, OutputArray dst, int ddepth,
+           int dx, int dy, int ksize = 3,
+           double scale = 1, double delta = 0,
+           int borderType = BORDER_DEFAULT);
+```
+
+<ParamField path="src" type="InputArray">
+  Input image.
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Output image of the same size and the same number of channels as src.
+</ParamField>
+
+<ParamField path="ddepth" type="int">
+  Output image depth. In the case of 8-bit input images it will result in truncated derivatives.
+</ParamField>
+
+<ParamField path="dx" type="int">
+  Order of the derivative x.
+</ParamField>
+
+<ParamField path="dy" type="int">
+  Order of the derivative y.
+</ParamField>
+
+<ParamField path="ksize" type="int" default="3">
+  Size of the extended Sobel kernel; it must be 1, 3, 5, or 7.
+</ParamField>
+
+<ParamField path="scale" type="double" default="1">
+  Optional scale factor for the computed derivative values; by default, no scaling is applied.
+</ParamField>
+
+<ParamField path="delta" type="double" default="0">
+  Optional delta value that is added to the results prior to storing them in dst.
+</ParamField>
+
+<ParamField path="borderType" type="int" default="BORDER_DEFAULT">
+  Pixel extrapolation method. BORDER_WRAP is not supported.
+</ParamField>
+
+The Sobel operators combine Gaussian smoothing and differentiation. Most often, the function is called with (xorder = 1, yorder = 0, ksize = 3) or (xorder = 0, yorder = 1, ksize = 3) to calculate the first x- or y- image derivative.
+
+---
+
+### Scharr
+
+Calculates the first x- or y- image derivative using Scharr operator.
+
+```cpp
+void Scharr(InputArray src, OutputArray dst, int ddepth,
+            int dx, int dy, double scale = 1, double delta = 0,
+            int borderType = BORDER_DEFAULT);
+```
+
+<ParamField path="src" type="InputArray">
+  Input image.
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Output image of the same size and the same number of channels as src.
+</ParamField>
+
+<ParamField path="ddepth" type="int">
+  Output image depth.
+</ParamField>
+
+<ParamField path="dx" type="int">
+  Order of the derivative x.
+</ParamField>
+
+<ParamField path="dy" type="int">
+  Order of the derivative y.
+</ParamField>
+
+<ParamField path="scale" type="double" default="1">
+  Optional scale factor for the computed derivative values.
+</ParamField>
+
+<ParamField path="delta" type="double" default="0">
+  Optional delta value that is added to the results prior to storing them in dst.
+</ParamField>
+
+<ParamField path="borderType" type="int" default="BORDER_DEFAULT">
+  Pixel extrapolation method. BORDER_WRAP is not supported.
+</ParamField>
+
+The Scharr operator may give more accurate results than the 3×3 Sobel. The Scharr aperture is:
+
+$$
+\begin{bmatrix}
+-3 & 0 & 3 \\
+-10 & 0 & 10 \\
+-3 & 0 & 3
+\end{bmatrix}
+$$
+
+for the x-derivative, or transposed for the y-derivative.
+
+---
+
+### Laplacian
+
+Calculates the Laplacian of an image.
+
+```cpp
+void Laplacian(InputArray src, OutputArray dst, int ddepth,
+               int ksize = 1, double scale = 1, double delta = 0,
+               int borderType = BORDER_DEFAULT);
+```
+
+<ParamField path="src" type="InputArray">
+  Source image.
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Destination image of the same size and the same number of channels as src.
+</ParamField>
+
+<ParamField path="ddepth" type="int">
+  Desired depth of the destination image.
+</ParamField>
+
+<ParamField path="ksize" type="int" default="1">
+  Aperture size used to compute the second-derivative filters. The size must be positive and odd.
+</ParamField>
+
+<ParamField path="scale" type="double" default="1">
+  Optional scale factor for the computed Laplacian values.
+</ParamField>
+
+<ParamField path="delta" type="double" default="0">
+  Optional delta value that is added to the results prior to storing them in dst.
+</ParamField>
+
+<ParamField path="borderType" type="int" default="BORDER_DEFAULT">
+  Pixel extrapolation method. BORDER_WRAP is not supported.
+</ParamField>
+
+The function calculates the Laplacian of the source image by adding up the second x and y derivatives calculated using the Sobel operator:
+
+$$
+\Delta \text{src} = \frac{\partial^2 \text{src}}{\partial x^2} + \frac{\partial^2 \text{src}}{\partial y^2}
+$$
+
+---
+
+## Corner Detection
+
+### cornerHarris
+
+Harris corner detector.
+
+```cpp
+void cornerHarris(InputArray src, OutputArray dst, int blockSize,
+                  int ksize, double k,
+                  int borderType = BORDER_DEFAULT);
+```
+
+<ParamField path="src" type="InputArray">
+  Input single-channel 8-bit or floating-point image.
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Image to store the Harris detector responses. It has the type CV_32FC1 and the same size as src.
+</ParamField>
+
+<ParamField path="blockSize" type="int">
+  Neighborhood size.
+</ParamField>
+
+<ParamField path="ksize" type="int">
+  Aperture parameter for the Sobel operator.
+</ParamField>
+
+<ParamField path="k" type="double">
+  Harris detector free parameter.
+</ParamField>
+
+<ParamField path="borderType" type="int" default="BORDER_DEFAULT">
+  Pixel extrapolation method. BORDER_WRAP is not supported.
+</ParamField>
+
+The function runs the Harris corner detector on the image. Corners in the image can be found as the local maxima of this response map.
+
+---
+
+### cornerMinEigenVal
+
+Calculates the minimal eigenvalue of gradient matrices for corner detection.
+
+```cpp
+void cornerMinEigenVal(InputArray src, OutputArray dst,
+                       int blockSize, int ksize = 3,
+                       int borderType = BORDER_DEFAULT);
+```
+
+<ParamField path="src" type="InputArray">
+  Input single-channel 8-bit or floating-point image.
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Image to store the minimal eigenvalues. It has the type CV_32FC1 and the same size as src.
+</ParamField>
+
+<ParamField path="blockSize" type="int">
+  Neighborhood size.
+</ParamField>
+
+<ParamField path="ksize" type="int" default="3">
+  Aperture parameter for the Sobel operator.
+</ParamField>
+
+<ParamField path="borderType" type="int" default="BORDER_DEFAULT">
+  Pixel extrapolation method. BORDER_WRAP is not supported.
+</ParamField>
+
+The function is similar to cornerEigenValsAndVecs but it calculates and stores only the minimal eigenvalue of the covariance matrix of derivatives.
+
+---
+
+### goodFeaturesToTrack
+
+Determines strong corners on an image.
+
+```cpp
+void goodFeaturesToTrack(InputArray image, OutputArray corners,
+                         int maxCorners, double qualityLevel, double minDistance,
+                         InputArray mask = noArray(), int blockSize = 3,
+                         bool useHarrisDetector = false, double k = 0.04);
+```
+
+<ParamField path="image" type="InputArray">
+  Input 8-bit or floating-point 32-bit, single-channel image.
+</ParamField>
+
+<ParamField path="corners" type="OutputArray">
+  Output vector of detected corners.
+</ParamField>
+
+<ParamField path="maxCorners" type="int">
+  Maximum number of corners to return. If there are more corners than are found, the strongest of them is returned. maxCorners &lt;= 0 implies that no limit on the maximum is set.
+</ParamField>
+
+<ParamField path="qualityLevel" type="double">
+  Parameter characterizing the minimal accepted quality of image corners. The parameter value is multiplied by the best corner quality measure.
+</ParamField>
+
+<ParamField path="minDistance" type="double">
+  Minimum possible Euclidean distance between the returned corners.
+</ParamField>
+
+<ParamField path="mask" type="InputArray" default="noArray()">
+  Optional region of interest.
+</ParamField>
+
+<ParamField path="blockSize" type="int" default="3">
+  Size of an average block for computing a derivative covariation matrix over each pixel neighborhood.
+</ParamField>
+
+<ParamField path="useHarrisDetector" type="bool" default="false">
+  Parameter indicating whether to use a Harris detector or cornerMinEigenVal.
+</ParamField>
+
+<ParamField path="k" type="double" default="0.04">
+  Free parameter of the Harris detector.
+</ParamField>
+
+The function finds the most prominent corners in the image or in the specified image region.
+
+---
+
+## Hough Transform
+
+### HoughLines
+
+Finds lines in a binary image using the standard Hough transform.
+
+```cpp
+void HoughLines(InputArray image, OutputArray lines,
+                double rho, double theta, int threshold,
+                double srn = 0, double stn = 0,
+                double min_theta = 0, double max_theta = CV_PI,
+                bool use_edgeval = false);
+```
+
+<ParamField path="image" type="InputArray">
+  8-bit, single-channel binary source image. The image may be modified by the function.
+</ParamField>
+
+<ParamField path="lines" type="OutputArray">
+  Output vector of lines. Each line is represented by a 2 or 3 element vector (ρ, θ) or (ρ, θ, votes).
+</ParamField>
+
+<ParamField path="rho" type="double">
+  Distance resolution of the accumulator in pixels.
+</ParamField>
+
+<ParamField path="theta" type="double">
+  Angle resolution of the accumulator in radians.
+</ParamField>
+
+<ParamField path="threshold" type="int">
+  Accumulator threshold parameter. Only those lines are returned that get enough votes (>threshold).
+</ParamField>
+
+<ParamField path="srn" type="double" default="0">
+  For the multi-scale Hough transform, it is a divisor for the distance resolution rho.
+</ParamField>
+
+<ParamField path="stn" type="double" default="0">
+  For the multi-scale Hough transform, it is a divisor for the distance resolution theta.
+</ParamField>
+
+<ParamField path="min_theta" type="double" default="0">
+  Minimum angle to check for lines. Must fall between 0 and max_theta.
+</ParamField>
+
+<ParamField path="max_theta" type="double" default="CV_PI">
+  Upper bound for the angle. Must fall between min_theta and CV_PI.
+</ParamField>
+
+The function implements the standard or standard multi-scale Hough transform algorithm for line detection.
+
+---
+
+### HoughLinesP
+
+Finds line segments in a binary image using the probabilistic Hough transform.
+
+```cpp
+void HoughLinesP(InputArray image, OutputArray lines,
+                 double rho, double theta, int threshold,
+                 double minLineLength = 0, double maxLineGap = 0);
+```
+
+<ParamField path="image" type="InputArray">
+  8-bit, single-channel binary source image. The image may be modified by the function.
+</ParamField>
+
+<ParamField path="lines" type="OutputArray">
+  Output vector of lines. Each line is represented by a 4-element vector (x₁, y₁, x₂, y₂), where (x₁,y₁) and (x₂, y₂) are the ending points of each detected line segment.
+</ParamField>
+
+<ParamField path="rho" type="double">
+  Distance resolution of the accumulator in pixels.
+</ParamField>
+
+<ParamField path="theta" type="double">
+  Angle resolution of the accumulator in radians.
+</ParamField>
+
+<ParamField path="threshold" type="int">
+  Accumulator threshold parameter. Only those lines are returned that get enough votes (>threshold).
+</ParamField>
+
+<ParamField path="minLineLength" type="double" default="0">
+  Minimum line length. Line segments shorter than that are rejected.
+</ParamField>
+
+<ParamField path="maxLineGap" type="double" default="0">
+  Maximum allowed gap between points on the same line to link them.
+</ParamField>
+
+The function implements the probabilistic Hough transform algorithm for line detection.
+
+---
+
+### HoughCircles
+
+Finds circles in a grayscale image using the Hough transform.
+
+```cpp
+void HoughCircles(InputArray image, OutputArray circles,
+                  int method, double dp, double minDist,
+                  double param1 = 100, double param2 = 100,
+                  int minRadius = 0, int maxRadius = 0);
+```
+
+<ParamField path="image" type="InputArray">
+  8-bit, single-channel, grayscale input image.
+</ParamField>
+
+<ParamField path="circles" type="OutputArray">
+  Output vector of found circles. Each vector is encoded as 3 or 4 element floating-point vector (x, y, radius) or (x, y, radius, votes).
+</ParamField>
+
+<ParamField path="method" type="int">
+  Detection method. The available methods are HOUGH_GRADIENT and HOUGH_GRADIENT_ALT.
+</ParamField>
+
+<ParamField path="dp" type="double">
+  Inverse ratio of the accumulator resolution to the image resolution. For example, if dp=1, the accumulator has the same resolution as the input image.
+</ParamField>
+
+<ParamField path="minDist" type="double">
+  Minimum distance between the centers of the detected circles.
+</ParamField>
+
+<ParamField path="param1" type="double" default="100">
+  First method-specific parameter. In case of HOUGH_GRADIENT and HOUGH_GRADIENT_ALT, it is the higher threshold of the two passed to the Canny edge detector.
+</ParamField>
+
+<ParamField path="param2" type="double" default="100">
+  Second method-specific parameter. In case of HOUGH_GRADIENT, it is the accumulator threshold for the circle centers at the detection stage.
+</ParamField>
+
+<ParamField path="minRadius" type="int" default="0">
+  Minimum circle radius.
+</ParamField>
+
+<ParamField path="maxRadius" type="int" default="0">
+  Maximum circle radius. If &lt;= 0, uses the maximum image dimension.
+</ParamField>
+
+The function finds circles in a grayscale image using a modification of the Hough transform.
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    Mat src = imread("image.jpg", IMREAD_GRAYSCALE);
+    Mat blurred;
+    GaussianBlur(src, blurred, Size(9, 9), 2, 2);
+    
+    vector<Vec3f> circles;
+    HoughCircles(blurred, circles, HOUGH_GRADIENT, 1, src.rows/8, 200, 100);
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    src = cv2.imread('image.jpg', cv2.IMREAD_GRAYSCALE)
+    blurred = cv2.GaussianBlur(src, (9, 9), 2)
+    
+    circles = cv2.HoughCircles(blurred, cv2.HOUGH_GRADIENT, 1, src.shape[0]/8,
+                                param1=200, param2=100)
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  Usually the function detects the centers of circles well. However, it may fail to find correct radii. You can assist to the function by specifying the radius range (minRadius and maxRadius) if you know it.
+</Note>
+
+---
+
+## Enumerations
+
+### HoughModes
+
+Variants of Hough transform:
+
+- `HOUGH_STANDARD` - Classical or standard Hough transform
+- `HOUGH_PROBABILISTIC` - Probabilistic Hough transform (more efficient)
+- `HOUGH_MULTI_SCALE` - Multi-scale variant of the classical Hough transform
+- `HOUGH_GRADIENT` - 21HT for circles
+- `HOUGH_GRADIENT_ALT` - Variation of HOUGH_GRADIENT to get better accuracy

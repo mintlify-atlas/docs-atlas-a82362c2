@@ -1,0 +1,590 @@
+---
+title: Camera Calibration
+description: Learn how to calibrate cameras, compute intrinsic and extrinsic parameters, and remove lens distortion in OpenCV
+---
+
+# Camera Calibration
+
+Learn how to calibrate cameras to correct lens distortion and obtain accurate 3D measurements from images.
+
+## Why Camera Calibration?
+
+Camera calibration is essential for:
+- Removing lens distortion from images
+- Measuring real-world dimensions from images
+- 3D reconstruction and depth estimation
+- Augmented reality applications
+- Accurate object tracking and positioning
+
+### Camera Parameters
+
+<Accordion title="Intrinsic Parameters">
+  Internal camera properties:
+  - **Focal length** (fx, fy): Distance from lens to sensor
+  - **Principal point** (cx, cy): Image center offset
+  - **Skew coefficient**: Axis skewness (usually 0)
+  - **Distortion coefficients**: Radial and tangential distortion
+  
+  Represented as camera matrix K:
+  ```
+  K = [fx  0  cx]
+      [0  fy  cy]
+      [0   0   1]
+  ```
+</Accordion>
+
+<Accordion title="Extrinsic Parameters">
+  Camera position and orientation in world space:
+  - **Rotation matrix** (R): 3x3 matrix
+  - **Translation vector** (t): 3x1 vector
+  
+  Transforms world coordinates to camera coordinates:
+  ```
+  [X_cam]   [R | t] [X_world]
+  [Y_cam] = [--+--] [Y_world]
+  [Z_cam]   [0 | 1] [Z_world]
+  ```
+</Accordion>
+
+<Accordion title="Distortion Coefficients">
+  Lens distortion parameters:
+  - **k1, k2, k3**: Radial distortion
+  - **p1, p2**: Tangential distortion
+  
+  Distortion model:
+  ```
+  x_distorted = x(1 + k1*r^2 + k2*r^4 + k3*r^6) + 2*p1*xy + p2*(r^2 + 2*x^2)
+  y_distorted = y(1 + k1*r^2 + k2*r^4 + k3*r^6) + p1*(r^2 + 2*y^2) + 2*p2*xy
+  ```
+</Accordion>
+
+## Calibration Pattern
+
+The most common calibration pattern is a chessboard:
+
+### Creating a Chessboard Pattern
+
+<Steps>
+  <Step title="Generate Pattern">
+    Print a chessboard pattern with known square size (e.g., 25mm). Common sizes:
+    - 9x6 inner corners (10x7 squares)
+    - 8x6 inner corners (9x7 squares)
+  </Step>
+  
+  <Step title="Mount on Flat Surface">
+    Attach the pattern to a rigid, flat surface (cardboard, acrylic, etc.)
+  </Step>
+  
+  <Step title="Capture Images">
+    Take 15-30 images of the pattern from different angles and distances
+  </Step>
+</Steps>
+
+<Note>
+Chessboard requirements:
+- High contrast between squares
+- Perfectly flat surface
+- No glare or reflections
+- Pattern fills 30-70% of image
+- Vary viewing angles (tilt, rotate, distance)
+</Note>
+
+## Camera Calibration Process
+
+Based on OpenCV's calibrate.py sample:
+
+### Single Camera Calibration
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+    from glob import glob
+
+    # Chessboard dimensions (inner corners)
+    pattern_size = (9, 6)
+    square_size = 25.0  # millimeters
+
+    # Prepare object points (0,0,0), (1,0,0), (2,0,0), ..., (8,5,0)
+    pattern_points = np.zeros((np.prod(pattern_size), 3), np.float32)
+    pattern_points[:, :2] = np.indices(pattern_size).T.reshape(-1, 2)
+    pattern_points *= square_size
+
+    # Arrays to store object points and image points
+    obj_points = []  # 3D points in real world
+    img_points = []  # 2D points in image plane
+
+    # Load calibration images
+    images = glob('calibration_images/*.jpg')
+
+    print(f"Found {len(images)} images")
+
+    for fname in images:
+        print(f'Processing {fname}...')
+        
+        img = cv.imread(fname)
+        gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+        
+        # Find chessboard corners
+        found, corners = cv.findChessboardCorners(gray, pattern_size, None)
+        
+        if found:
+            print(f'  Corners found')
+            
+            # Refine corner locations
+            criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+            corners_refined = cv.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
+            
+            # Store points
+            obj_points.append(pattern_points)
+            img_points.append(corners_refined)
+            
+            # Draw and display corners
+            cv.drawChessboardCorners(img, pattern_size, corners_refined, found)
+            cv.imshow('Chessboard', img)
+            cv.waitKey(100)
+        else:
+            print(f'  Pattern not found')
+
+    cv.destroyAllWindows()
+
+    # Calibrate camera
+    print("\nCalibrating camera...")
+    h, w = gray.shape[:2]
+    ret, camera_matrix, dist_coeffs, rvecs, tvecs = cv.calibrateCamera(
+        obj_points, img_points, (w, h), None, None
+    )
+
+    # Print results
+    print(f"\nCalibration successful!")
+    print(f"RMS re-projection error: {ret:.4f}")
+    print(f"\nCamera matrix:\n{camera_matrix}")
+    print(f"\nDistortion coefficients:\n{dist_coeffs.ravel()}")
+
+    # Save calibration
+    np.savez('calibration.npz',
+            camera_matrix=camera_matrix,
+            dist_coeffs=dist_coeffs,
+            rvecs=rvecs,
+            tvecs=tvecs)
+
+    print("\nCalibration saved to calibration.npz")
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    #include <opencv2/calib3d.hpp>
+    #include <iostream>
+    #include <vector>
+    #include <glob.h>
+
+    using namespace cv;
+    using namespace std;
+
+    int main() {
+        // Chessboard dimensions
+        Size pattern_size(9, 6);
+        float square_size = 25.0f;  // mm
+        
+        // Prepare object points
+        vector<Point3f> pattern_points;
+        for(int i = 0; i < pattern_size.height; i++)
+            for(int j = 0; j < pattern_size.width; j++)
+                pattern_points.push_back(
+                    Point3f(j*square_size, i*square_size, 0));
+        
+        vector<vector<Point3f>> object_points;
+        vector<vector<Point2f>> image_points;
+        
+        // Load images
+        vector<String> images;
+        glob("calibration_images/*.jpg", images);
+        
+        cout << "Found " << images.size() << " images" << endl;
+        
+        Size img_size;
+        for(const auto& fname : images) {
+            cout << "Processing " << fname << "...";
+            
+            Mat img = imread(fname);
+            Mat gray;
+            cvtColor(img, gray, COLOR_BGR2GRAY);
+            img_size = gray.size();
+            
+            vector<Point2f> corners;
+            bool found = findChessboardCorners(gray, pattern_size, corners);
+            
+            if(found) {
+                cout << " corners found" << endl;
+                
+                // Refine corners
+                TermCriteria criteria(TermCriteria::EPS + TermCriteria::MAX_ITER,
+                                     30, 0.001);
+                cornerSubPix(gray, corners, Size(11, 11), Size(-1, -1), criteria);
+                
+                object_points.push_back(pattern_points);
+                image_points.push_back(corners);
+                
+                // Draw corners
+                drawChessboardCorners(img, pattern_size, corners, found);
+                imshow("Chessboard", img);
+                waitKey(100);
+            } else {
+                cout << " pattern not found" << endl;
+            }
+        }
+        
+        destroyAllWindows();
+        
+        // Calibrate
+        cout << "\nCalibrating camera..." << endl;
+        
+        Mat camera_matrix, dist_coeffs;
+        vector<Mat> rvecs, tvecs;
+        
+        double rms = calibrateCamera(object_points, image_points, img_size,
+                                    camera_matrix, dist_coeffs, rvecs, tvecs);
+        
+        cout << "\nCalibration successful!" << endl;
+        cout << "RMS error: " << rms << endl;
+        cout << "\nCamera matrix:\n" << camera_matrix << endl;
+        cout << "\nDistortion coefficients:\n" << dist_coeffs << endl;
+        
+        // Save calibration
+        FileStorage fs("calibration.xml", FileStorage::WRITE);
+        fs << "camera_matrix" << camera_matrix;
+        fs << "dist_coeffs" << dist_coeffs;
+        fs.release();
+        
+        cout << "\nCalibration saved to calibration.xml" << endl;
+        
+        return 0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Undistorting Images
+
+### Basic Undistortion
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    # Load calibration
+    calib = np.load('calibration.npz')
+    camera_matrix = calib['camera_matrix']
+    dist_coeffs = calib['dist_coeffs']
+
+    # Load distorted image
+    img = cv.imread('distorted.jpg')
+    h, w = img.shape[:2]
+
+    # Get optimal camera matrix
+    new_camera_matrix, roi = cv.getOptimalNewCameraMatrix(
+        camera_matrix, dist_coeffs, (w, h), 1, (w, h)
+    )
+
+    # Undistort
+    undistorted = cv.undistort(img, camera_matrix, dist_coeffs, 
+                              None, new_camera_matrix)
+
+    # Crop to ROI
+    x, y, w, h = roi
+    undistorted = undistorted[y:y+h, x:x+w]
+
+    # Display
+    cv.imshow('Original', img)
+    cv.imshow('Undistorted', undistorted)
+    cv.waitKey(0)
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    int main() {
+        // Load calibration
+        FileStorage fs("calibration.xml", FileStorage::READ);
+        Mat camera_matrix, dist_coeffs;
+        fs["camera_matrix"] >> camera_matrix;
+        fs["dist_coeffs"] >> dist_coeffs;
+        fs.release();
+        
+        // Load image
+        Mat img = imread("distorted.jpg");
+        
+        // Get optimal camera matrix
+        Rect roi;
+        Mat new_camera_matrix = getOptimalNewCameraMatrix(
+            camera_matrix, dist_coeffs, img.size(), 1, img.size(), &roi
+        );
+        
+        // Undistort
+        Mat undistorted;
+        undistort(img, undistorted, camera_matrix, dist_coeffs, 
+                 new_camera_matrix);
+        
+        // Crop to ROI
+        undistorted = undistorted(roi);
+        
+        imshow("Original", img);
+        imshow("Undistorted", undistorted);
+        waitKey(0);
+        
+        return 0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Efficient Undistortion with Remapping
+
+For real-time video, precompute undistortion maps:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    # Load calibration
+    calib = np.load('calibration.npz')
+    camera_matrix = calib['camera_matrix']
+    dist_coeffs = calib['dist_coeffs']
+
+    # Open video
+    cap = cv.VideoCapture(0)
+    ret, frame = cap.read()
+    h, w = frame.shape[:2]
+
+    # Get optimal camera matrix
+    new_camera_matrix, roi = cv.getOptimalNewCameraMatrix(
+        camera_matrix, dist_coeffs, (w, h), 1, (w, h)
+    )
+
+    # Precompute undistortion maps (only once)
+    mapx, mapy = cv.initUndistortRectifyMap(
+        camera_matrix, dist_coeffs, None, new_camera_matrix,
+        (w, h), cv.CV_16SC2
+    )
+
+    # Process video
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        # Fast undistortion using precomputed maps
+        undistorted = cv.remap(frame, mapx, mapy, cv.INTER_LINEAR)
+        
+        cv.imshow('Undistorted Video', undistorted)
+        
+        if cv.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv.destroyAllWindows()
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    int main() {
+        FileStorage fs("calibration.xml", FileStorage::READ);
+        Mat camera_matrix, dist_coeffs;
+        fs["camera_matrix"] >> camera_matrix;
+        fs["dist_coeffs"] >> dist_coeffs;
+        
+        VideoCapture cap(0);
+        Mat frame;
+        cap >> frame;
+        
+        // Precompute maps
+        Mat new_camera_matrix = getOptimalNewCameraMatrix(
+            camera_matrix, dist_coeffs, frame.size(), 1, frame.size()
+        );
+        
+        Mat mapx, mapy;
+        initUndistortRectifyMap(camera_matrix, dist_coeffs, Mat(),
+                               new_camera_matrix, frame.size(),
+                               CV_16SC2, mapx, mapy);
+        
+        while(cap.read(frame)) {
+            Mat undistorted;
+            remap(frame, undistorted, mapx, mapy, INTER_LINEAR);
+            
+            imshow("Undistorted", undistorted);
+            
+            if(waitKey(1) == 'q')
+                break;
+        }
+        
+        return 0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Calibration Quality Assessment
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    def evaluate_calibration(obj_points, img_points, rvecs, tvecs,
+                            camera_matrix, dist_coeffs):
+        """Calculate reprojection errors for each image"""
+        mean_error = 0
+        
+        for i in range(len(obj_points)):
+            # Project 3D points to image plane
+            img_points2, _ = cv.projectPoints(obj_points[i], rvecs[i], tvecs[i],
+                                             camera_matrix, dist_coeffs)
+            
+            # Calculate error
+            error = cv.norm(img_points[i], img_points2, cv.NORM_L2) / len(img_points2)
+            mean_error += error
+            
+            print(f"Image {i+1}: error = {error:.4f} pixels")
+        
+        mean_error /= len(obj_points)
+        print(f"\nMean reprojection error: {mean_error:.4f} pixels")
+        
+        return mean_error
+
+    # After calibration
+    error = evaluate_calibration(obj_points, img_points, rvecs, tvecs,
+                                camera_matrix, dist_coeffs)
+
+    if error < 0.5:
+        print("Excellent calibration!")
+    elif error < 1.0:
+        print("Good calibration")
+    else:
+        print("Calibration may need improvement")
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+Calibration quality guidelines:
+- **RMS error < 0.5**: Excellent
+- **RMS error < 1.0**: Good
+- **RMS error > 1.0**: May need more images or better pattern detection
+
+Tips for better calibration:
+- Use 15-30 images minimum
+- Cover all areas of the image
+- Include tilted views (30-45 degrees)
+- Vary distances to pattern
+- Ensure sharp, well-lit images
+- Use higher resolution if possible
+</Note>
+
+## Stereo Calibration
+
+Calibrate two cameras for stereo vision:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    # After detecting corners in both left and right images
+    # obj_points, img_points_left, img_points_right are collected
+
+    # Calibrate each camera individually first
+    ret_left, mtx_left, dist_left, _, _ = cv.calibrateCamera(
+        obj_points, img_points_left, img_size, None, None
+    )
+
+    ret_right, mtx_right, dist_right, _, _ = cv.calibrateCamera(
+        obj_points, img_points_right, img_size, None, None
+    )
+
+    # Stereo calibration
+    flags = cv.CALIB_FIX_INTRINSIC  # Fix individual camera parameters
+
+    ret, mtx_left, dist_left, mtx_right, dist_right, R, T, E, F = \
+        cv.stereoCalibrate(
+            obj_points, img_points_left, img_points_right,
+            mtx_left, dist_left,
+            mtx_right, dist_right,
+            img_size,
+            criteria=(cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 1e-6),
+            flags=flags
+        )
+
+    print(f"Stereo calibration RMS: {ret}")
+    print(f"\nRotation matrix:\n{R}")
+    print(f"\nTranslation vector:\n{T}")
+
+    # Save stereo calibration
+    np.savez('stereo_calibration.npz',
+            mtx_left=mtx_left, dist_left=dist_left,
+            mtx_right=mtx_right, dist_right=dist_right,
+            R=R, T=T, E=E, F=F)
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+Common calibration mistakes:
+- Too few images (minimum 15 recommended)
+- Images too similar (vary angles and distances)
+- Motion blur or poor lighting
+- Chessboard not flat or warped
+- Pattern detection failures ignored
+- Not checking reprojection error
+</Warning>
+
+## Practical Applications
+
+<Accordion title="Measuring Real-World Distances">
+  After calibration, you can measure distances between points:
+  ```python
+  # Get 2D image points
+  point1 = (x1, y1)
+  point2 = (x2, y2)
+  
+  # Convert to normalized coordinates
+  # Then use triangulation or known depth
+  ```
+</Accordion>
+
+<Accordion title="Augmented Reality">
+  Use calibration for accurate AR overlay:
+  ```python
+  # Detect marker
+  # Estimate pose using solvePnP
+  # Project 3D model onto image
+  ```
+</Accordion>
+
+<Accordion title="3D Reconstruction">
+  Combine with stereo vision:
+  ```python
+  # Stereo rectification
+  # Disparity map computation
+  # 3D point cloud generation
+  ```
+</Accordion>
+
+## Next Steps
+
+- Apply calibration to [Video Processing](/tutorials/video-processing)
+- Use with [Deep Learning](/tutorials/deep-learning) for accurate 3D object detection
+- Explore stereo vision and depth estimation
+- Learn about pose estimation and AR applications

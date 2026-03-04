@@ -1,0 +1,369 @@
+---
+title: "Image Stitching Module"
+description: "Panorama creation and image stitching with automatic feature matching"
+---
+
+## Overview
+
+The Stitching module provides a complete pipeline for creating panoramas from multiple images. It handles:
+- Feature detection and matching
+- Camera parameter estimation
+- Image warping
+- Exposure compensation
+- Seam finding
+- Image blending
+
+## Quick Start
+
+### Simple Panorama
+
+```cpp
+#include <opencv2/stitching.hpp>
+
+using namespace cv;
+
+int main() {
+    // Load images
+    std::vector<Mat> images;
+    images.push_back(imread("img1.jpg"));
+    images.push_back(imread("img2.jpg"));
+    images.push_back(imread("img3.jpg"));
+    
+    // Create stitcher
+    Ptr<Stitcher> stitcher = Stitcher::create(
+        Stitcher::PANORAMA
+    );
+    
+    // Stitch images
+    Mat pano;
+    Stitcher::Status status = stitcher->stitch(images, pano);
+    
+    if(status == Stitcher::OK) {
+        imwrite("panorama.jpg", pano);
+    } else {
+        std::cerr << "Stitching failed: " << status << std::endl;
+    }
+    
+    return 0;
+}
+```
+
+## Stitcher Modes
+
+### PANORAMA Mode
+
+For regular camera photos:
+
+```cpp
+Ptr<Stitcher> stitcher = Stitcher::create(Stitcher::PANORAMA);
+```
+
+**Features**:
+- Expects perspective transformations
+- Uses homography-based estimation
+- Projects to spherical surface
+- Applies exposure compensation
+
+### SCANS Mode
+
+For scanned images or documents:
+
+```cpp
+Ptr<Stitcher> stitcher = Stitcher::create(Stitcher::SCANS);
+```
+
+**Features**:
+- Expects affine transformations
+- No exposure compensation
+- Better for flat scans
+
+## Stitching Pipeline
+
+### Step-by-Step Process
+
+```cpp
+// 1. Create stitcher
+Ptr<Stitcher> stitcher = Stitcher::create();
+
+// 2. Configure (optional)
+stitcher->setRegistrationResol(0.6);  // Resolution for registration
+stitcher->setSeamEstimationResol(0.1); // Resolution for seam finding
+stitcher->setCompositingResol(-1);     // Use original resolution
+stitcher->setPanoConfidenceThresh(1);  // Confidence threshold
+
+// 3. Estimate transformations
+Stitcher::Status status = stitcher->estimateTransform(images);
+if(status != Stitcher::OK) {
+    std::cerr << "Transform estimation failed\n";
+    return -1;
+}
+
+// 4. Compose panorama
+Mat pano;
+status = stitcher->composePanorama(pano);
+```
+
+## Advanced Configuration
+
+### Feature Detection
+
+```cpp
+// Use ORB features (faster)
+Ptr<ORB> orb = ORB::create(500);
+stitcher->setFeaturesFinder(orb);
+
+// Use SIFT features (better quality)
+Ptr<SIFT> sift = SIFT::create();
+stitcher->setFeaturesFinder(sift);
+```
+
+### Feature Matching
+
+```cpp
+using namespace cv::detail;
+
+// Best of 2 nearest matcher
+Ptr<BestOf2NearestMatcher> matcher = 
+    makePtr<BestOf2NearestMatcher>(false, 0.3f);
+stitcher->setFeaturesMatcher(matcher);
+
+// Affine matcher (for SCANS mode)
+Ptr<AffineBestOf2NearestMatcher> affineMatcher = 
+    makePtr<AffineBestOf2NearestMatcher>();
+stitcher->setFeaturesMatcher(affineMatcher);
+```
+
+### Warping
+
+```cpp
+// Spherical warper (default for PANORAMA)
+Ptr<SphericalWarper> warper = 
+    makePtr<SphericalWarper>();
+stitcher->setWarper(warper);
+
+// Cylindrical warper
+Ptr<CylindricalWarper> cylindrical = 
+    makePtr<CylindricalWarper>();
+stitcher->setWarper(cylindrical);
+
+// Plane warper  
+Ptr<PlaneWarper> plane = 
+    makePtr<PlaneWarper>();
+stitcher->setWarper(plane);
+```
+
+### Exposure Compensation
+
+```cpp
+using namespace cv::detail;
+
+// Block-based gain compensation
+Ptr<BlocksGainCompensator> compensator = 
+    makePtr<BlocksGainCompensator>();
+stitcher->setExposureCompensator(compensator);
+
+// No compensation
+Ptr<NoExposureCompensator> noComp = 
+    makePtr<NoExposureCompensator>();
+stitcher->setExposureCompensator(noComp);
+```
+
+### Seam Finding
+
+```cpp
+using namespace cv::detail;
+
+// Graph cut seam finder (best quality)
+Ptr<GraphCutSeamFinder> seamFinder = 
+    makePtr<GraphCutSeamFinder>(GraphCutSeamFinder::COST_COLOR);
+stitcher->setSeamFinder(seamFinder);
+
+// Voronoi seam finder (faster)
+Ptr<VoronoiSeamFinder> voronoi = 
+    makePtr<VoronoiSeamFinder>();
+stitcher->setSeamFinder(voronoi);
+```
+
+### Blending
+
+```cpp
+using namespace cv::detail;
+
+// Multi-band blending (best quality)
+Ptr<MultiBandBlender> blender = 
+    makePtr<MultiBandBlender>(false, 5);
+stitcher->setBlender(blender);
+
+// Feather blending (faster)
+Ptr<FeatherBlender> feather = 
+    makePtr<FeatherBlender>(0.01f);
+stitcher->setBlender(feather);
+```
+
+## Resolution Control
+
+```cpp
+// Set resolutions (megapixels)
+stitcher->setRegistrationResol(0.6);    // Feature detection
+stitcher->setSeamEstimationResol(0.1);  // Seam finding
+stitcher->setCompositingResol(-1);      // Final output (-1 = original)
+
+// Use original resolution everywhere
+stitcher->setRegistrationResol(Stitcher::ORIG_RESOL);
+stitcher->setSeamEstimationResol(Stitcher::ORIG_RESOL);
+stitcher->setCompositingResol(Stitcher::ORIG_RESOL);
+```
+
+## Error Handling
+
+```cpp
+Stitcher::Status status = stitcher->stitch(images, pano);
+
+switch(status) {
+    case Stitcher::OK:
+        std::cout << "Stitching successful\n";
+        break;
+    case Stitcher::ERR_NEED_MORE_IMGS:
+        std::cerr << "Need more images\n";
+        break;
+    case Stitcher::ERR_HOMOGRAPHY_EST_FAIL:
+        std::cerr << "Homography estimation failed\n";
+        break;
+    case Stitcher::ERR_CAMERA_PARAMS_ADJUST_FAIL:
+        std::cerr << "Camera parameter adjustment failed\n";
+        break;
+}
+```
+
+## Complete Example: Custom Pipeline
+
+```cpp
+#include <opencv2/stitching.hpp>
+#include <opencv2/features2d.hpp>
+
+using namespace cv;
+using namespace cv::detail;
+
+int main() {
+    // Load images
+    std::vector<Mat> images;
+    for(int i = 1; i <= 5; i++) {
+        images.push_back(
+            imread("img" + std::to_string(i) + ".jpg")
+        );
+    }
+    
+    // Create and configure stitcher
+    Ptr<Stitcher> stitcher = Stitcher::create(
+        Stitcher::PANORAMA
+    );
+    
+    // Use SIFT features
+    Ptr<SIFT> sift = SIFT::create(1000);
+    stitcher->setFeaturesFinder(sift);
+    
+    // Configure resolution
+    stitcher->setRegistrationResol(0.6);
+    stitcher->setSeamEstimationResol(0.1);
+    stitcher->setCompositingResol(1.0);
+    
+    // Graph cut seam finder
+    Ptr<GraphCutSeamFinder> seamFinder = 
+        makePtr<GraphCutSeamFinder>(
+            GraphCutSeamFinder::COST_COLOR
+        );
+    stitcher->setSeamFinder(seamFinder);
+    
+    // Multi-band blending
+    stitcher->setBlender(
+        makePtr<MultiBandBlender>(false, 5)
+    );
+    
+    // Estimate transforms
+    Stitcher::Status status = 
+        stitcher->estimateTransform(images);
+    
+    if(status != Stitcher::OK) {
+        std::cerr << "Transform estimation failed: " 
+                  << status << std::endl;
+        return -1;
+    }
+    
+    // Get camera parameters
+    std::vector<CameraParams> cameras = 
+        stitcher->cameras();
+    std::cout << "Found " << cameras.size() 
+              << " cameras\n";
+    
+    // Compose panorama
+    Mat pano;
+    status = stitcher->composePanorama(pano);
+    
+    if(status == Stitcher::OK) {
+        imwrite("panorama.jpg", pano);
+        std::cout << "Panorama size: " 
+                  << pano.size() << std::endl;
+    }
+    
+    return 0;
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+<Card title="Overlapping Images" icon="layer-group">
+30-50% overlap between adjacent images
+</Card>
+
+<Card title="Consistent Exposure" icon="sun">
+Use manual exposure or lock exposure
+</Card>
+
+<Card title="Fixed Focal Length" icon="camera">
+Avoid zooming between shots
+</Card>
+
+<Card title="Steady Camera" icon="camera-rotate">
+Use tripod for best results
+</Card>
+</CardGroup>
+
+## Performance Optimization
+
+```cpp
+// Reduce resolution for speed
+stitcher->setRegistrationResol(0.3);  // Lower = faster
+stitcher->setSeamEstimationResol(0.05);
+
+// Use faster algorithms
+stitcher->setFeaturesFinder(ORB::create(500));
+stitcher->setSeamFinder(
+    makePtr<VoronoiSeamFinder>()
+);
+stitcher->setBlender(
+    makePtr<FeatherBlender>(0.01f)
+);
+```
+
+## Troubleshooting
+
+### Stitching Fails
+
+1. Check image overlap (needs 30%+)
+2. Ensure similar lighting
+3. Try different feature detectors
+4. Increase confidence threshold
+
+### Poor Quality
+
+1. Increase registration resolution
+2. Use graph cut seam finder
+3. Use multi-band blending
+4. Enable exposure compensation
+
+## See Also
+
+- [Features2D Module](/modules/features2d) - Feature detection
+- [Calib3D Module](/modules/calib3d) - Camera calibration
+- [Stitching Tutorial](https://docs.opencv.org/master/d8/d19/tutorial_stitcher.html)

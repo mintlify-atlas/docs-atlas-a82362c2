@@ -1,0 +1,493 @@
+---
+title: Image Operations
+description: Learn basic image operations including resize, crop, rotate, flip, and filters in OpenCV
+---
+
+# Image Operations
+
+Learn how to perform basic image operations in OpenCV, including resizing, cropping, rotating, flipping, and applying various filters to images.
+
+## Reading and Displaying Images
+
+Before performing any operations, you need to load an image:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    # Read an image
+    img = cv.imread('image.jpg')
+    
+    # Read as grayscale
+    gray_img = cv.imread('image.jpg', cv.IMREAD_GRAYSCALE)
+    
+    # Display the image
+    cv.imshow('Image', img)
+    cv.waitKey(0)
+    cv.destroyAllWindows()
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    int main() {
+        // Read an image
+        Mat img = imread("image.jpg");
+        
+        // Read as grayscale
+        Mat gray_img = imread("image.jpg", IMREAD_GRAYSCALE);
+        
+        // Display the image
+        imshow("Image", img);
+        waitKey(0);
+        destroyAllWindows();
+        
+        return 0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Resizing Images
+
+Resize images to specific dimensions or by a scale factor:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    img = cv.imread('image.jpg')
+    
+    # Resize to specific dimensions
+    resized = cv.resize(img, (640, 480))
+    
+    # Resize by scale factor
+    scale = 0.5
+    width = int(img.shape[1] * scale)
+    height = int(img.shape[0] * scale)
+    resized_scale = cv.resize(img, (width, height), interpolation=cv.INTER_LINEAR)
+    
+    # Maintain aspect ratio - scale by factor
+    fx, fy = 0.5, 0.5
+    resized_aspect = cv.resize(img, None, fx=fx, fy=fy, interpolation=cv.INTER_AREA)
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    Mat img = imread("image.jpg");
+    Mat resized, resized_scale;
+    
+    // Resize to specific dimensions
+    resize(img, resized, Size(640, 480));
+    
+    // Resize by scale factor
+    double scale = 0.5;
+    resize(img, resized_scale, Size(), scale, scale, INTER_LINEAR);
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+Interpolation methods:
+- `INTER_LINEAR`: Bilinear interpolation (default)
+- `INTER_AREA`: Best for shrinking images
+- `INTER_CUBIC`: Bicubic interpolation for enlarging
+- `INTER_LANCZOS4`: Lanczos interpolation over 8x8 neighborhood
+</Note>
+
+## Cropping Images
+
+Crop images using array slicing:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    img = cv.imread('image.jpg')
+    
+    # Crop using slicing [y1:y2, x1:x2]
+    cropped = img[100:400, 200:500]
+    
+    # Crop a region of interest (ROI)
+    x, y, w, h = 100, 50, 300, 200
+    roi = img[y:y+h, x:x+w]
+    
+    cv.imshow('Cropped', cropped)
+    cv.waitKey(0)
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    Mat img = imread("image.jpg");
+    
+    // Define rectangle for ROI
+    Rect roi(100, 50, 300, 200);  // x, y, width, height
+    Mat cropped = img(roi);
+    
+    imshow("Cropped", cropped);
+    waitKey(0);
+    ```
+  </Tab>
+</Tabs>
+
+## Rotating Images
+
+### Simple 90-degree Rotations
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    img = cv.imread('image.jpg')
+    
+    # Rotate 90 degrees clockwise
+    rotated_90 = cv.rotate(img, cv.ROTATE_90_CLOCKWISE)
+    
+    # Rotate 90 degrees counter-clockwise
+    rotated_90_ccw = cv.rotate(img, cv.ROTATE_90_COUNTERCLOCKWISE)
+    
+    # Rotate 180 degrees
+    rotated_180 = cv.rotate(img, cv.ROTATE_180)
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    Mat img = imread("image.jpg");
+    Mat rotated;
+    
+    // Rotate 90 degrees clockwise
+    rotate(img, rotated, ROTATE_90_CLOCKWISE);
+    
+    // Rotate 90 degrees counter-clockwise  
+    rotate(img, rotated, ROTATE_90_COUNTERCLOCKWISE);
+    
+    // Rotate 180 degrees
+    rotate(img, rotated, ROTATE_180);
+    ```
+  </Tab>
+</Tabs>
+
+### Arbitrary Angle Rotation
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    img = cv.imread('image.jpg')
+    height, width = img.shape[:2]
+    
+    # Get rotation matrix for 45 degrees
+    center = (width // 2, height // 2)
+    angle = 45
+    scale = 1.0
+    rotation_matrix = cv.getRotationMatrix2D(center, angle, scale)
+    
+    # Apply rotation
+    rotated = cv.warpAffine(img, rotation_matrix, (width, height))
+    
+    cv.imshow('Rotated', rotated)
+    cv.waitKey(0)
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    Mat img = imread("image.jpg");
+    Mat rotated;
+    
+    Point2f center(img.cols / 2.0, img.rows / 2.0);
+    double angle = 45.0;
+    double scale = 1.0;
+    
+    Mat rotation_matrix = getRotationMatrix2D(center, angle, scale);
+    warpAffine(img, rotated, rotation_matrix, img.size());
+    ```
+  </Tab>
+</Tabs>
+
+## Flipping Images
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    img = cv.imread('image.jpg')
+    
+    # Flip horizontally (left-right)
+    flipped_h = cv.flip(img, 1)
+    
+    # Flip vertically (top-bottom)
+    flipped_v = cv.flip(img, 0)
+    
+    # Flip both directions
+    flipped_both = cv.flip(img, -1)
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    Mat img = imread("image.jpg");
+    Mat flipped;
+    
+    // Flip horizontally
+    flip(img, flipped, 1);
+    
+    // Flip vertically
+    flip(img, flipped, 0);
+    
+    // Flip both
+    flip(img, flipped, -1);
+    ```
+  </Tab>
+</Tabs>
+
+## Image Filtering and Smoothing
+
+### Gaussian Blur
+
+Remove noise and detail from images:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    img = cv.imread('image.jpg')
+    
+    # Apply Gaussian blur
+    # Kernel size must be odd: (3,3), (5,5), (7,7), etc.
+    blurred = cv.GaussianBlur(img, (5, 5), 0)
+    
+    # Larger kernel = more blur
+    blurred_more = cv.GaussianBlur(img, (15, 15), 0)
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    Mat img = imread("image.jpg");
+    Mat blurred;
+    
+    // Apply Gaussian blur
+    GaussianBlur(img, blurred, Size(5, 5), 0);
+    
+    // Larger kernel for more blur
+    GaussianBlur(img, blurred, Size(15, 15), 0);
+    ```
+  </Tab>
+</Tabs>
+
+### Median Blur
+
+Excellent for removing salt-and-pepper noise:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    img = cv.imread('image.jpg')
+    
+    # Apply median blur (kernel size must be odd)
+    median = cv.medianBlur(img, 5)
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    Mat img = imread("image.jpg");
+    Mat median;
+    
+    medianBlur(img, median, 5);
+    ```
+  </Tab>
+</Tabs>
+
+### Bilateral Filter
+
+Smooths images while preserving edges:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    img = cv.imread('image.jpg')
+    
+    # d: diameter of pixel neighborhood
+    # sigmaColor: filter in color space
+    # sigmaSpace: filter in coordinate space
+    bilateral = cv.bilateralFilter(img, d=9, sigmaColor=75, sigmaSpace=75)
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    Mat img = imread("image.jpg");
+    Mat bilateral;
+    
+    bilateralFilter(img, bilateral, 9, 75, 75);
+    ```
+  </Tab>
+</Tabs>
+
+## Complete Example: Image Processing Pipeline
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    # Load image
+    img = cv.imread('input.jpg')
+    if img is None:
+        print('Error loading image')
+        exit()
+    
+    # Resize to a standard size
+    img = cv.resize(img, (800, 600))
+    
+    # Apply Gaussian blur to reduce noise
+    blurred = cv.GaussianBlur(img, (5, 5), 0)
+    
+    # Crop region of interest
+    h, w = blurred.shape[:2]
+    roi = blurred[h//4:3*h//4, w//4:3*w//4]
+    
+    # Rotate the ROI
+    center = (roi.shape[1]//2, roi.shape[0]//2)
+    matrix = cv.getRotationMatrix2D(center, 15, 1.0)
+    rotated = cv.warpAffine(roi, matrix, (roi.shape[1], roi.shape[0]))
+    
+    # Display results
+    cv.imshow('Original', img)
+    cv.imshow('Processed', rotated)
+    cv.waitKey(0)
+    cv.destroyAllWindows()
+    
+    # Save result
+    cv.imwrite('output.jpg', rotated)
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    #include <iostream>
+    using namespace cv;
+    using namespace std;
+
+    int main() {
+        // Load image
+        Mat img = imread("input.jpg");
+        if (img.empty()) {
+            cout << "Error loading image" << endl;
+            return -1;
+        }
+        
+        // Resize to standard size
+        resize(img, img, Size(800, 600));
+        
+        // Apply Gaussian blur
+        Mat blurred;
+        GaussianBlur(img, blurred, Size(5, 5), 0);
+        
+        // Crop region of interest
+        int h = blurred.rows, w = blurred.cols;
+        Rect roi_rect(w/4, h/4, w/2, h/2);
+        Mat roi = blurred(roi_rect);
+        
+        // Rotate the ROI
+        Point2f center(roi.cols/2.0, roi.rows/2.0);
+        Mat matrix = getRotationMatrix2D(center, 15, 1.0);
+        Mat rotated;
+        warpAffine(roi, rotated, matrix, roi.size());
+        
+        // Display results
+        imshow("Original", img);
+        imshow("Processed", rotated);
+        waitKey(0);
+        
+        // Save result
+        imwrite("output.jpg", rotated);
+        
+        return 0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+When working with images, always check if the image was loaded successfully before performing operations. Use `if img is None:` in Python or `if (img.empty())` in C++.
+</Note>
+
+## Additional Operations
+
+<Accordion title="Color Space Conversion">
+  Convert between different color spaces:
+  
+  ```python
+  # BGR to Grayscale
+  gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+  
+  # BGR to HSV
+  hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
+  
+  # BGR to RGB
+  rgb = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+  ```
+</Accordion>
+
+<Accordion title="Image Thresholding">
+  Create binary images:
+  
+  ```python
+  gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+  
+  # Simple threshold
+  ret, thresh = cv.threshold(gray, 127, 255, cv.THRESH_BINARY)
+  
+  # Adaptive threshold
+  adaptive = cv.adaptiveThreshold(gray, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                  cv.THRESH_BINARY, 11, 2)
+  ```
+</Accordion>
+
+<Warning>
+Be careful with image data types when performing operations. OpenCV typically uses `uint8` (0-255) for display, but intermediate calculations may require `float32` or `float64` to avoid overflow.
+</Warning>
+
+## Next Steps
+
+- Learn about [Video Processing](/tutorials/video-processing) for working with video streams
+- Explore [Feature Detection](/tutorials/feature-detection) for finding keypoints in images
+- Master [Object Detection](/tutorials/object-detection) to identify objects in images

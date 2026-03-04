@@ -1,0 +1,601 @@
+---
+title: ArUco Marker Detection
+description: API reference for ArUco marker detection, CharUco board detection, and dictionary management
+---
+
+# ArUco Marker Detection
+
+API reference for detecting ArUco markers and CharUco boards for robust camera pose estimation.
+
+## ArucoDetector
+
+Main class for detecting ArUco markers in images.
+
+### Constructor
+
+```cpp
+cv::aruco::ArucoDetector::ArucoDetector(
+    const Dictionary& dictionary = getPredefinedDictionary(cv::aruco::DICT_4X4_50),
+    const DetectorParameters& detectorParams = DetectorParameters(),
+    const RefineParameters& refineParams = RefineParameters()
+)
+```
+
+<ParamField path="dictionary" type="Dictionary">
+  Dictionary indicating the type of markers that will be searched
+</ParamField>
+
+<ParamField path="detectorParams" type="DetectorParameters">
+  Marker detection parameters
+</ParamField>
+
+<ParamField path="refineParams" type="RefineParameters">
+  Marker refine detection parameters
+</ParamField>
+
+#### Multi-Dictionary Constructor
+
+```cpp
+cv::aruco::ArucoDetector::ArucoDetector(
+    const std::vector<Dictionary>& dictionaries,
+    const DetectorParameters& detectorParams = DetectorParameters(),
+    const RefineParameters& refineParams = RefineParameters()
+)
+```
+
+<ParamField path="dictionaries" type="std::vector<Dictionary>">
+  Multiple dictionaries for marker detection. Cannot be empty.
+</ParamField>
+
+### Methods
+
+#### detectMarkers
+
+Basic marker detection in an image.
+
+```cpp
+void detectMarkers(
+    InputArray image,
+    OutputArrayOfArrays corners,
+    OutputArray ids,
+    OutputArrayOfArrays rejectedImgPoints = noArray()
+) const
+```
+
+<ParamField path="image" type="InputArray">
+  Input image where markers will be detected
+</ParamField>
+
+<ParamField path="corners" type="OutputArrayOfArrays">
+  Vector of detected marker corners. For each marker, its four corners are provided (clockwise order). For N detected markers, dimensions are Nx4.
+</ParamField>
+
+<ParamField path="ids" type="OutputArray">
+  Vector of identifiers of the detected markers. For N detected markers, the size is N.
+</ParamField>
+
+<ParamField path="rejectedImgPoints" type="OutputArrayOfArrays" optional>
+  Contains the corners of squares whose inner code has incorrect codification. Useful for debugging.
+</ParamField>
+
+<Note>
+The function does not correct lens distortion. It's recommended to undistort the input image if camera parameters are known.
+</Note>
+
+#### detectMarkersWithConfidence
+
+Marker detection with confidence computation.
+
+```cpp
+void detectMarkersWithConfidence(
+    InputArray image,
+    OutputArrayOfArrays corners,
+    OutputArray ids,
+    OutputArray markersConfidence,
+    OutputArrayOfArrays rejectedImgPoints = noArray()
+) const
+```
+
+<ParamField path="markersConfidence" type="OutputArray">
+  Contains the normalized confidence [0;1] of the markers' detection, defined as 1 minus the normalized uncertainty (percentage of incorrect pixel detections).
+</ParamField>
+
+#### refineDetectedMarkers
+
+Refine undetected markers based on already detected markers and board layout.
+
+```cpp
+void refineDetectedMarkers(
+    InputArray image,
+    const Board& board,
+    InputOutputArrayOfArrays detectedCorners,
+    InputOutputArray detectedIds,
+    InputOutputArrayOfArrays rejectedCorners,
+    InputArray cameraMatrix = noArray(),
+    InputArray distCoeffs = noArray(),
+    OutputArray recoveredIdxs = noArray()
+) const
+```
+
+<ParamField path="image" type="InputArray">
+  Input image
+</ParamField>
+
+<ParamField path="board" type="Board">
+  Layout of markers in the board
+</ParamField>
+
+<ParamField path="detectedCorners" type="InputOutputArrayOfArrays">
+  Vector of already detected marker corners
+</ParamField>
+
+<ParamField path="detectedIds" type="InputOutputArray">
+  Vector of already detected marker identifiers
+</ParamField>
+
+<ParamField path="rejectedCorners" type="InputOutputArrayOfArrays">
+  Vector of rejected candidates during the marker detection process
+</ParamField>
+
+<ParamField path="cameraMatrix" type="InputArray" optional>
+  Optional 3x3 floating-point camera matrix
+</ParamField>
+
+<ParamField path="distCoeffs" type="InputArray" optional>
+  Optional vector of distortion coefficients
+</ParamField>
+
+<ParamField path="recoveredIdxs" type="OutputArray" optional>
+  Optional array to return the indexes of recovered candidates in the original rejectedCorners array
+</ParamField>
+
+#### getDictionary / setDictionary
+
+```cpp
+const Dictionary& getDictionary() const
+void setDictionary(const Dictionary& dictionary)
+```
+
+Gets or sets the first dictionary used for marker detection.
+
+#### getDetectorParameters / setDetectorParameters
+
+```cpp
+const DetectorParameters& getDetectorParameters() const
+void setDetectorParameters(const DetectorParameters& detectorParameters)
+```
+
+Gets or sets the detector parameters.
+
+#### getRefineParameters / setRefineParameters
+
+```cpp
+const RefineParameters& getRefineParameters() const
+void setRefineParameters(const RefineParameters& refineParameters)
+```
+
+Gets or sets the refine parameters.
+
+### Example Usage
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/objdetect/aruco_detector.hpp>
+    #include <opencv2/imgproc.hpp>
+    
+    // Create ArUco detector with 6x6 dictionary
+    cv::aruco::Dictionary dictionary = 
+        cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+    cv::aruco::DetectorParameters detectorParams = 
+        cv::aruco::DetectorParameters();
+    cv::aruco::ArucoDetector detector(dictionary, detectorParams);
+    
+    // Detect markers
+    std::vector<std::vector<cv::Point2f>> corners;
+    std::vector<int> ids;
+    std::vector<std::vector<cv::Point2f>> rejected;
+    
+    detector.detectMarkers(image, corners, ids, rejected);
+    
+    // Draw detected markers
+    if (!ids.empty()) {
+        cv::aruco::drawDetectedMarkers(image, corners, ids);
+    }
+    
+    std::cout << "Detected " << ids.size() << " markers" << std::endl;
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    import cv2
+    import numpy as np
+    
+    # Create ArUco detector with 6x6 dictionary
+    dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_250)
+    parameters = cv2.aruco.DetectorParameters()
+    detector = cv2.aruco.ArucoDetector(dictionary, parameters)
+    
+    # Detect markers
+    corners, ids, rejected = detector.detectMarkers(image)
+    
+    # Draw detected markers
+    if ids is not None:
+        cv2.aruco.drawDetectedMarkers(image, corners, ids)
+    
+    print(f"Detected {len(ids) if ids is not None else 0} markers")
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Dictionary
+
+A dictionary is a set of unique ArUco markers of the same size.
+
+### Constructor
+
+```cpp
+cv::aruco::Dictionary::Dictionary()
+
+cv::aruco::Dictionary::Dictionary(
+    const Mat& bytesList,
+    int markerSize,
+    int maxCorrectionBits = 0
+)
+```
+
+<ParamField path="bytesList" type="Mat">
+  Bits for all ArUco markers in dictionary (CV_8UC4 type)
+</ParamField>
+
+<ParamField path="markerSize" type="int">
+  ArUco marker size in units (number of bits per dimension)
+</ParamField>
+
+<ParamField path="maxCorrectionBits" type="int" default="0">
+  Maximum number of bits that can be corrected
+</ParamField>
+
+### Properties
+
+- `bytesList` (Mat): Marker code information stored as 2D matrix with 4 channels
+- `markerSize` (int): Number of bits per dimension
+- `maxCorrectionBits` (int): Maximum number of bits that can be corrected
+
+### Methods
+
+#### identify
+
+Given a matrix of bits, returns whether the marker is identified.
+
+```cpp
+bool identify(
+    const Mat& onlyBits,
+    int& idx,
+    int& rotation,
+    double maxCorrectionRate
+) const
+```
+
+<ParamField path="onlyBits" type="Mat">
+  Input matrix of bits
+</ParamField>
+
+<ParamField path="idx" type="int&">
+  Output marker ID in the dictionary (if any)
+</ParamField>
+
+<ParamField path="rotation" type="int&">
+  Output marker rotation (0-3)
+</ParamField>
+
+<ParamField path="maxCorrectionRate" type="double">
+  Maximum error correction rate
+</ParamField>
+
+**Returns:** `true` if marker is identified
+
+#### generateImageMarker
+
+Generates a canonical marker image.
+
+```cpp
+void generateImageMarker(
+    int id,
+    int sidePixels,
+    OutputArray img,
+    int borderBits = 1
+) const
+```
+
+<ParamField path="id" type="int">
+  Marker ID to generate
+</ParamField>
+
+<ParamField path="sidePixels" type="int">
+  Size of the output image in pixels
+</ParamField>
+
+<ParamField path="img" type="OutputArray">
+  Output marker image
+</ParamField>
+
+<ParamField path="borderBits" type="int" default="1">
+  Width of the marker border
+</ParamField>
+
+### Predefined Dictionaries
+
+#### getPredefinedDictionary
+
+```cpp
+Dictionary getPredefinedDictionary(PredefinedDictionaryType name)
+Dictionary getPredefinedDictionary(int dict)
+```
+
+Available predefined dictionaries:
+
+- `DICT_4X4_50` - 4x4 bits, 50 markers, hamming distance 4
+- `DICT_4X4_100` - 4x4 bits, 100 markers, hamming distance 3
+- `DICT_4X4_250` - 4x4 bits, 250 markers, hamming distance 3
+- `DICT_4X4_1000` - 4x4 bits, 1000 markers, hamming distance 2
+- `DICT_5X5_50` - 5x5 bits, 50 markers, hamming distance 8
+- `DICT_5X5_100` - 5x5 bits, 100 markers, hamming distance 7
+- `DICT_5X5_250` - 5x5 bits, 250 markers, hamming distance 6
+- `DICT_5X5_1000` - 5x5 bits, 1000 markers, hamming distance 5
+- `DICT_6X6_50` - 6x6 bits, 50 markers, hamming distance 13
+- `DICT_6X6_100` - 6x6 bits, 100 markers, hamming distance 12
+- `DICT_6X6_250` - 6x6 bits, 250 markers, hamming distance 11
+- `DICT_6X6_1000` - 6x6 bits, 1000 markers, hamming distance 9
+- `DICT_7X7_50` - 7x7 bits, 50 markers, hamming distance 19
+- `DICT_7X7_100` - 7x7 bits, 100 markers, hamming distance 18
+- `DICT_7X7_250` - 7x7 bits, 250 markers, hamming distance 17
+- `DICT_7X7_1000` - 7x7 bits, 1000 markers, hamming distance 14
+- `DICT_ARUCO_ORIGINAL` - 6x6 bits, 1024 markers (standard ArUco Library)
+- `DICT_APRILTAG_16h5` - 4x4 bits, 30 markers, hamming distance 5
+- `DICT_APRILTAG_25h9` - 5x5 bits, 35 markers, hamming distance 9
+- `DICT_APRILTAG_36h10` - 6x6 bits, 2320 markers, hamming distance 10
+- `DICT_APRILTAG_36h11` - 6x6 bits, 587 markers, hamming distance 11
+- `DICT_ARUCO_MIP_36h12` - 6x6 bits, 250 markers, hamming distance 12
+
+---
+
+## CharucoDetector
+
+Detector for ChArUco boards (chessboard + ArUco markers).
+
+### Constructor
+
+```cpp
+cv::aruco::CharucoDetector::CharucoDetector(
+    const CharucoBoard& board,
+    const CharucoParameters& charucoParams = CharucoParameters(),
+    const DetectorParameters& detectorParams = DetectorParameters(),
+    const RefineParameters& refineParams = RefineParameters()
+)
+```
+
+<ParamField path="board" type="CharucoBoard">
+  ChArUco board configuration
+</ParamField>
+
+<ParamField path="charucoParams" type="CharucoParameters">
+  ChArUco detection parameters
+</ParamField>
+
+<ParamField path="detectorParams" type="DetectorParameters">
+  Marker detection parameters
+</ParamField>
+
+<ParamField path="refineParams" type="RefineParameters">
+  Marker refine detection parameters
+</ParamField>
+
+### Methods
+
+#### detectBoard
+
+Detects ArUco markers and interpolates ChArUco board corners.
+
+```cpp
+void detectBoard(
+    InputArray image,
+    OutputArray charucoCorners,
+    OutputArray charucoIds,
+    InputOutputArrayOfArrays markerCorners = noArray(),
+    InputOutputArray markerIds = noArray()
+) const
+```
+
+<ParamField path="image" type="InputArray">
+  Input image necessary for corner refinement
+</ParamField>
+
+<ParamField path="charucoCorners" type="OutputArray">
+  Interpolated chessboard corners
+</ParamField>
+
+<ParamField path="charucoIds" type="OutputArray">
+  Interpolated chessboard corner identifiers
+</ParamField>
+
+<ParamField path="markerCorners" type="InputOutputArrayOfArrays" optional>
+  Vector of already detected marker corners. If empty, the function will detect markers.
+</ParamField>
+
+<ParamField path="markerIds" type="InputOutputArray" optional>
+  List of identifiers for each marker in corners. If empty, the function will detect markers.
+</ParamField>
+
+<Note>
+After OpenCV 4.6.0, there was an incompatible change in the ChArUco pattern generation algorithm for even row counts. Use `CharucoBoard::setLegacyPattern()` to ensure compatibility with patterns created before 4.6.0.
+</Note>
+
+#### detectDiamonds
+
+Detects ChArUco Diamond markers.
+
+```cpp
+void detectDiamonds(
+    InputArray image,
+    OutputArrayOfArrays diamondCorners,
+    OutputArray diamondIds,
+    InputOutputArrayOfArrays markerCorners = noArray(),
+    InputOutputArray markerIds = noArray()
+) const
+```
+
+<ParamField path="image" type="InputArray">
+  Input image necessary for corner subpixel accuracy
+</ParamField>
+
+<ParamField path="diamondCorners" type="OutputArrayOfArrays">
+  Output list of detected diamond corners (4 corners per diamond) in clockwise order
+</ParamField>
+
+<ParamField path="diamondIds" type="OutputArray">
+  IDs of the diamonds. Each diamond has 4 IDs corresponding to the ArUco markers composing it.
+</ParamField>
+
+<ParamField path="markerCorners" type="InputOutputArrayOfArrays" optional>
+  List of detected marker corners. If empty, the function will detect markers.
+</ParamField>
+
+<ParamField path="markerIds" type="InputOutputArray" optional>
+  List of marker IDs. If empty, the function will detect markers.
+</ParamField>
+
+### Example Usage
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/objdetect/charuco_detector.hpp>
+    #include <opencv2/objdetect/aruco_board.hpp>
+    
+    // Create ChArUco board
+    cv::aruco::Dictionary dictionary = 
+        cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+    cv::aruco::CharucoBoard board(cv::Size(5, 7), 0.04f, 0.02f, dictionary);
+    
+    // Create detector
+    cv::aruco::CharucoDetector detector(board);
+    
+    // Detect ChArUco corners
+    std::vector<cv::Point2f> charucoCorners;
+    std::vector<int> charucoIds;
+    std::vector<std::vector<cv::Point2f>> markerCorners;
+    std::vector<int> markerIds;
+    
+    detector.detectBoard(image, charucoCorners, charucoIds, 
+                         markerCorners, markerIds);
+    
+    // Draw detected corners
+    if (!charucoIds.empty()) {
+        cv::aruco::drawDetectedCornersCharuco(image, charucoCorners, 
+                                              charucoIds, cv::Scalar(255, 0, 0));
+    }
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    import cv2
+    import numpy as np
+    
+    # Create ChArUco board
+    dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_250)
+    board = cv2.aruco.CharucoBoard((5, 7), 0.04, 0.02, dictionary)
+    
+    # Create detector
+    detector = cv2.aruco.CharucoDetector(board)
+    
+    # Detect ChArUco corners
+    charuco_corners, charuco_ids, marker_corners, marker_ids = \
+        detector.detectBoard(image)
+    
+    # Draw detected corners
+    if charuco_ids is not None and len(charuco_ids) > 0:
+        cv2.aruco.drawDetectedCornersCharuco(image, charuco_corners, 
+                                             charuco_ids, (255, 0, 0))
+    ```
+  </Tab>
+</Tabs>
+
+## DetectorParameters
+
+Parameters for ArUco marker detection.
+
+### Key Parameters
+
+```cpp
+struct DetectorParameters {
+    int adaptiveThreshWinSizeMin;      // default: 3
+    int adaptiveThreshWinSizeMax;      // default: 23
+    int adaptiveThreshWinSizeStep;     // default: 10
+    double adaptiveThreshConstant;     // default: 7
+    double minMarkerPerimeterRate;     // default: 0.03
+    double maxMarkerPerimeterRate;     // default: 4.0
+    double polygonalApproxAccuracyRate; // default: 0.03
+    double minCornerDistanceRate;      // default: 0.05
+    int minDistanceToBorder;           // default: 3
+    double minMarkerDistanceRate;      // default: 0.125
+    int cornerRefinementMethod;        // default: CORNER_REFINE_NONE
+    int cornerRefinementWinSize;       // default: 5
+    int cornerRefinementMaxIterations; // default: 30
+    double cornerRefinementMinAccuracy; // default: 0.1
+    int markerBorderBits;              // default: 1
+    int perspectiveRemovePixelPerCell; // default: 4
+    double errorCorrectionRate;        // default: 0.6
+    bool detectInvertedMarker;         // default: false
+    bool useAruco3Detection;           // default: false
+}
+```
+
+<ParamField path="cornerRefinementMethod" type="int">
+  Corner refinement method:
+  - `CORNER_REFINE_NONE` - No refinement
+  - `CORNER_REFINE_SUBPIX` - Subpixel corner refinement
+  - `CORNER_REFINE_CONTOUR` - Contour-based refinement
+  - `CORNER_REFINE_APRILTAG` - AprilTag approach
+</ParamField>
+
+<ParamField path="useAruco3Detection" type="bool">
+  Enable the new and faster ArUco 3 detection strategy (from Romero-Ramirez et al. 2018)
+</ParamField>
+
+## Utility Functions
+
+### drawDetectedMarkers
+
+Draws detected markers in an image.
+
+```cpp
+void drawDetectedMarkers(
+    InputOutputArray image,
+    InputArrayOfArrays corners,
+    InputArray ids = noArray(),
+    Scalar borderColor = Scalar(0, 255, 0)
+)
+```
+
+### generateImageMarker
+
+Generates a canonical marker image.
+
+```cpp
+void generateImageMarker(
+    const Dictionary& dictionary,
+    int id,
+    int sidePixels,
+    OutputArray img,
+    int borderBits = 1
+)
+```
+
+## See Also
+
+- [Cascade Classifier](/api/objdetect/cascade)
+- [Face Detection](/api/objdetect/face)
+- [QR Code Detection](/api/objdetect/qrcode)

@@ -1,0 +1,562 @@
+---
+title: Java Bindings
+description: Use OpenCV in Java applications and Android apps with automatically generated Java bindings
+---
+
+## Overview
+
+OpenCV provides Java bindings through an automatic code generation system. The bindings include both the Java API (JAR file) and native JNI libraries, enabling OpenCV functionality in standard Java applications and Android apps.
+
+## Installation
+
+### Desktop Java Applications
+
+<Tabs>
+  <Tab title="Maven">
+    Add OpenCV to your `pom.xml`:
+
+    ```xml
+    <dependencies>
+        <dependency>
+            <groupId>org.openpnp</groupId>
+            <artifactId>opencv</artifactId>
+            <version>4.9.0-0</version>
+        </dependency>
+    </dependencies>
+    ```
+  </Tab>
+  <Tab title="Gradle">
+    Add to your `build.gradle`:
+
+    ```groovy
+    dependencies {
+        implementation 'org.openpnp:opencv:4.9.0-0'
+    }
+    ```
+  </Tab>
+  <Tab title="Manual">
+    1. Download OpenCV from [opencv.org](https://opencv.org/releases/)
+    2. Extract the archive
+    3. Find the Java bindings:
+       - JAR file: `build/bin/opencv-4xx.jar`
+       - Native library: `build/lib/libopencv_java4xx.so` (Linux), `.dylib` (macOS), or `.dll` (Windows)
+    4. Add JAR to your classpath
+    5. Load native library at runtime
+  </Tab>
+</Tabs>
+
+### Android Applications
+
+<Tabs>
+  <Tab title="Gradle (Recommended)">
+    Add to your app's `build.gradle`:
+
+    ```groovy
+    android {
+        defaultConfig {
+            // ...
+        }
+    }
+
+    dependencies {
+        implementation 'org.opencv:opencv:4.9.0'
+    }
+    ```
+  </Tab>
+  <Tab title="OpenCV SDK">
+    1. Download [OpenCV Android SDK](https://opencv.org/releases/)
+    2. Extract the SDK
+    3. Import as module in Android Studio:
+       - File → New → Import Module
+       - Select `sdk/java` directory
+    4. Add module dependency in `build.gradle`:
+
+    ```groovy
+    dependencies {
+        implementation project(':opencv')
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Building from Source
+
+For custom builds:
+
+```bash
+# Clone repository
+git clone https://github.com/opencv/opencv.git
+cd opencv
+mkdir build && cd build
+
+# Configure for Java
+cmake -DBUILD_SHARED_LIBS=OFF \
+      -DBUILD_TESTS=OFF \
+      -DBUILD_PERF_TESTS=OFF \
+      -DBUILD_opencv_java=ON \
+      ..
+
+# Build
+make -j$(nproc)
+
+# Find outputs in build/bin/
+```
+
+## Quick Start
+
+### Loading the Native Library
+
+Before using OpenCV in Java, load the native library:
+
+```java
+import org.opencv.core.Core;
+
+public class OpenCVExample {
+    static {
+        // Load native library
+        System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+    }
+    
+    public static void main(String[] args) {
+        System.out.println("OpenCV version: " + Core.getVersionString());
+    }
+}
+```
+
+<Note>
+On Android, use `OpenCVLoader` to load the library asynchronously or through the OpenCV Manager.
+</Note>
+
+### Android Initialization
+
+```java
+import org.opencv.android.OpenCVLoader;
+import android.app.Activity;
+import android.os.Bundle;
+
+public class MainActivity extends Activity {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        
+        if (OpenCVLoader.initLocal()) {
+            // OpenCV loaded successfully
+            System.out.println("OpenCV loaded");
+        } else {
+            // Handle initialization error
+            System.out.println("OpenCV not loaded");
+        }
+    }
+}
+```
+
+## Core Concepts
+
+### Mat Class
+
+The `Mat` class represents images and matrices:
+
+```java
+import org.opencv.core.Mat;
+import org.opencv.core.CvType;
+import org.opencv.core.Scalar;
+
+// Create a 3x3 matrix
+Mat mat = new Mat(3, 3, CvType.CV_8UC1);
+
+// Create identity matrix
+Mat identity = Mat.eye(3, 3, CvType.CV_64FC1);
+
+// Create matrix filled with zeros
+Mat zeros = Mat.zeros(480, 640, CvType.CV_8UC3);
+
+// Create matrix filled with ones
+Mat ones = Mat.ones(100, 100, CvType.CV_32FC1);
+
+// Set all elements to a value
+mat.setTo(new Scalar(255));
+
+// Remember to release Mat objects
+mat.release();
+```
+
+<Warning>
+**Memory Management**: Unlike Python, Java OpenCV requires manual memory management. Always call `mat.release()` when done with Mat objects to prevent memory leaks.
+</Warning>
+
+## Code Examples
+
+### Reading and Writing Images
+
+```java
+import org.opencv.core.Mat;
+import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.core.Core;
+
+public class ImageIO {
+    static {
+        System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+    }
+    
+    public static void main(String[] args) {
+        // Read image
+        Mat image = Imgcodecs.imread("input.jpg");
+        
+        if (image.empty()) {
+            System.out.println("Could not open or find the image");
+            return;
+        }
+        
+        System.out.println("Image loaded: " + image.rows() + "x" + image.cols());
+        
+        // Read in grayscale
+        Mat gray = Imgcodecs.imread("input.jpg", Imgcodecs.IMREAD_GRAYSCALE);
+        
+        // Write image
+        Imgcodecs.imwrite("output.jpg", image);
+        
+        // Clean up
+        image.release();
+        gray.release();
+    }
+}
+```
+
+### Image Processing
+
+```java
+import org.opencv.core.*;
+import org.opencv.imgproc.Imgproc;
+import org.opencv.imgcodecs.Imgcodecs;
+
+public class ImageProcessing {
+    static {
+        System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+    }
+    
+    public static void main(String[] args) {
+        // Load image
+        Mat src = Imgcodecs.imread("input.jpg");
+        
+        // Convert to grayscale
+        Mat gray = new Mat();
+        Imgproc.cvtColor(src, gray, Imgproc.COLOR_BGR2GRAY);
+        
+        // Apply Gaussian blur
+        Mat blurred = new Mat();
+        Imgproc.GaussianBlur(gray, blurred, new Size(5, 5), 0);
+        
+        // Edge detection
+        Mat edges = new Mat();
+        Imgproc.Canny(blurred, edges, 50, 150);
+        
+        // Find contours
+        java.util.List<MatOfPoint> contours = new java.util.ArrayList<>();
+        Mat hierarchy = new Mat();
+        Imgproc.findContours(edges, contours, hierarchy, 
+                            Imgproc.RETR_EXTERNAL, 
+                            Imgproc.CHAIN_APPROX_SIMPLE);
+        
+        // Draw contours
+        Mat result = src.clone();
+        Imgproc.drawContours(result, contours, -1, new Scalar(0, 255, 0), 2);
+        
+        // Save result
+        Imgcodecs.imwrite("output.jpg", result);
+        
+        // Clean up
+        src.release();
+        gray.release();
+        blurred.release();
+        edges.release();
+        hierarchy.release();
+        result.release();
+    }
+}
+```
+
+### Android Camera Processing
+
+```java
+import org.opencv.android.CameraBridgeViewBase;
+import org.opencv.android.OpenCVLoader;
+import org.opencv.core.Mat;
+import org.opencv.core.Core;
+import org.opencv.core.Scalar;
+import org.opencv.core.Size;
+import org.opencv.imgproc.Imgproc;
+import android.app.Activity;
+import android.os.Bundle;
+
+public class Puzzle15Processor {
+    private static final int GRID_SIZE = 4;
+    private Mat mRgba15;
+    private Mat[] mCells15;
+    
+    public void prepareGameSize(int width, int height) {
+        mRgba15 = new Mat(height, width, CvType.CV_8UC4);
+        mCells15 = new Mat[GRID_SIZE * GRID_SIZE];
+        
+        for (int i = 0; i < GRID_SIZE; i++) {
+            for (int j = 0; j < GRID_SIZE; j++) {
+                int k = i * GRID_SIZE + j;
+                mCells15[k] = mRgba15.submat(
+                    i * height / GRID_SIZE, 
+                    (i + 1) * height / GRID_SIZE,
+                    j * width / GRID_SIZE, 
+                    (j + 1) * width / GRID_SIZE
+                );
+            }
+        }
+    }
+    
+    public synchronized Mat puzzleFrame(Mat inputPicture) {
+        int rows = inputPicture.rows();
+        int cols = inputPicture.cols();
+        
+        rows = rows - rows % 4;
+        cols = cols - cols % 4;
+        
+        Mat[] cells = new Mat[GRID_SIZE * GRID_SIZE];
+        for (int i = 0; i < GRID_SIZE; i++) {
+            for (int j = 0; j < GRID_SIZE; j++) {
+                int k = i * GRID_SIZE + j;
+                cells[k] = inputPicture.submat(
+                    i * inputPicture.rows() / GRID_SIZE,
+                    (i + 1) * inputPicture.rows() / GRID_SIZE,
+                    j * inputPicture.cols() / GRID_SIZE,
+                    (j + 1) * inputPicture.cols() / GRID_SIZE
+                );
+            }
+        }
+        
+        // Copy cells to output
+        for (int i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
+            cells[i].copyTo(mCells15[i]);
+        }
+        
+        // Draw grid lines
+        drawGrid(cols, rows, mRgba15);
+        
+        // Release temporary cells
+        for (Mat cell : cells) {
+            cell.release();
+        }
+        
+        return mRgba15;
+    }
+    
+    private void drawGrid(int cols, int rows, Mat drawMat) {
+        for (int i = 1; i < GRID_SIZE; i++) {
+            Imgproc.line(drawMat, 
+                new Point(0, i * rows / GRID_SIZE),
+                new Point(cols, i * rows / GRID_SIZE),
+                new Scalar(0, 255, 0, 255), 3);
+            Imgproc.line(drawMat,
+                new Point(i * cols / GRID_SIZE, 0),
+                new Point(i * cols / GRID_SIZE, rows),
+                new Scalar(0, 255, 0, 255), 3);
+        }
+    }
+}
+```
+
+### Face Detection
+
+```java
+import org.opencv.core.*;
+import org.opencv.imgproc.Imgproc;
+import org.opencv.objdetect.CascadeClassifier;
+import org.opencv.imgcodecs.Imgcodecs;
+
+public class FaceDetection {
+    static {
+        System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+    }
+    
+    public static void main(String[] args) {
+        // Load cascade classifier
+        CascadeClassifier faceCascade = new CascadeClassifier();
+        faceCascade.load("haarcascade_frontalface_alt.xml");
+        
+        // Load image
+        Mat image = Imgcodecs.imread("faces.jpg");
+        Mat gray = new Mat();
+        
+        // Convert to grayscale
+        Imgproc.cvtColor(image, gray, Imgproc.COLOR_BGR2GRAY);
+        Imgproc.equalizeHist(gray, gray);
+        
+        // Detect faces
+        MatOfRect faces = new MatOfRect();
+        faceCascade.detectMultiScale(gray, faces, 1.1, 2, 0,
+                                     new Size(30, 30), new Size());
+        
+        // Draw rectangles around faces
+        for (Rect rect : faces.toArray()) {
+            Imgproc.rectangle(image, 
+                new Point(rect.x, rect.y),
+                new Point(rect.x + rect.width, rect.y + rect.height),
+                new Scalar(0, 255, 0), 2);
+        }
+        
+        System.out.println("Detected " + faces.toArray().length + " faces");
+        
+        // Save result
+        Imgcodecs.imwrite("output.jpg", image);
+        
+        // Clean up
+        image.release();
+        gray.release();
+        faces.release();
+    }
+}
+```
+
+### Working with Matrices
+
+```java
+import org.opencv.core.*;
+
+public class MatrixOperations {
+    static {
+        System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+    }
+    
+    public static void main(String[] args) {
+        // Create matrices
+        Mat A = new Mat(3, 3, CvType.CV_64FC1);
+        Mat B = new Mat(3, 3, CvType.CV_64FC1);
+        
+        // Fill with random values
+        Core.randu(A, 0, 10);
+        Core.randu(B, 0, 10);
+        
+        System.out.println("Matrix A:\n" + A.dump());
+        
+        // Matrix operations
+        Mat C = new Mat();
+        Core.add(A, B, C);          // Addition
+        Core.subtract(A, B, C);     // Subtraction
+        Core.gemm(A, B, 1, new Mat(), 0, C);  // Multiplication
+        Core.transpose(A, C);       // Transpose
+        
+        // Element access
+        double[] data = new double[1];
+        A.get(0, 0, data);
+        System.out.println("Element [0,0]: " + data[0]);
+        
+        // Set element
+        A.put(0, 0, 42.0);
+        
+        // Clean up
+        A.release();
+        B.release();
+        C.release();
+    }
+}
+```
+
+## Android Best Practices
+
+### Using CameraBridgeViewBase
+
+```java
+import org.opencv.android.CameraBridgeViewBase;
+import org.opencv.android.CameraBridgeViewBase.CvCameraViewFrame;
+import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
+
+public class MainActivity extends Activity implements CvCameraViewListener2 {
+    private CameraBridgeViewBase mOpenCvCameraView;
+    
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        
+        mOpenCvCameraView = findViewById(R.id.camera_view);
+        mOpenCvCameraView.setCvCameraViewListener(this);
+    }
+    
+    @Override
+    public void onCameraViewStarted(int width, int height) {
+        // Initialize processing
+    }
+    
+    @Override
+    public void onCameraViewStopped() {
+        // Clean up
+    }
+    
+    @Override
+    public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
+        Mat rgba = inputFrame.rgba();
+        
+        // Process frame here
+        // Return the Mat to be displayed
+        
+        return rgba;
+    }
+    
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (OpenCVLoader.initLocal()) {
+            mOpenCvCameraView.enableView();
+        }
+    }
+    
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (mOpenCvCameraView != null) {
+            mOpenCvCameraView.disableView();
+        }
+    }
+}
+```
+
+<Note>
+Always enable and disable the camera view in `onResume()` and `onPause()` to properly manage resources.
+</Note>
+
+## Common Patterns
+
+### Resource Management
+
+```java
+// Use try-finally for cleanup
+Mat mat = new Mat();
+try {
+    // Use mat
+    Imgcodecs.imread("image.jpg", mat);
+    // Process...
+} finally {
+    mat.release();
+}
+
+// Or create a helper method
+public void processImage(String path) {
+    Mat image = Imgcodecs.imread(path);
+    if (image.empty()) return;
+    
+    try {
+        // Processing logic
+    } finally {
+        image.release();
+    }
+}
+```
+
+## Resources
+
+- [OpenCV Java API Reference](https://docs.opencv.org/4.x/javadoc/)
+- [Android Tutorials](https://docs.opencv.org/4.x/d9/d52/tutorial_android_dev_intro.html)
+- [Sample Code](https://github.com/opencv/opencv/tree/4.x/samples/android)
+- [OpenCV Android SDK](https://opencv.org/releases/)
+
+## Next Steps
+
+- Learn about [Image Processing](/modules/imgproc) in Java
+- Explore [Object Detection](/modules/objdetect) features
+- Build Android apps with OpenCV camera integration

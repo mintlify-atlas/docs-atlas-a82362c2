@@ -1,0 +1,264 @@
+---
+title: "Features2D Module"
+description: "2D feature detection, description, and matching in OpenCV"
+---
+
+## Overview
+
+The `features2d` module provides algorithms for detecting, describing, and matching 2D features in images. Features are distinctive points (keypoints) that can be reliably found across different views of the same scene.
+
+## Key Concepts
+
+### Feature Detection
+
+Detecting distinctive points (corners, blobs) in images that are stable under various transformations.
+
+### Feature Description  
+
+Computing numerical descriptors for each keypoint that capture local appearance.
+
+### Feature Matching
+
+Finding correspondences between features in different images.
+
+## Main Classes
+
+### Feature2D
+
+Base class for feature detectors and descriptor extractors:
+
+```cpp
+class Feature2D : public Algorithm {
+public:
+    // Detect keypoints
+    virtual void detect(InputArray image, 
+                       std::vector<KeyPoint>& keypoints,
+                       InputArray mask = noArray());
+    
+    // Compute descriptors
+    virtual void compute(InputArray image,
+                        std::vector<KeyPoint>& keypoints,
+                        OutputArray descriptors);
+    
+    // Detect and compute in one call
+    virtual void detectAndCompute(InputArray image, 
+                                  InputArray mask,
+                                  std::vector<KeyPoint>& keypoints,
+                                  OutputArray descriptors,
+                                  bool useProvidedKeypoints = false);
+};
+```
+
+### KeyPoint Structure
+
+```cpp
+struct KeyPoint {
+    Point2f pt;        // Coordinates
+    float size;        // Diameter of meaningful neighborhood  
+    float angle;       // Orientation (-1 if not applicable)
+    float response;    // Detector response (strength)
+    int octave;        // Pyramid layer
+    int class_id;      // Object class (for tracking)
+};
+```
+
+## Feature Detectors
+
+### SIFT (Scale-Invariant Feature Transform)
+
+```cpp
+// Create detector
+Ptr<SIFT> sift = SIFT::create(
+    0,              // nfeatures (0 = all)
+    3,              // nOctaveLayers
+    0.04,           // contrastThreshold
+    10,             // edgeThreshold
+    1.6             // sigma
+);
+
+// Detect and compute
+std::vector<KeyPoint> keypoints;
+Mat descriptors;
+sift->detectAndCompute(img, noArray(), keypoints, descriptors);
+```
+
+**Properties**:
+- Scale invariant
+- Rotation invariant
+- 128-dimensional float descriptors
+- Patented (free for research)
+
+### ORB (Oriented FAST and Rotated BRIEF)
+
+```cpp
+Ptr<ORB> orb = ORB::create(
+    500,            // nfeatures
+    1.2f,           // scaleFactor
+    8,              // nlevels
+    31,             // edgeThreshold
+    0,              // firstLevel
+    2,              // WTA_K
+    ORB::HARRIS_SCORE,  // scoreType
+    31,             // patchSize
+    20              // fastThreshold
+);
+
+orb->detectAndCompute(img, noArray(), keypoints, descriptors);
+```
+
+**Properties**:
+- Very fast
+- Binary descriptors (32 bytes)
+- Free to use
+- Good for real-time applications
+
+### BRISK
+
+```cpp
+Ptr<BRISK> brisk = BRISK::create(
+    30,             // threshold
+    3,              // octaves  
+    1.0f            // patternScale
+);
+```
+
+### AKAZE
+
+```cpp
+Ptr<AKAZE> akaze = AKAZE::create(
+    AKAZE::DESCRIPTOR_MLDB,  // descriptor_type
+    0,              // descriptor_size
+    3,              // descriptor_channels
+    0.001f,         // threshold
+    4,              // nOctaves
+    4,              // nOctaveLayers
+    KAZE::DIFF_PM_G2  // diffusivity
+);
+```
+
+### FAST Corner Detector
+
+```cpp
+std::vector<KeyPoint> keypoints;
+FAST(img, keypoints, 
+     10,            // threshold
+     true);         // nonmaxSuppression
+
+// Or using detector class
+Ptr<FastFeatureDetector> fast = 
+    FastFeatureDetector::create(10, true);
+fast->detect(img, keypoints);
+```
+
+## Descriptor Matchers
+
+### BFMatcher (Brute Force)
+
+```cpp
+// For binary descriptors (ORB, BRISK)
+BFMatcher matcher(NORM_HAMMING, true);  // crossCheck
+
+// For float descriptors (SIFT, SURF)
+BFMatcher matcher(NORM_L2, true);
+
+// Match
+std::vector<DMatch> matches;
+matcher.match(descriptors1, descriptors2, matches);
+```
+
+### FLANN Matcher
+
+```cpp
+// Faster for large datasets
+FlannBasedMatcher matcher;
+
+std::vector<DMatch> matches;
+matcher.match(descriptors1, descriptors2, matches);
+```
+
+### KNN Matching
+
+```cpp
+std::vector<std::vector<DMatch>> knn_matches;
+matcher.knnMatch(descriptors1, descriptors2, knn_matches, 2);
+
+// Lowe's ratio test
+std::vector<DMatch> good_matches;
+for(size_t i = 0; i < knn_matches.size(); i++) {
+    if(knn_matches[i][0].distance < 
+       0.75f * knn_matches[i][1].distance) {
+        good_matches.push_back(knn_matches[i][0]);
+    }
+}
+```
+
+## Complete Example
+
+```cpp
+#include <opencv2/features2d.hpp>
+#include <opencv2/highgui.hpp>
+
+int main() {
+    // Load images
+    Mat img1 = imread("image1.jpg", IMREAD_GRAYSCALE);
+    Mat img2 = imread("image2.jpg", IMREAD_GRAYSCALE);
+    
+    // Create detector
+    Ptr<ORB> detector = ORB::create(1000);
+    
+    // Detect and compute
+    std::vector<KeyPoint> kp1, kp2;
+    Mat desc1, desc2;
+    detector->detectAndCompute(img1, noArray(), kp1, desc1);
+    detector->detectAndCompute(img2, noArray(), kp2, desc2);
+    
+    // Match
+    BFMatcher matcher(NORM_HAMMING);
+    std::vector<DMatch> matches;
+    matcher.match(desc1, desc2, matches);
+    
+    // Draw matches
+    Mat img_matches;
+    drawMatches(img1, kp1, img2, kp2, matches, img_matches);
+    
+    imshow("Matches", img_matches);
+    waitKey(0);
+    
+    return 0;
+}
+```
+
+## Algorithm Comparison
+
+| Algorithm | Speed | Descriptor | License | Best For |
+|-----------|-------|------------|---------|----------|
+| **SIFT** | Slow | Float 128D | Patented | Accuracy |
+| **ORB** | Very Fast | Binary 32B | Free | Real-time |
+| **AKAZE** | Fast | Binary/Float | Free | General |
+| **BRISK** | Fast | Binary 64B | Free | Real-time |
+
+## Best Practices
+
+<CardGroup cols={2}>
+<Card title="Use ORB for Real-time" icon="bolt">
+Fastest detector/descriptor, good for video
+</Card>
+
+<Card title="Use SIFT for Quality" icon="star">
+Best accuracy but slower, patented
+</Card>
+
+<Card title="Apply Ratio Test" icon="filter">
+Filter matches using Lowe's ratio test
+</Card>
+
+<Card title="Use Grayscale" icon="image">
+Convert to grayscale for better performance
+</Card>
+</CardGroup>
+
+## See Also
+
+- [Calib3D Module](/modules/calib3d) - Camera calibration using features
+- [Video Module](/modules/video) - Object tracking with features
+- [Feature Detection Tutorial](https://docs.opencv.org/master/df/d0c/tutorial_py_fast.html)

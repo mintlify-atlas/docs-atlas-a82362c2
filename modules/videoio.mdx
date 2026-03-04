@@ -1,0 +1,607 @@
+---
+title: Video I/O Module
+description: Video capture from cameras and files, video writing, and stream handling with support for multiple backends
+---
+
+The Video I/O (videoio) module provides interfaces for reading video from cameras or files and writing video to files, with support for multiple backend APIs and hardware acceleration.
+
+## Overview
+
+From opencv2/videoio.hpp:48-64:
+
+> Read and write video or image sequences with OpenCV. This module provides unified interfaces for video capture and writing across different platforms and backends including FFmpeg, GStreamer, DirectShow, AVFoundation, and more.
+
+<CardGroup cols={2}>
+  <Card title="VideoCapture" icon="camera">
+    Capture from cameras or read video files
+  </Card>
+  <Card title="VideoWriter" icon="file-video">
+    Write video files with codec selection
+  </Card>
+  <Card title="Backends" icon="plug">
+    Multiple API backend support (FFmpeg, GStreamer, etc.)
+  </Card>
+  <Card title="Hardware Accel" icon="microchip">
+    GPU-accelerated encoding and decoding
+  </Card>
+</CardGroup>
+
+## VideoCapture Class
+
+### Capturing from Camera
+
+Example from samples/cpp/videocapture_basic.cpp:
+
+```cpp
+#include <opencv2/videoio.hpp>
+#include <opencv2/highgui.hpp>
+
+using namespace cv;
+
+int main() {
+    VideoCapture cap;
+    
+    // Open default camera (videocapture_basic.cpp:25-28)
+    int deviceID = 0;        // 0 = default camera
+    int apiID = CAP_ANY;     // Autodetect API
+    cap.open(deviceID, apiID);
+    
+    // Check if opened successfully (videocapture_basic.cpp:30-33)
+    if (!cap.isOpened()) {
+        cerr << "ERROR! Unable to open camera\n";
+        return -1;
+    }
+    
+    // Grab and process frames (videocapture_basic.cpp:38-50)
+    Mat frame;
+    for (;;) {
+        cap.read(frame);  // Capture frame
+        
+        if (frame.empty()) {
+            cerr << "ERROR! Blank frame grabbed\n";
+            break;
+        }
+        
+        // Display frame
+        imshow("Live", frame);
+        if (waitKey(5) >= 0) break;
+    }
+    
+    return 0;
+}
+```
+
+### Reading Video Files
+
+```cpp
+// Open video file
+VideoCapture cap("video.mp4");
+
+// Or with specific backend
+VideoCapture cap("video.mp4", CAP_FFMPEG);
+
+// Check if opened
+if (!cap.isOpened()) {
+    cerr << "Error opening video file\n";
+    return -1;
+}
+
+// Get video properties
+int frameCount = cap.get(CAP_PROP_FRAME_COUNT);
+double fps = cap.get(CAP_PROP_FPS);
+int width = cap.get(CAP_PROP_FRAME_WIDTH);
+int height = cap.get(CAP_PROP_FRAME_HEIGHT);
+
+// Read frames
+Mat frame;
+while (cap.read(frame)) {
+    // Process frame
+    imshow("Video", frame);
+    if (waitKey(1000/fps) >= 0) break;
+}
+
+cap.release();
+```
+
+## Video Capture Backends
+
+From videoio.hpp:92-129, OpenCV supports multiple backends:
+
+```cpp
+enum VideoCaptureAPIs {
+    CAP_ANY = 0,            // Auto detect
+    CAP_V4L2 = 200,         // V4L/V4L2 (Linux)
+    CAP_FIREWIRE = 300,     // IEEE 1394
+    CAP_DSHOW = 700,        // DirectShow (Windows)
+    CAP_PVAPI = 800,        // PvAPI (Prosilica GigE)
+    CAP_OPENNI = 900,       // OpenNI (Kinect)
+    CAP_ANDROID = 1000,     // MediaNDK (Android)
+    CAP_XIAPI = 1100,       // XIMEA Camera
+    CAP_AVFOUNDATION = 1200,// AVFoundation (macOS/iOS)
+    CAP_MSMF = 1400,        // Microsoft Media Foundation
+    CAP_REALSENSE = 1500,   // Intel RealSense
+    CAP_OPENNI2 = 1600,     // OpenNI2
+    CAP_GPHOTO2 = 1700,     // gPhoto2
+    CAP_GSTREAMER = 1800,   // GStreamer
+    CAP_FFMPEG = 1900,      // FFmpeg
+    CAP_IMAGES = 2000,      // Image sequence
+    CAP_ARAVIS = 2100,      // Aravis SDK
+    CAP_OPENCV_MJPEG = 2200,// OpenCV MJPEG codec
+    CAP_INTEL_MFX = 2300,   // Intel MediaSDK
+    CAP_OBSENSOR = 2600     // Orbbec 3D sensors
+};
+
+// Specify backend
+VideoCapture cap(0, CAP_DSHOW);  // Use DirectShow on Windows
+VideoCapture cap("video.mp4", CAP_FFMPEG);  // Use FFmpeg
+```
+
+## Video Capture Properties
+
+From videoio.hpp:138-216, extensive property control:
+
+```cpp
+// Position properties
+cap.get(CAP_PROP_POS_MSEC);      // Current position (ms)
+cap.get(CAP_PROP_POS_FRAMES);    // Current frame number
+cap.get(CAP_PROP_POS_AVI_RATIO); // Relative position (0-1)
+
+// Frame properties  
+int width = cap.get(CAP_PROP_FRAME_WIDTH);
+int height = cap.get(CAP_PROP_FRAME_HEIGHT);
+double fps = cap.get(CAP_PROP_FPS);
+int fourcc = cap.get(CAP_PROP_FOURCC);
+int frameCount = cap.get(CAP_PROP_FRAME_COUNT);
+
+// Camera properties (if supported)
+cap.set(CAP_PROP_BRIGHTNESS, 0.5);
+cap.set(CAP_PROP_CONTRAST, 0.5);
+cap.set(CAP_PROP_SATURATION, 0.5);
+cap.set(CAP_PROP_HUE, 0.5);
+cap.set(CAP_PROP_GAIN, 0.5);
+cap.set(CAP_PROP_EXPOSURE, 0.5);
+
+// Advanced properties
+cap.set(CAP_PROP_AUTOFOCUS, 1);
+cap.set(CAP_PROP_AUTO_WB, 1);
+cap.set(CAP_PROP_ZOOM, 1.5);
+cap.set(CAP_PROP_FOCUS, 0.5);
+
+// Backend information
+int backend = cap.get(CAP_PROP_BACKEND);
+```
+
+### Seeking in Videos
+
+```cpp
+// Seek to specific frame
+cap.set(CAP_PROP_POS_FRAMES, 100);
+
+// Seek to time position (milliseconds)
+cap.set(CAP_PROP_POS_MSEC, 5000);  // 5 seconds
+
+// Seek to relative position (0.0 to 1.0)
+cap.set(CAP_PROP_POS_AVI_RATIO, 0.5);  // Middle of video
+
+// Read frame at new position
+Mat frame;
+cap.read(frame);
+```
+
+## VideoWriter Class
+
+### Writing Video Files
+
+```cpp
+#include <opencv2/videoio.hpp>
+
+using namespace cv;
+
+// Define video properties
+String filename = "output.mp4";
+int fourcc = VideoWriter::fourcc('M','P','4','V');
+double fps = 30.0;
+Size frameSize(640, 480);
+bool isColor = true;
+
+// Create VideoWriter
+VideoWriter writer(filename, fourcc, fps, frameSize, isColor);
+
+// Check if opened
+if (!writer.isOpened()) {
+    cerr << "Could not open video writer\n";
+    return -1;
+}
+
+// Write frames
+Mat frame;
+for (int i = 0; i < 100; i++) {
+    // Generate or capture frame
+    frame = generateFrame(i);
+    
+    // Write frame
+    writer.write(frame);
+    // Or equivalently: writer << frame;
+}
+
+// Release writer (flushes and closes file)
+writer.release();
+```
+
+### FourCC Codes
+
+```cpp
+// Common FourCC codes for codecs
+int fourcc;
+
+// H.264 (most widely supported)
+fourcc = VideoWriter::fourcc('H','2','6','4');
+fourcc = VideoWriter::fourcc('X','2','6','4');  // Alternative
+fourcc = VideoWriter::fourcc('a','v','c','1');  // Apple variant
+
+// MPEG-4
+fourcc = VideoWriter::fourcc('M','P','4','V');
+fourcc = VideoWriter::fourcc('M','P','4','2');
+
+// Motion JPEG
+fourcc = VideoWriter::fourcc('M','J','P','G');
+
+// VP9 (WebM)
+fourcc = VideoWriter::fourcc('V','P','9','0');
+
+// HEVC (H.265)
+fourcc = VideoWriter::fourcc('H','E','V','C');
+
+// Uncompressed (large files!)
+fourcc = VideoWriter::fourcc('D','I','B',' ');  // BMP
+
+// Let backend choose
+fourcc = 0;  // or VideoWriter::fourcc('\0','\0','\0','\0')
+```
+
+## Hardware Acceleration
+
+From videoio.hpp:256-269:
+
+```cpp
+// Hardware acceleration types
+enum VideoAccelerationType {
+    VIDEO_ACCELERATION_NONE = 0,   // Software only
+    VIDEO_ACCELERATION_ANY = 1,    // Prefer hardware
+    VIDEO_ACCELERATION_D3D11 = 2,  // DirectX 11
+    VIDEO_ACCELERATION_VAAPI = 3,  // Video Acceleration API
+    VIDEO_ACCELERATION_MFX = 4,    // Intel MediaSDK
+    VIDEO_ACCELERATION_DRM = 5      // Raspberry Pi V4
+};
+
+// Use hardware acceleration for capture
+vector<VideoCaptureAPIs> apiPreference = {CAP_FFMPEG};
+map<int, int> params = {
+    {CAP_PROP_HW_ACCELERATION, VIDEO_ACCELERATION_ANY},
+    {CAP_PROP_HW_DEVICE, 0}  // GPU device index
+};
+VideoCapture cap("video.mp4", CAP_FFMPEG, params);
+
+// Use hardware acceleration for writing
+map<int, int> writerParams = {
+    {VIDEOWRITER_PROP_HW_ACCELERATION, VIDEO_ACCELERATION_ANY},
+    {VIDEOWRITER_PROP_HW_DEVICE, 0}
+};
+VideoWriter writer("output.mp4", CAP_FFMPEG,
+                   VideoWriter::fourcc('H','2','6','4'),
+                   30, Size(1920, 1080), writerParams);
+```
+
+## Image Sequences
+
+```cpp
+// Read image sequence
+// Files: img_0001.jpg, img_0002.jpg, etc.
+VideoCapture cap("img_%04d.jpg");
+
+Mat frame;
+while (cap.read(frame)) {
+    // Process frames
+    imshow("Sequence", frame);
+    waitKey(30);
+}
+
+// Write image sequence
+VideoWriter writer("output_%04d.png", CAP_IMAGES,
+                   0,  // FPS not used for images
+                   30, Size(640, 480));
+
+for (int i = 0; i < 100; i++) {
+    Mat frame = generateFrame(i);
+    writer.write(frame);
+}
+```
+
+## Audio Support
+
+From videoio.hpp:198-206:
+
+```cpp
+// Open video with audio stream
+map<int, int> params = {
+    {CAP_PROP_AUDIO_STREAM, 0}  // Enable audio, stream 0
+};
+VideoCapture cap("video.mp4", CAP_FFMPEG, params);
+
+// Get audio properties
+int audioPos = cap.get(CAP_PROP_AUDIO_POS);
+int audioBaseIndex = cap.get(CAP_PROP_AUDIO_BASE_INDEX);
+int audioChannels = cap.get(CAP_PROP_AUDIO_TOTAL_CHANNELS);
+int audioSampleRate = cap.get(CAP_PROP_AUDIO_SAMPLES_PER_SECOND);
+
+// Retrieve audio samples
+Mat audioFrame;
+cap.retrieve(audioFrame, audioBaseIndex);
+```
+
+## Practical Examples
+
+### Video File Converter
+
+```cpp
+#include <opencv2/videoio.hpp>
+#include <opencv2/highgui.hpp>
+
+using namespace cv;
+
+void convertVideo(const string& input, const string& output,
+                  int targetWidth, int targetHeight) {
+    // Open input
+    VideoCapture cap(input);
+    if (!cap.isOpened()) {
+        cerr << "Cannot open input video\n";
+        return;
+    }
+    
+    // Get properties
+    double fps = cap.get(CAP_PROP_FPS);
+    
+    // Create writer
+    VideoWriter writer(
+        output,
+        VideoWriter::fourcc('H','2','6','4'),
+        fps,
+        Size(targetWidth, targetHeight)
+    );
+    
+    if (!writer.isOpened()) {
+        cerr << "Cannot open output video\n";
+        return;
+    }
+    
+    // Process frames
+    Mat frame, resized;
+    while (cap.read(frame)) {
+        resize(frame, resized, Size(targetWidth, targetHeight));
+        writer.write(resized);
+    }
+}
+```
+
+### Extract Video Frames
+
+```cpp
+void extractFrames(const string& videoPath,
+                   const string& outputDir,
+                   int frameInterval = 30) {
+    VideoCapture cap(videoPath);
+    if (!cap.isOpened()) return;
+    
+    int frameNum = 0;
+    int savedCount = 0;
+    Mat frame;
+    
+    while (cap.read(frame)) {
+        if (frameNum % frameInterval == 0) {
+            string filename = outputDir + "/frame_" +
+                            to_string(savedCount) + ".jpg";
+            imwrite(filename, frame);
+            savedCount++;
+        }
+        frameNum++;
+    }
+    
+    cout << "Extracted " << savedCount << " frames\n";
+}
+```
+
+### Real-time Camera Processing
+
+```cpp
+#include <opencv2/videoio.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
+
+using namespace cv;
+
+int main() {
+    VideoCapture cap(0);
+    if (!cap.isOpened()) return -1;
+    
+    // Set camera properties
+    cap.set(CAP_PROP_FRAME_WIDTH, 1280);
+    cap.set(CAP_PROP_FRAME_HEIGHT, 720);
+    cap.set(CAP_PROP_FPS, 30);
+    
+    // Optional: Create video writer
+    VideoWriter writer(
+        "recording.mp4",
+        VideoWriter::fourcc('H','2','6','4'),
+        30.0,
+        Size(1280, 720)
+    );
+    
+    Mat frame, processed;
+    bool recording = false;
+    
+    while (true) {
+        cap >> frame;
+        if (frame.empty()) break;
+        
+        // Process frame
+        cvtColor(frame, processed, COLOR_BGR2GRAY);
+        cvtColor(processed, processed, COLOR_GRAY2BGR);
+        
+        // Record if enabled
+        if (recording) {
+            writer.write(frame);
+        }
+        
+        // Display
+        imshow("Camera", processed);
+        
+        // Handle keys
+        int key = waitKey(1);
+        if (key == 'q') break;
+        if (key == 'r') recording = !recording;
+    }
+    
+    return 0;
+}
+```
+
+### Video Stabilization
+
+```cpp
+void stabilizeVideo(const string& input, const string& output) {
+    VideoCapture cap(input);
+    
+    // Get video properties
+    int width = cap.get(CAP_PROP_FRAME_WIDTH);
+    int height = cap.get(CAP_PROP_FRAME_HEIGHT);
+    double fps = cap.get(CAP_PROP_FPS);
+    
+    VideoWriter writer(
+        output,
+        VideoWriter::fourcc('M','P','4','V'),
+        fps,
+        Size(width, height)
+    );
+    
+    Mat prevFrame, prevGray;
+    cap >> prevFrame;
+    cvtColor(prevFrame, prevGray, COLOR_BGR2GRAY);
+    
+    // Transformation accumulator
+    Mat totalTransform = Mat::eye(2, 3, CV_64F);
+    
+    Mat frame, gray, transform, stabilized;
+    while (cap.read(frame)) {
+        cvtColor(frame, gray, COLOR_BGR2GRAY);
+        
+        // Estimate transform
+        vector<Point2f> prevPts, currPts;
+        goodFeaturesToTrack(prevGray, prevPts, 200, 0.01, 30);
+        
+        vector<uchar> status;
+        vector<float> err;
+        calcOpticalFlowPyrLK(prevGray, gray, prevPts,
+                            currPts, status, err);
+        
+        // Calculate transformation
+        transform = estimateAffinePartial2D(prevPts, currPts);
+        
+        // Apply smoothing and warp
+        // ... (smoothing logic) ...
+        
+        warpAffine(frame, stabilized, totalTransform,
+                  frame.size());
+        
+        writer.write(stabilized);
+        
+        prevGray = gray.clone();
+    }
+}
+```
+
+## Best Practices
+
+<Note>
+**Always Check isOpened():**
+```cpp
+VideoCapture cap("video.mp4");
+if (!cap.isOpened()) {
+    cerr << "Error: Cannot open video\n";
+    return -1;
+}
+```
+This catches missing files, unsupported formats, or codec issues.
+</Note>
+
+<Note>
+**Choose the Right Backend:**
+- **FFmpeg** - Best for file I/O, most format support
+- **GStreamer** - Good for streaming, pipelines
+- **Platform-specific** - MSMF (Windows), AVFoundation (macOS) for cameras
+
+```cpp
+VideoCapture cap(source, CAP_FFMPEG);  // Explicit backend
+```
+</Note>
+
+<Note>
+**Frame Rate Control:**
+```cpp
+double fps = cap.get(CAP_PROP_FPS);
+int delay = cvRound(1000.0 / fps);  // Delay in ms
+
+while (cap.read(frame)) {
+    imshow("Video", frame);
+    if (waitKey(delay) >= 0) break;  // Proper playback speed
+}
+```
+</Note>
+
+<Note>
+**Codec Compatibility:**
+H.264 is the most widely supported codec:
+```cpp
+int fourcc = VideoWriter::fourcc('H','2','6','4');
+VideoWriter writer("output.mp4", fourcc, 30, size);
+```
+
+For maximum compatibility, use .mp4 container with H.264 codec.
+</Note>
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"Cannot open video"**
+   - Check file exists and path is correct
+   - Verify codec support: `cap.get(CAP_PROP_FOURCC)`
+   - Try different backend: `VideoCapture(file, CAP_FFMPEG)`
+
+2. **Frames not written**
+   - Ensure frame size matches VideoWriter size
+   - Check frame type (CV_8UC3 for color)
+   - Verify disk space and write permissions
+
+3. **Camera not found**
+   - Try different camera indices (0, 1, 2...)
+   - Specify backend: `VideoCapture(0, CAP_DSHOW)`
+   - Check camera permissions
+
+4. **Playback too fast/slow**
+   - Get FPS: `cap.get(CAP_PROP_FPS)`
+   - Use proper delay: `waitKey(1000/fps)`
+
+## Related Modules
+
+- [Image Codecs](/modules/imgcodecs) - Image I/O operations
+- [High-Level GUI](/modules/highgui) - Display video frames
+- [Video Analysis](/modules/video) - Process video content
+
+## Source Reference
+
+Main header: `~/workspace/source/modules/videoio/include/opencv2/videoio.hpp`
+
+Examples:
+- `samples/cpp/videocapture_basic.cpp`
+- `samples/cpp/videowriter_basic.cpp`
+- `samples/cpp/videocapture_camera.cpp`

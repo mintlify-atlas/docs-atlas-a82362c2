@@ -1,0 +1,596 @@
+---
+title: JavaScript Bindings (opencv.js)
+description: Use OpenCV directly in web browsers with opencv.js compiled via Emscripten
+---
+
+## Overview
+
+OpenCV.js brings OpenCV functionality to web browsers through WebAssembly (WASM). It's compiled from C++ using Emscripten and provides a JavaScript API that closely mirrors the C++ interface.
+
+## Installation
+
+### Using Pre-built opencv.js
+
+The easiest way to get started:
+
+<CodeGroup>
+```html CDN
+<script async src="https://docs.opencv.org/4.x/opencv.js" type="text/javascript"></script>
+```
+
+```html Local File
+<script async src="./opencv.js" type="text/javascript"></script>
+```
+</CodeGroup>
+
+<Note>
+The `async` attribute allows the page to load while opencv.js downloads. Use the `onRuntimeInitialized` callback to run code after OpenCV is ready.
+</Note>
+
+### Waiting for OpenCV to Load
+
+```html
+<script type="text/javascript">
+function onOpenCvReady() {
+    console.log('OpenCV.js is ready');
+    console.log('Version:', cv.getBuildInformation());
+    // Your OpenCV code here
+}
+</script>
+
+<script async src="opencv.js" 
+        onload="onOpenCvReady();" 
+        type="text/javascript">
+</script>
+```
+
+Or use the runtime callback:
+
+```html
+<script type="text/javascript">
+cv['onRuntimeInitialized'] = () => {
+    console.log('OpenCV.js loaded');
+    // Your code here
+};
+</script>
+<script async src="opencv.js" type="text/javascript"></script>
+```
+
+### Building from Source
+
+For custom builds with specific modules:
+
+```bash
+# Install Emscripten
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk
+./emsdk install latest
+./emsdk activate latest
+source ./emsdk_env.sh
+
+# Clone OpenCV
+git clone https://github.com/opencv/opencv.git
+cd opencv
+
+# Build opencv.js
+emcmake python ./platforms/js/build_js.py build_js \
+    --build_wasm \
+    --cmake_option="-DCMAKE_CXX_STANDARD=17"
+
+# Output: build_js/bin/opencv.js
+```
+
+<Note>
+Emscripten 4.0.20+ requires C++17 or newer. The build process typically takes 5-10 minutes.
+</Note>
+
+## Quick Start
+
+### Basic HTML Template
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>OpenCV.js Example</title>
+</head>
+<body>
+    <h1>OpenCV.js Demo</h1>
+    
+    <div>
+        <input type="file" id="fileInput" accept="image/*">
+    </div>
+    
+    <div>
+        <canvas id="canvasInput"></canvas>
+        <canvas id="canvasOutput"></canvas>
+    </div>
+    
+    <script async src="opencv.js" type="text/javascript"></script>
+    <script type="text/javascript">
+        cv['onRuntimeInitialized'] = () => {
+            console.log('OpenCV.js ready');
+            document.getElementById('fileInput').addEventListener('change', loadImage);
+        };
+        
+        function loadImage(e) {
+            let file = e.target.files[0];
+            let img = new Image();
+            img.onload = function() {
+                processImage(img);
+            };
+            img.src = URL.createObjectURL(file);
+        }
+        
+        function processImage(imgElement) {
+            let src = cv.imread(imgElement);
+            let dst = new cv.Mat();
+            
+            // Convert to grayscale
+            cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
+            
+            // Display result
+            cv.imshow('canvasOutput', dst);
+            
+            // Clean up
+            src.delete();
+            dst.delete();
+        }
+    </script>
+</body>
+</html>
+```
+
+## Core Concepts
+
+### Mat Objects
+
+All images in OpenCV.js are represented by `cv.Mat`:
+
+```javascript
+// Create Mat from canvas or image element
+let img = cv.imread('imageId');
+
+// Create empty Mat
+let mat = new cv.Mat(rows, cols, cv.CV_8UC3);
+
+// Create with specific values
+let zeros = cv.Mat.zeros(480, 640, cv.CV_8UC1);
+let ones = cv.Mat.ones(100, 100, cv.CV_8UC3);
+let eye = cv.Mat.eye(3, 3, cv.CV_64FC1);
+
+// IMPORTANT: Always delete Mat objects when done
+mat.delete();
+```
+
+<Warning>
+**Memory Management**: JavaScript garbage collection doesn't handle WebAssembly memory. Always call `.delete()` on Mat objects to prevent memory leaks.
+</Warning>
+
+### Reading Images
+
+```javascript
+// From img element
+let img = document.getElementById('myImage');
+let mat = cv.imread(img);
+
+// From canvas
+let canvas = document.getElementById('myCanvas');
+let mat = cv.imread(canvas);
+
+// From video element (current frame)
+let video = document.getElementById('myVideo');
+let mat = cv.imread(video);
+```
+
+### Displaying Images
+
+```javascript
+// Display Mat on canvas
+cv.imshow('canvasOutputId', mat);
+
+// Or get canvas element first
+let canvas = document.getElementById('canvasOutput');
+cv.imshow(canvas, mat);
+```
+
+## Code Examples
+
+### Image Processing Pipeline
+
+```html
+<script type="text/javascript">
+function processImage() {
+    // Read image
+    let src = cv.imread('imageInput');
+    let dst = new cv.Mat();
+    
+    // Convert to grayscale
+    let gray = new cv.Mat();
+    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+    
+    // Apply Gaussian blur
+    let blurred = new cv.Mat();
+    let ksize = new cv.Size(5, 5);
+    cv.GaussianBlur(gray, blurred, ksize, 0);
+    
+    // Edge detection
+    let edges = new cv.Mat();
+    cv.Canny(blurred, edges, 50, 150);
+    
+    // Find contours
+    let contours = new cv.MatVector();
+    let hierarchy = new cv.Mat();
+    cv.findContours(edges, contours, hierarchy, 
+                   cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+    
+    // Draw contours
+    let color = new cv.Scalar(0, 255, 0, 255);
+    cv.cvtColor(edges, dst, cv.COLOR_GRAY2RGBA);
+    cv.drawContours(dst, contours, -1, color, 2);
+    
+    // Display result
+    cv.imshow('canvasOutput', dst);
+    
+    // Clean up memory
+    src.delete();
+    dst.delete();
+    gray.delete();
+    blurred.delete();
+    edges.delete();
+    contours.delete();
+    hierarchy.delete();
+}
+</script>
+```
+
+### Face Detection in Browser
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <script async src="opencv.js" type="text/javascript"></script>
+    <script src="utils.js" type="text/javascript"></script>
+</head>
+<body>
+    <h1>Face Detection Demo</h1>
+    <canvas id="canvasOutput" width="640" height="480"></canvas>
+    <button id="startStopButton" disabled>Start</button>
+    
+    <script type="text/javascript">
+        let video = document.createElement('video');
+        let streaming = false;
+        let netDet = undefined;
+        
+        cv['onRuntimeInitialized'] = () => {
+            loadModel();
+        };
+        
+        function loadModel() {
+            let utils = new Utils('');
+            let modelUrl = 'face_detection_yunet_2023mar.onnx';
+            
+            utils.createFileFromUrl(modelUrl, modelUrl, () => {
+                netDet = new cv.FaceDetectorYN(
+                    modelUrl, "", 
+                    new cv.Size(320, 320), 
+                    0.9, 0.3, 5000
+                );
+                document.getElementById('startStopButton').disabled = false;
+            });
+        }
+        
+        function detectFaces(img) {
+            netDet.setInputSize(new cv.Size(img.cols, img.rows));
+            let faces = new cv.Mat();
+            netDet.detect(img, faces);
+            
+            let faceArray = [];
+            for (let i = 0; i < faces.data32F.length; i += 15) {
+                let confidence = faces.data32F[i + 14];
+                if (confidence > 0.9) {
+                    faceArray.push({
+                        x: faces.data32F[i],
+                        y: faces.data32F[i + 1],
+                        width: faces.data32F[i + 2],
+                        height: faces.data32F[i + 3]
+                    });
+                }
+            }
+            
+            faces.delete();
+            return faceArray;
+        }
+        
+        function processVideo() {
+            let src = new cv.Mat(video.height, video.width, cv.CV_8UC4);
+            let cap = new cv.VideoCapture(video);
+            
+            const FPS = 30;
+            function processFrame() {
+                if (!streaming) return;
+                
+                let begin = Date.now();
+                cap.read(src);
+                
+                let faces = detectFaces(src);
+                
+                // Draw rectangles around faces
+                faces.forEach(face => {
+                    let point1 = new cv.Point(face.x, face.y);
+                    let point2 = new cv.Point(face.x + face.width, 
+                                             face.y + face.height);
+                    cv.rectangle(src, point1, point2, 
+                               [0, 255, 0, 255], 2);
+                });
+                
+                cv.imshow('canvasOutput', src);
+                
+                let delay = 1000/FPS - (Date.now() - begin);
+                setTimeout(processFrame, delay);
+            }
+            
+            // Start camera
+            navigator.mediaDevices.getUserMedia({video: true, audio: false})
+                .then(stream => {
+                    video.srcObject = stream;
+                    video.play();
+                    streaming = true;
+                    processFrame();
+                });
+        }
+        
+        document.getElementById('startStopButton').onclick = () => {
+            if (!streaming) {
+                processVideo();
+            } else {
+                streaming = false;
+            }
+        };
+    </script>
+</body>
+</html>
+```
+
+### Real-time Webcam Processing
+
+```javascript
+let video = document.getElementById('videoInput');
+let src = new cv.Mat(video.height, video.width, cv.CV_8UC4);
+let dst = new cv.Mat(video.height, video.width, cv.CV_8UC1);
+let cap = new cv.VideoCapture(video);
+
+const FPS = 30;
+function processVideo() {
+    let begin = Date.now();
+    
+    // Capture frame
+    cap.read(src);
+    
+    // Convert to grayscale
+    cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
+    
+    // Display
+    cv.imshow('canvasOutput', dst);
+    
+    // Schedule next frame
+    let delay = 1000/FPS - (Date.now() - begin);
+    setTimeout(processVideo, delay);
+}
+
+// Start camera
+navigator.mediaDevices.getUserMedia({video: true, audio: false})
+    .then(stream => {
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+            video.play();
+            processVideo();
+        };
+    })
+    .catch(err => {
+        console.error('Camera error:', err);
+    });
+```
+
+### Working with Data
+
+```javascript
+// Access pixel values
+let mat = cv.imread('imageId');
+let row = 10, col = 20;
+let pixel = mat.ucharPtr(row, col);
+// pixel is Uint8Array with [R, G, B, A] values
+
+// Modify pixels
+pixel[0] = 255;  // Red
+pixel[1] = 0;    // Green
+pixel[2] = 0;    // Blue
+pixel[3] = 255;  // Alpha
+
+// Get Mat data as typed array
+let data = mat.data;  // Uint8Array
+
+// Create Mat from array
+let dataArray = new Uint8Array([255, 0, 0, 255, 0, 255, 0, 255]);
+let mat2 = new cv.Mat(2, 1, cv.CV_8UC4);
+mat2.data.set(dataArray);
+```
+
+### Image Transformations
+
+```javascript
+function transformImage() {
+    let src = cv.imread('inputImage');
+    let dst = new cv.Mat();
+    
+    // Resize
+    let dsize = new cv.Size(320, 240);
+    cv.resize(src, dst, dsize, 0, 0, cv.INTER_LINEAR);
+    
+    // Rotate
+    let center = new cv.Point(src.cols/2, src.rows/2);
+    let M = cv.getRotationMatrix2D(center, 45, 1.0);
+    cv.warpAffine(src, dst, M, new cv.Size(src.cols, src.rows));
+    
+    // Flip
+    cv.flip(src, dst, 1);  // 1 = horizontal, 0 = vertical, -1 = both
+    
+    // Crop (using ROI)
+    let rect = new cv.Rect(10, 10, 100, 100);
+    let cropped = src.roi(rect);
+    
+    cv.imshow('canvasOutput', dst);
+    
+    // Clean up
+    src.delete();
+    dst.delete();
+    M.delete();
+    cropped.delete();
+}
+```
+
+## Advanced Features
+
+### Using DNN Module
+
+```javascript
+// Load ONNX model
+let net = cv.readNet('model.onnx');
+
+// Prepare input
+let img = cv.imread('imageId');
+let blob = cv.blobFromImage(
+    img, 
+    1.0,                          // scale factor
+    new cv.Size(224, 224),        // size
+    new cv.Scalar(0, 0, 0, 0),   // mean
+    true,                         // swapRB
+    false                         // crop
+);
+
+// Set input and run inference
+net.setInput(blob);
+let output = net.forward();
+
+console.log('Output shape:', output.size());
+
+// Clean up
+img.delete();
+blob.delete();
+output.delete();
+net.delete();
+```
+
+### Performance Optimization
+
+<Tabs>
+  <Tab title="Memory Management">
+    ```javascript
+    // Good: Clean up immediately
+    function process() {
+        let mat = cv.imread('img');
+        let result = new cv.Mat();
+        
+        try {
+            cv.cvtColor(mat, result, cv.COLOR_RGBA2GRAY);
+            cv.imshow('output', result);
+        } finally {
+            mat.delete();
+            result.delete();
+        }
+    }
+    
+    // Bad: Memory leak
+    function processLeaky() {
+        let mat = cv.imread('img');
+        let result = new cv.Mat();
+        cv.cvtColor(mat, result, cv.COLOR_RGBA2GRAY);
+        // Forgot to delete!
+    }
+    ```
+  </Tab>
+  <Tab title="Reuse Objects">
+    ```javascript
+    // Good: Reuse Mat objects
+    let src = new cv.Mat();
+    let dst = new cv.Mat();
+    
+    function processFrame() {
+        cap.read(src);
+        cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
+        cv.imshow('output', dst);
+    }
+    
+    // Call many times without recreating
+    setInterval(processFrame, 33);
+    
+    // Clean up when done
+    // src.delete();
+    // dst.delete();
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+**Performance Tip**: Reuse Mat objects in loops instead of creating new ones. Only delete when completely done.
+</Note>
+
+## Common Issues
+
+### Memory Usage
+
+```javascript
+// Check memory usage (Emscripten specific)
+console.log('Memory:', cv.getBuildInformation());
+
+// Force garbage collection (if available)
+if (typeof gc === 'function') {
+    gc();
+}
+```
+
+### Loading Files
+
+OpenCV.js uses Emscripten's virtual filesystem:
+
+```javascript
+// Create file in virtual FS
+let utils = new Utils('');
+utils.createFileFromUrl('model.xml', 'path/to/model.xml', () => {
+    // File loaded, can use it now
+    let cascade = new cv.CascadeClassifier();
+    cascade.load('model.xml');
+});
+```
+
+## Build Configuration
+
+Customize which modules to include:
+
+```bash
+python ./platforms/js/build_js.py build_js \
+    --build_wasm \
+    --disable_single_file \
+    --cmake_option="-DBUILD_LIST=core,imgproc,objdetect,dnn"
+```
+
+Common build flags:
+- `--build_wasm`: Build WebAssembly version
+- `--disable_single_file`: Separate .wasm file
+- `--enable_exception`: Enable C++ exceptions
+- `--build_test`: Include test utilities
+
+## Resources
+
+- [OpenCV.js Tutorials](https://docs.opencv.org/4.x/d5/d10/tutorial_js_root.html)
+- [OpenCV.js API Reference](https://docs.opencv.org/4.x/d5/d10/tutorial_js_root.html)
+- [Building opencv.js](https://docs.opencv.org/4.x/d4/da1/tutorial_js_setup.html)
+- [Sample Code](https://github.com/opencv/opencv/tree/4.x/samples/dnn)
+- [Emscripten Documentation](https://emscripten.org/docs/)
+
+## Next Steps
+
+- Learn about [DNN Module](/modules/dnn) for deep learning
+- Explore [Image Processing](/modules/imgproc) functions
+- Try [Video Analysis](/modules/video) in the browser

@@ -1,0 +1,675 @@
+---
+title: Stereo Vision
+description: Functions for stereo camera calibration, rectification, and depth computation from stereo image pairs
+---
+
+## Overview
+
+Stereo vision uses two cameras to compute depth information by triangulation. OpenCV provides functions for:
+- Calibrating stereo camera systems
+- Computing rectification transformations
+- Stereo correspondence algorithms (StereoBM, StereoSGBM)
+- 3D reconstruction from disparity maps
+
+## Stereo Calibration
+
+### stereoCalibrate
+
+Calibrates a stereo camera setup by finding intrinsic parameters for each camera and extrinsic parameters between them.
+
+```cpp
+double cv::stereoCalibrate(
+    InputArrayOfArrays objectPoints,
+    InputArrayOfArrays imagePoints1,
+    InputArrayOfArrays imagePoints2,
+    InputOutputArray cameraMatrix1,
+    InputOutputArray distCoeffs1,
+    InputOutputArray cameraMatrix2,
+    InputOutputArray distCoeffs2,
+    Size imageSize,
+    OutputArray R,
+    OutputArray T,
+    OutputArray E,
+    OutputArray F,
+    int flags = CALIB_FIX_INTRINSIC,
+    TermCriteria criteria = TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, 30, 1e-6)
+)
+```
+
+<ParamField path="objectPoints" type="InputArrayOfArrays" required>
+  Vector of vectors of calibration pattern points. Both cameras need to see the same object points. Structure same as calibrateCamera.
+</ParamField>
+
+<ParamField path="imagePoints1" type="InputArrayOfArrays" required>
+  Vector of vectors of projections of calibration pattern points observed by the first camera.
+</ParamField>
+
+<ParamField path="imagePoints2" type="InputArrayOfArrays" required>
+  Vector of vectors of projections of calibration pattern points observed by the second camera.
+</ParamField>
+
+<ParamField path="cameraMatrix1" type="InputOutputArray" required>
+  Input/output camera intrinsic matrix for the first camera.
+</ParamField>
+
+<ParamField path="distCoeffs1" type="InputOutputArray" required>
+  Input/output vector of distortion coefficients for the first camera.
+</ParamField>
+
+<ParamField path="cameraMatrix2" type="InputOutputArray" required>
+  Input/output camera intrinsic matrix for the second camera.
+</ParamField>
+
+<ParamField path="distCoeffs2" type="InputOutputArray" required>
+  Input/output vector of distortion coefficients for the second camera.
+</ParamField>
+
+<ParamField path="imageSize" type="Size" required>
+  Size of the image used only to initialize camera intrinsic matrices.
+</ParamField>
+
+<ParamField path="R" type="OutputArray" required>
+  Output rotation matrix between the first and second camera coordinate systems. This matrix brings points from the first camera's coordinate system to the second camera's coordinate system.
+</ParamField>
+
+<ParamField path="T" type="OutputArray" required>
+  Output translation vector between the coordinate systems of the cameras. Equivalent to the position of the first camera with respect to the second camera.
+</ParamField>
+
+<ParamField path="E" type="OutputArray" required>
+  Output essential matrix.
+</ParamField>
+
+<ParamField path="F" type="OutputArray" required>
+  Output fundamental matrix.
+</ParamField>
+
+<ParamField path="flags" type="int" default="CALIB_FIX_INTRINSIC">
+  Different flags for stereo calibration (see Stereo Calibration Flags below).
+</ParamField>
+
+<ParamField path="criteria" type="TermCriteria" default="TermCriteria(COUNT+EPS, 30, 1e-6)">
+  Termination criteria for the iterative optimization algorithm.
+</ParamField>
+
+**Returns:** The overall RMS re-projection error.
+
+The function estimates the transformation between two cameras:
+
+```
+R2 = R * R1
+T2 = R * T1 + T
+```
+
+Optionally computes the essential matrix E:
+
+```
+E = [T]_x * R
+```
+
+where `[T]_x` is the skew-symmetric matrix of T.
+
+And the fundamental matrix F:
+
+```
+F = cameraMatrix2^(-T) * E * cameraMatrix1^(-1)
+```
+
+<Warning>
+Due to high dimensionality and noise, the function can diverge. If intrinsic parameters can be estimated with high accuracy for each camera individually (using calibrateCamera), it's recommended to pass CALIB_FIX_INTRINSIC flag with the computed intrinsic parameters.
+</Warning>
+
+### Extended Version
+
+```cpp
+double cv::stereoCalibrate(
+    InputArrayOfArrays objectPoints,
+    InputArrayOfArrays imagePoints1,
+    InputArrayOfArrays imagePoints2,
+    InputOutputArray cameraMatrix1,
+    InputOutputArray distCoeffs1,
+    InputOutputArray cameraMatrix2,
+    InputOutputArray distCoeffs2,
+    Size imageSize,
+    InputOutputArray R,
+    InputOutputArray T,
+    OutputArray E,
+    OutputArray F,
+    OutputArrayOfArrays rvecs,
+    OutputArrayOfArrays tvecs,
+    OutputArray perViewErrors,
+    int flags = CALIB_FIX_INTRINSIC,
+    TermCriteria criteria = TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, 30, 1e-6)
+)
+```
+
+<ParamField path="rvecs" type="OutputArrayOfArrays">
+  Output vector of rotation vectors (Rodrigues) estimated for each pattern view in the coordinate system of the first camera.
+</ParamField>
+
+<ParamField path="tvecs" type="OutputArrayOfArrays">
+  Output vector of translation vectors estimated for each pattern view.
+</ParamField>
+
+<ParamField path="perViewErrors" type="OutputArray">
+  Output vector of the RMS re-projection error estimated for each pattern view.
+</ParamField>
+
+### Stereo Calibration Flags
+
+Flags control the calibration behavior (in addition to single camera flags):
+
+| Flag | Value | Description |
+|------|-------|-------------|
+| `CALIB_FIX_INTRINSIC` | 0x00100 | Fix cameraMatrix1/2 and distCoeffs1/2 so that only R, T, E, F are estimated |
+| `CALIB_USE_INTRINSIC_GUESS` | 0x00001 | Optimize some or all intrinsic parameters according to specified flags |
+| `CALIB_USE_EXTRINSIC_GUESS` | 1 &lt;&lt; 22 | R and T contain valid initial values that are optimized further |
+| `CALIB_FIX_PRINCIPAL_POINT` | 0x00004 | Fix principal points during optimization |
+| `CALIB_FIX_FOCAL_LENGTH` | 0x00010 | Fix fx and fy for both cameras |
+| `CALIB_FIX_ASPECT_RATIO` | 0x00002 | Optimize fy, fix ratio fx/fy |
+| `CALIB_SAME_FOCAL_LENGTH` | 0x00200 | Enforce fx^(0) = fx^(1) and fy^(0) = fy^(1) |
+| `CALIB_ZERO_TANGENT_DIST` | 0x00008 | Set tangential distortion coefficients to zero for each camera |
+| `CALIB_FIX_K1` ... `CALIB_FIX_K6` | Various | Do not change corresponding radial distortion coefficient |
+| `CALIB_RATIONAL_MODEL` | 0x04000 | Enable k4, k5, k6 coefficients (8 coefficients total) |
+| `CALIB_THIN_PRISM_MODEL` | 0x08000 | Enable s1, s2, s3, s4 coefficients (12 coefficients total) |
+| `CALIB_FIX_S1_S2_S3_S4` | 0x10000 | Thin prism distortion coefficients are not changed |
+| `CALIB_TILTED_MODEL` | 0x40000 | Enable tauX and tauY coefficients (14 coefficients) |
+| `CALIB_FIX_TAUX_TAUY` | 0x80000 | Tilted sensor model coefficients are not changed |
+
+<Note>
+It's usually reasonable to restrict some parameters, e.g., pass CALIB_SAME_FOCAL_LENGTH and CALIB_ZERO_TANGENT_DIST flags.
+</Note>
+
+## Stereo Rectification
+
+### stereoRectify
+
+Computes rectification transforms for each head of a calibrated stereo camera.
+
+```cpp
+void cv::stereoRectify(
+    InputArray cameraMatrix1,
+    InputArray distCoeffs1,
+    InputArray cameraMatrix2,
+    InputArray distCoeffs2,
+    Size imageSize,
+    InputArray R,
+    InputArray T,
+    OutputArray R1,
+    OutputArray R2,
+    OutputArray P1,
+    OutputArray P2,
+    OutputArray Q,
+    int flags = CALIB_ZERO_DISPARITY,
+    double alpha = -1,
+    Size newImageSize = Size(),
+    CV_OUT Rect* validPixROI1 = 0,
+    CV_OUT Rect* validPixROI2 = 0
+)
+```
+
+<ParamField path="cameraMatrix1" type="InputArray" required>
+  First camera intrinsic matrix.
+</ParamField>
+
+<ParamField path="distCoeffs1" type="InputArray" required>
+  First camera distortion parameters.
+</ParamField>
+
+<ParamField path="cameraMatrix2" type="InputArray" required>
+  Second camera intrinsic matrix.
+</ParamField>
+
+<ParamField path="distCoeffs2" type="InputArray" required>
+  Second camera distortion parameters.
+</ParamField>
+
+<ParamField path="imageSize" type="Size" required>
+  Size of the image used for stereo calibration.
+</ParamField>
+
+<ParamField path="R" type="InputArray" required>
+  Rotation matrix from the coordinate system of the first camera to the second camera (from stereoCalibrate).
+</ParamField>
+
+<ParamField path="T" type="InputArray" required>
+  Translation vector from the coordinate system of the first camera to the second camera (from stereoCalibrate).
+</ParamField>
+
+<ParamField path="R1" type="OutputArray" required>
+  Output 3x3 rectification transform (rotation matrix) for the first camera. Performs change of basis from unrectified to rectified first camera's coordinate system.
+</ParamField>
+
+<ParamField path="R2" type="OutputArray" required>
+  Output 3x3 rectification transform (rotation matrix) for the second camera.
+</ParamField>
+
+<ParamField path="P1" type="OutputArray" required>
+  Output 3x4 projection matrix in the new (rectified) coordinate systems for the first camera. Projects points given in the rectified first camera coordinate system into the rectified first camera's image.
+</ParamField>
+
+<ParamField path="P2" type="OutputArray" required>
+  Output 3x4 projection matrix in the new (rectified) coordinate systems for the second camera.
+</ParamField>
+
+<ParamField path="Q" type="OutputArray" required>
+  Output 4x4 disparity-to-depth mapping matrix (see reprojectImageTo3D).
+</ParamField>
+
+<ParamField path="flags" type="int" default="CALIB_ZERO_DISPARITY">
+  Operation flags:
+  - `CALIB_ZERO_DISPARITY` (0x00400): Makes principal points of each camera have the same pixel coordinates in rectified views
+</ParamField>
+
+<ParamField path="alpha" type="double" default="-1">
+  Free scaling parameter between 0 and 1:
+  - `alpha=0`: Rectified images are zoomed and shifted so only valid pixels are visible (no black areas)
+  - `alpha=1`: Rectified images are decimated and shifted so all pixels from original images are retained
+  - `-1`: Default scaling
+</ParamField>
+
+<ParamField path="newImageSize" type="Size" default="Size()">
+  New image resolution after rectification. When (0,0), it's set to the original imageSize. Setting to larger value helps preserve details.
+</ParamField>
+
+<ParamField path="validPixROI1" type="Rect*">
+  Optional output rectangle inside the rectified first image where all pixels are valid.
+</ParamField>
+
+<ParamField path="validPixROI2" type="Rect*">
+  Optional output rectangle inside the rectified second image where all pixels are valid.
+</ParamField>
+
+The function computes rotation matrices for each camera that make both camera image planes the same plane. This makes all epipolar lines parallel, simplifying dense stereo correspondence.
+
+**Horizontal Stereo:**
+
+For cameras shifted mainly along x-axis, the projection matrices are:
+
+```
+P1 = [f  0  cx1  0   ]
+     [0  f  cy   0   ]
+     [0  0  1    0   ]
+
+P2 = [f  0  cx2  Tx*f]
+     [0  f  cy   0   ]
+     [0  0  1    0   ]
+
+Q  = [1  0  0    -cx1       ]
+     [0  1  0    -cy        ]
+     [0  0  0    f          ]
+     [0  0  -1/Tx (cx1-cx2)/Tx]
+```
+
+where Tx is horizontal shift between cameras and cx1=cx2 if CALIB_ZERO_DISPARITY is set.
+
+**Vertical Stereo:**
+
+For cameras shifted mainly along y-axis:
+
+```
+P1 = [f  0  cx  0   ]
+     [0  f  cy1 0   ]
+     [0  0  1   0   ]
+
+P2 = [f  0  cx  0   ]
+     [0  f  cy2 Ty*f]
+     [0  0  1   0   ]
+
+Q  = [1  0  0    -cx        ]
+     [0  1  0    -cy1       ]
+     [0  0  0    f          ]
+     [0  0  -1/Ty (cy1-cy2)/Ty]
+```
+
+<Note>
+The first three columns of P1 and P2 are the new "rectified" camera matrices. Pass these with R1 and R2 to initUndistortRectifyMap to initialize rectification maps.
+</Note>
+
+### stereoRectifyUncalibrated
+
+Computes a rectification transform for an uncalibrated stereo camera.
+
+```cpp
+bool cv::stereoRectifyUncalibrated(
+    InputArray points1,
+    InputArray points2,
+    InputArray F,
+    Size imgSize,
+    OutputArray H1,
+    OutputArray H2,
+    double threshold = 5
+)
+```
+
+<ParamField path="points1" type="InputArray" required>
+  Array of feature points in the first image.
+</ParamField>
+
+<ParamField path="points2" type="InputArray" required>
+  Corresponding points in the second image.
+</ParamField>
+
+<ParamField path="F" type="InputArray" required>
+  Input fundamental matrix. Can be computed from the same point pairs using findFundamentalMat.
+</ParamField>
+
+<ParamField path="imgSize" type="Size" required>
+  Size of the image.
+</ParamField>
+
+<ParamField path="H1" type="OutputArray" required>
+  Output rectification homography matrix for the first image.
+</ParamField>
+
+<ParamField path="H2" type="OutputArray" required>
+  Output rectification homography matrix for the second image.
+</ParamField>
+
+<ParamField path="threshold" type="double" default="5">
+  Optional threshold to filter outliers. If >0, point pairs not complying with epipolar geometry are rejected. Otherwise all points are considered inliers.
+</ParamField>
+
+Computes rectification transformations without knowing intrinsic parameters. Implements the algorithm from Hartley99.
+
+<Warning>
+Algorithm heavily depends on epipolar geometry. If camera lenses have significant distortion, correct it before computing fundamental matrix and calling this function.
+</Warning>
+
+## Utility Functions
+
+### getOptimalNewCameraMatrix
+
+Returns the new camera intrinsic matrix based on the free scaling parameter.
+
+```cpp
+Mat cv::getOptimalNewCameraMatrix(
+    InputArray cameraMatrix,
+    InputArray distCoeffs,
+    Size imageSize,
+    double alpha,
+    Size newImgSize = Size(),
+    CV_OUT Rect* validPixROI = 0,
+    bool centerPrincipalPoint = false
+)
+```
+
+<ParamField path="cameraMatrix" type="InputArray" required>
+  Input camera intrinsic matrix.
+</ParamField>
+
+<ParamField path="distCoeffs" type="InputArray" required>
+  Input vector of distortion coefficients. If NULL/empty, zero distortion is assumed.
+</ParamField>
+
+<ParamField path="imageSize" type="Size" required>
+  Original image size.
+</ParamField>
+
+<ParamField path="alpha" type="double" required>
+  Free scaling parameter between 0 (only valid pixels) and 1 (retain all source pixels). See stereoRectify for details.
+</ParamField>
+
+<ParamField path="newImgSize" type="Size" default="Size()">
+  Image size after rectification. By default, set to imageSize.
+</ParamField>
+
+<ParamField path="validPixROI" type="Rect*">
+  Optional output rectangle outlining all-good-pixels region in undistorted image.
+</ParamField>
+
+<ParamField path="centerPrincipalPoint" type="bool" default="false">
+  Optional flag indicating whether the principal point should be at image center or chosen to best fit source image (determined by alpha).
+</ParamField>
+
+**Returns:** New camera intrinsic matrix.
+
+By varying alpha parameter, you can retrieve only sensible pixels (alpha=0), keep all original pixels (alpha=1), or get something in between. When alpha>0, undistorted result likely has black pixels corresponding to "virtual" pixels outside captured distorted image.
+
+### rectify3Collinear
+
+Computes rectification transforms for 3-head camera where all heads are on the same line.
+
+```cpp
+float cv::rectify3Collinear(
+    InputArray cameraMatrix1,
+    InputArray distCoeffs1,
+    InputArray cameraMatrix2,
+    InputArray distCoeffs2,
+    InputArray cameraMatrix3,
+    InputArray distCoeffs3,
+    InputArrayOfArrays imgpt1,
+    InputArrayOfArrays imgpt3,
+    Size imageSize,
+    InputArray R12,
+    InputArray T12,
+    InputArray R13,
+    InputArray T13,
+    OutputArray R1,
+    OutputArray R2,
+    OutputArray R3,
+    OutputArray P1,
+    OutputArray P2,
+    OutputArray P3,
+    OutputArray Q,
+    double alpha,
+    Size newImgSize,
+    CV_OUT Rect* roi1,
+    CV_OUT Rect* roi2,
+    int flags
+)
+```
+
+Computes rectification transformations for tri-focal stereo camera systems with collinear arrangement.
+
+## Stereo Matching Classes
+
+### StereoBM
+
+Class for computing stereo correspondence using the block matching algorithm.
+
+```cpp
+class CV_EXPORTS_W StereoBM : public StereoMatcher
+{
+public:
+    static Ptr<StereoBM> create(int numDisparities = 0, int blockSize = 21);
+    
+    // Parameters
+    CV_WRAP virtual int getPreFilterType() const = 0;
+    CV_WRAP virtual void setPreFilterType(int preFilterType) = 0;
+    
+    CV_WRAP virtual int getPreFilterSize() const = 0;
+    CV_WRAP virtual void setPreFilterSize(int preFilterSize) = 0;
+    
+    CV_WRAP virtual int getPreFilterCap() const = 0;
+    CV_WRAP virtual void setPreFilterCap(int preFilterCap) = 0;
+    
+    CV_WRAP virtual int getTextureThreshold() const = 0;
+    CV_WRAP virtual void setTextureThreshold(int textureThreshold) = 0;
+    
+    CV_WRAP virtual int getUniquenessRatio() const = 0;
+    CV_WRAP virtual void setUniquenessRatio(int uniquenessRatio) = 0;
+    
+    CV_WRAP virtual int getSmallerBlockSize() const = 0;
+    CV_WRAP virtual void setSmallerBlockSize(int blockSize) = 0;
+    
+    CV_WRAP virtual Rect getROI1() const = 0;
+    CV_WRAP virtual void setROI1(Rect roi1) = 0;
+    
+    CV_WRAP virtual Rect getROI2() const = 0;
+    CV_WRAP virtual void setROI2(Rect roi2) = 0;
+};
+```
+
+**Key Parameters:**
+
+<ParamField path="numDisparities" type="int" default="0">
+  Maximum disparity minus minimum disparity. Must be divisible by 16. Typical value: 16, 32, 48, 64, etc.
+</ParamField>
+
+<ParamField path="blockSize" type="int" default="21">
+  Matched block size. Must be odd number ≥1. Typical values: 5-21. Larger blocks produce smoother but less detailed disparity maps.
+</ParamField>
+
+<ParamField path="preFilterType" type="int">
+  Type of the prefilter:
+  - `PREFILTER_NORMALIZED_RESPONSE`: Normalized response
+  - `PREFILTER_XSOBEL`: Sobel prefilter
+</ParamField>
+
+<ParamField path="preFilterSize" type="int">
+  Prefilter window size (5-255, must be odd).
+</ParamField>
+
+<ParamField path="preFilterCap" type="int">
+  Truncation value for prefiltered image pixels (1-63).
+</ParamField>
+
+<ParamField path="textureThreshold" type="int">
+  Minimum texture for disparity computation. Areas with low texture are filtered out.
+</ParamField>
+
+<ParamField path="uniquenessRatio" type="int">
+  Margin in percentage by which best computed cost function value should "win" second best value. Typically 5-15.
+</ParamField>
+
+**Example:**
+```cpp
+Ptr<StereoBM> stereo = StereoBM::create(64, 15);
+stereo->setPreFilterCap(31);
+stereo->setUniquenessRatio(10);
+
+Mat disparity;
+stereo->compute(leftImage, rightImage, disparity);
+```
+
+### StereoSGBM
+
+Class for computing stereo correspondence using Semi-Global Block Matching algorithm.
+
+```cpp
+class CV_EXPORTS_W StereoSGBM : public StereoMatcher
+{
+public:
+    enum {
+        MODE_SGBM = 0,
+        MODE_HH   = 1,
+        MODE_SGBM_3WAY = 2,
+        MODE_HH4  = 3
+    };
+    
+    static Ptr<StereoSGBM> create(
+        int minDisparity = 0,
+        int numDisparities = 16,
+        int blockSize = 3,
+        int P1 = 0,
+        int P2 = 0,
+        int disp12MaxDiff = 0,
+        int preFilterCap = 0,
+        int uniquenessRatio = 0,
+        int speckleWindowSize = 0,
+        int speckleRange = 0,
+        int mode = MODE_SGBM
+    );
+    
+    CV_WRAP virtual int getPreFilterCap() const = 0;
+    CV_WRAP virtual void setPreFilterCap(int preFilterCap) = 0;
+    
+    CV_WRAP virtual int getUniquenessRatio() const = 0;
+    CV_WRAP virtual void setUniquenessRatio(int uniquenessRatio) = 0;
+    
+    CV_WRAP virtual int getP1() const = 0;
+    CV_WRAP virtual void setP1(int P1) = 0;
+    
+    CV_WRAP virtual int getP2() const = 0;
+    CV_WRAP virtual void setP2(int P2) = 0;
+    
+    CV_WRAP virtual int getMode() const = 0;
+    CV_WRAP virtual void setMode(int mode) = 0;
+};
+```
+
+**Key Parameters:**
+
+<ParamField path="minDisparity" type="int" default="0">
+  Minimum possible disparity value. Typically 0, but can be adjusted.
+</ParamField>
+
+<ParamField path="numDisparities" type="int" default="16">
+  Maximum disparity minus minimum disparity. Must be divisible by 16. Values: 16, 32, 48, 64, 96, 128, etc.
+</ParamField>
+
+<ParamField path="blockSize" type="int" default="3">
+  Matched block size. Must be odd number ≥1. Values: 3, 5, 7, etc. SGBM works well with smaller blocks than BM.
+</ParamField>
+
+<ParamField path="P1" type="int" default="0">
+  First parameter controlling disparity smoothness. Penalty for disparity change by ±1. If 0, default is `8 * channels * blockSize^2`.
+</ParamField>
+
+<ParamField path="P2" type="int" default="0">
+  Second parameter controlling disparity smoothness. Penalty for disparity change by more than 1. If 0, default is `32 * channels * blockSize^2`. P2 > P1.
+</ParamField>
+
+<ParamField path="disp12MaxDiff" type="int" default="0">
+  Maximum allowed difference in left-right disparity check. Set to negative value to disable check.
+</ParamField>
+
+<ParamField path="preFilterCap" type="int" default="0">
+  Truncation value for prefiltered image pixels. Default: 63.
+</ParamField>
+
+<ParamField path="uniquenessRatio" type="int" default="0">
+  Margin by which best cost function value should "win" second best. Typically 5-15.
+</ParamField>
+
+<ParamField path="speckleWindowSize" type="int" default="0">
+  Maximum size of smooth disparity regions to consider noise speckles and invalidate. Set to 0 to disable. Typical: 50-200.
+</ParamField>
+
+<ParamField path="speckleRange" type="int" default="0">
+  Maximum disparity variation within connected component. Typical: 1-2.
+</ParamField>
+
+<ParamField path="mode" type="int" default="MODE_SGBM">
+  Algorithm mode:
+  - `MODE_SGBM`: Standard Semi-Global Block Matching
+  - `MODE_HH`: Hirschmuller algorithm
+  - `MODE_SGBM_3WAY`: Modified SGBM
+  - `MODE_HH4`: Full-scale two-pass algorithm
+</ParamField>
+
+SGBM produces smoother and more accurate disparity maps than BM but is computationally more expensive.
+
+**Example:**
+```cpp
+Ptr<StereoSGBM> stereo = StereoSGBM::create(
+    0,    // minDisparity
+    96,   // numDisparities
+    5,    // blockSize
+    600,  // P1
+    2400, // P2
+    1,    // disp12MaxDiff
+    63,   // preFilterCap
+    10,   // uniquenessRatio
+    100,  // speckleWindowSize
+    32,   // speckleRange
+    StereoSGBM::MODE_SGBM_3WAY
+);
+
+Mat disparity;
+stereo->compute(leftImage, rightImage, disparity);
+
+// Convert to float disparity
+disparity.convertTo(disparity, CV_32F, 1.0/16.0);
+```
+
+<Note>
+SGBM is more suitable for real-time applications and produces better results than BM, especially in textured regions. Consider using MODE_SGBM_3WAY or MODE_HH4 for best quality.
+</Note>
+
+## See Also
+
+- [Camera Calibration](/api/calib3d/calibration) - calibrateCamera for obtaining camera intrinsics
+- [Pose Estimation](/api/calib3d/pose-estimation) - solvePnP for 3D-2D correspondences
+- OpenCV samples: `stereo_calib.cpp`, `stereo_match.cpp`

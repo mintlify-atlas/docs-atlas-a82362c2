@@ -1,0 +1,479 @@
+---
+title: Color Space Conversions
+description: Learn how to convert between different color spaces and apply thresholding techniques
+---
+
+This guide covers color space conversions between BGR, RGB, HSV, grayscale, and other formats, along with thresholding techniques for image segmentation.
+
+## Overview
+
+Color spaces represent colors in different ways for various purposes:
+- **BGR/RGB**: Standard color representation for displays
+- **HSV**: Hue, Saturation, Value - intuitive for color filtering
+- **Grayscale**: Single channel intensity values
+- **LAB**: Perceptually uniform color space
+- **YCrCb**: Luminance and chrominance separation
+
+## BGR to RGB Conversion
+
+OpenCV reads images in BGR format by default, but many libraries expect RGB.
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import matplotlib.pyplot as plt
+
+    # Read image (loaded in BGR format)
+    img_bgr = cv.imread("image.jpg")
+
+    # Convert BGR to RGB
+    img_rgb = cv.cvtColor(img_bgr, cv.COLOR_BGR2RGB)
+
+    # Display using matplotlib (expects RGB)
+    plt.imshow(img_rgb)
+    plt.title("RGB Image")
+    plt.axis('off')
+    plt.show()
+
+    # Display using OpenCV (expects BGR)
+    cv.imshow("BGR Image", img_bgr)
+    cv.waitKey(0)
+    ```
+  </Tab>
+  
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    // Read image (loaded in BGR format)
+    Mat img_bgr = imread("image.jpg");
+
+    // Convert BGR to RGB
+    Mat img_rgb;
+    cvtColor(img_bgr, img_rgb, COLOR_BGR2RGB);
+
+    // Display (OpenCV expects BGR)
+    imshow("BGR Image", img_bgr);
+    waitKey(0);
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  OpenCV uses BGR format by default for historical reasons related to early camera standards. Always convert to RGB when interfacing with other libraries like Matplotlib, PIL, or TensorFlow.
+</Note>
+
+## BGR to Grayscale Conversion
+
+Convert color images to grayscale for simplified processing.
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    # Read color image
+    img = cv.imread("image.jpg")
+
+    # Convert to grayscale
+    gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+
+    cv.imshow("Original", img)
+    cv.imshow("Grayscale", gray)
+    cv.waitKey(0)
+    cv.destroyAllWindows()
+    ```
+  </Tab>
+  
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    // Read color image
+    Mat img = imread("image.jpg");
+
+    // Convert to grayscale
+    Mat gray;
+    cvtColor(img, gray, COLOR_BGR2GRAY);
+
+    imshow("Original", img);
+    imshow("Grayscale", gray);
+    waitKey(0);
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+  You can also load images directly in grayscale using `imread("image.jpg", IMREAD_GRAYSCALE)` to skip the conversion step.
+</Tip>
+
+## BGR to HSV Conversion
+
+HSV (Hue, Saturation, Value) is ideal for color-based object detection and filtering.
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    # Read image
+    img = cv.imread("image.jpg")
+
+    # Convert BGR to HSV
+    hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
+
+    # Split into channels
+    h, s, v = cv.split(hsv)
+
+    cv.imshow("Original", img)
+    cv.imshow("Hue", h)
+    cv.imshow("Saturation", s)
+    cv.imshow("Value", v)
+    cv.waitKey(0)
+    ```
+  </Tab>
+  
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+    using namespace std;
+
+    // Read image
+    Mat img = imread("image.jpg");
+
+    // Convert BGR to HSV
+    Mat hsv;
+    cvtColor(img, hsv, COLOR_BGR2HSV);
+
+    // Split into channels
+    vector<Mat> channels;
+    split(hsv, channels);
+
+    imshow("Original", img);
+    imshow("Hue", channels[0]);
+    imshow("Saturation", channels[1]);
+    imshow("Value", channels[2]);
+    waitKey(0);
+    ```
+  </Tab>
+</Tabs>
+
+## Color Range Detection with HSV
+
+Detect specific colors by defining HSV ranges.
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+
+    # Read image
+    frame = cv.imread("image.jpg")
+
+    # Convert to HSV
+    frame_HSV = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
+
+    # Define range for blue color in HSV
+    low_H = 100
+    low_S = 50
+    low_V = 50
+    high_H = 130
+    high_S = 255
+    high_V = 255
+
+    # Create mask for blue color
+    mask = cv.inRange(frame_HSV, (low_H, low_S, low_V), (high_H, high_S, high_V))
+
+    # Apply mask to original image
+    result = cv.bitwise_and(frame, frame, mask=mask)
+
+    cv.imshow("Original", frame)
+    cv.imshow("Mask", mask)
+    cv.imshow("Result", result)
+    cv.waitKey(0)
+    ```
+  </Tab>
+  
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    // Read image
+    Mat frame = imread("image.jpg");
+
+    // Convert to HSV
+    Mat frame_HSV;
+    cvtColor(frame, frame_HSV, COLOR_BGR2HSV);
+
+    // Define range for blue color in HSV
+    int low_H = 100, low_S = 50, low_V = 50;
+    int high_H = 130, high_S = 255, high_V = 255;
+
+    // Create mask for blue color
+    Mat mask;
+    inRange(frame_HSV, Scalar(low_H, low_S, low_V), 
+            Scalar(high_H, high_S, high_V), mask);
+
+    // Apply mask to original image
+    Mat result;
+    bitwise_and(frame, frame, result, mask);
+
+    imshow("Original", frame);
+    imshow("Mask", mask);
+    imshow("Result", result);
+    waitKey(0);
+    ```
+  </Tab>
+</Tabs>
+
+### Common HSV Color Ranges
+
+| Color | Hue Range (H) | Saturation (S) | Value (V) |
+|-------|---------------|----------------|------------|
+| Red | 0-10, 170-180 | 50-255 | 50-255 |
+| Orange | 10-25 | 50-255 | 50-255 |
+| Yellow | 25-35 | 50-255 | 50-255 |
+| Green | 35-85 | 50-255 | 50-255 |
+| Blue | 100-130 | 50-255 | 50-255 |
+| Purple | 130-160 | 50-255 | 50-255 |
+
+<Note>
+  In OpenCV, Hue values range from 0-179 (not 0-359) to fit in a single byte. Adjust your ranges accordingly.
+</Note>
+
+## Thresholding
+
+Thresholding converts grayscale images to binary images by applying a threshold value.
+
+### Basic Thresholding
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    # Read image in grayscale
+    src = cv.imread("image.jpg")
+    src_gray = cv.cvtColor(src, cv.COLOR_BGR2GRAY)
+
+    # Apply different threshold types
+    threshold_value = 127
+    max_value = 255
+
+    # Binary threshold
+    _, binary = cv.threshold(src_gray, threshold_value, max_value, cv.THRESH_BINARY)
+
+    # Binary inverted threshold
+    _, binary_inv = cv.threshold(src_gray, threshold_value, max_value, cv.THRESH_BINARY_INV)
+
+    # Truncate threshold
+    _, truncate = cv.threshold(src_gray, threshold_value, max_value, cv.THRESH_TRUNC)
+
+    # To zero threshold
+    _, to_zero = cv.threshold(src_gray, threshold_value, max_value, cv.THRESH_TOZERO)
+
+    # To zero inverted threshold
+    _, to_zero_inv = cv.threshold(src_gray, threshold_value, max_value, cv.THRESH_TOZERO_INV)
+
+    cv.imshow("Original", src_gray)
+    cv.imshow("Binary", binary)
+    cv.imshow("Binary Inverted", binary_inv)
+    cv.imshow("Truncate", truncate)
+    cv.imshow("To Zero", to_zero)
+    cv.waitKey(0)
+    ```
+  </Tab>
+  
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    // Read image in grayscale
+    Mat src = imread("image.jpg");
+    Mat src_gray;
+    cvtColor(src, src_gray, COLOR_BGR2GRAY);
+
+    // Apply different threshold types
+    int threshold_value = 127;
+    int max_value = 255;
+
+    Mat binary, binary_inv, truncate, to_zero, to_zero_inv;
+
+    // Binary threshold
+    threshold(src_gray, binary, threshold_value, max_value, THRESH_BINARY);
+
+    // Binary inverted threshold
+    threshold(src_gray, binary_inv, threshold_value, max_value, THRESH_BINARY_INV);
+
+    // Truncate threshold
+    threshold(src_gray, truncate, threshold_value, max_value, THRESH_TRUNC);
+
+    // To zero threshold
+    threshold(src_gray, to_zero, threshold_value, max_value, THRESH_TOZERO);
+
+    // To zero inverted threshold
+    threshold(src_gray, to_zero_inv, threshold_value, max_value, THRESH_TOZERO_INV);
+
+    imshow("Original", src_gray);
+    imshow("Binary", binary);
+    imshow("Binary Inverted", binary_inv);
+    waitKey(0);
+    ```
+  </Tab>
+</Tabs>
+
+### Adaptive Thresholding
+
+Adaptive thresholding calculates different thresholds for different regions, useful for varying lighting conditions.
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    # Read image in grayscale
+    img = cv.imread("image.jpg")
+    gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+
+    # Global threshold
+    _, global_thresh = cv.threshold(gray, 127, 255, cv.THRESH_BINARY)
+
+    # Adaptive threshold (mean)
+    adaptive_mean = cv.adaptiveThreshold(gray, 255, 
+                                          cv.ADAPTIVE_THRESH_MEAN_C,
+                                          cv.THRESH_BINARY, 11, 2)
+
+    # Adaptive threshold (gaussian)
+    adaptive_gaussian = cv.adaptiveThreshold(gray, 255,
+                                              cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                              cv.THRESH_BINARY, 11, 2)
+
+    cv.imshow("Original", gray)
+    cv.imshow("Global Threshold", global_thresh)
+    cv.imshow("Adaptive Mean", adaptive_mean)
+    cv.imshow("Adaptive Gaussian", adaptive_gaussian)
+    cv.waitKey(0)
+    ```
+  </Tab>
+  
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    // Read image in grayscale
+    Mat img = imread("image.jpg");
+    Mat gray;
+    cvtColor(img, gray, COLOR_BGR2GRAY);
+
+    Mat global_thresh, adaptive_mean, adaptive_gaussian;
+
+    // Global threshold
+    threshold(gray, global_thresh, 127, 255, THRESH_BINARY);
+
+    // Adaptive threshold (mean)
+    adaptiveThreshold(gray, adaptive_mean, 255,
+                      ADAPTIVE_THRESH_MEAN_C,
+                      THRESH_BINARY, 11, 2);
+
+    // Adaptive threshold (gaussian)
+    adaptiveThreshold(gray, adaptive_gaussian, 255,
+                      ADAPTIVE_THRESH_GAUSSIAN_C,
+                      THRESH_BINARY, 11, 2);
+
+    imshow("Original", gray);
+    imshow("Global Threshold", global_thresh);
+    imshow("Adaptive Mean", adaptive_mean);
+    imshow("Adaptive Gaussian", adaptive_gaussian);
+    waitKey(0);
+    ```
+  </Tab>
+</Tabs>
+
+## Other Color Space Conversions
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    img = cv.imread("image.jpg")
+
+    # BGR to LAB
+    lab = cv.cvtColor(img, cv.COLOR_BGR2LAB)
+
+    # BGR to YCrCb
+    ycrcb = cv.cvtColor(img, cv.COLOR_BGR2YCrCb)
+
+    # BGR to XYZ
+    xyz = cv.cvtColor(img, cv.COLOR_BGR2XYZ)
+
+    # BGR to HLS
+    hls = cv.cvtColor(img, cv.COLOR_BGR2HLS)
+
+    # HSV back to BGR
+    hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
+    bgr_from_hsv = cv.cvtColor(hsv, cv.COLOR_HSV2BGR)
+    ```
+  </Tab>
+  
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+    using namespace cv;
+
+    Mat img = imread("image.jpg");
+    Mat lab, ycrcb, xyz, hls, hsv, bgr_from_hsv;
+
+    // BGR to LAB
+    cvtColor(img, lab, COLOR_BGR2LAB);
+
+    // BGR to YCrCb
+    cvtColor(img, ycrcb, COLOR_BGR2YCrCb);
+
+    // BGR to XYZ
+    cvtColor(img, xyz, COLOR_BGR2XYZ);
+
+    // BGR to HLS
+    cvtColor(img, hls, COLOR_BGR2HLS);
+
+    // HSV back to BGR
+    cvtColor(img, hsv, COLOR_BGR2HSV);
+    cvtColor(hsv, bgr_from_hsv, COLOR_HSV2BGR);
+    ```
+  </Tab>
+</Tabs>
+
+## Key Functions
+
+| Function | Description |
+|----------|-------------|
+| `cvtColor()` | Convert image between color spaces |
+| `split()` | Split multi-channel image into separate channels |
+| `merge()` | Merge separate channels into multi-channel image |
+| `inRange()` | Create binary mask for pixels within specified range |
+| `threshold()` | Apply global threshold to grayscale image |
+| `adaptiveThreshold()` | Apply adaptive threshold for varying lighting |
+
+## Common Color Space Codes
+
+| Conversion | Code |
+|------------|------|
+| BGR to RGB | `COLOR_BGR2RGB` |
+| BGR to Gray | `COLOR_BGR2GRAY` |
+| BGR to HSV | `COLOR_BGR2HSV` |
+| BGR to LAB | `COLOR_BGR2LAB` |
+| HSV to BGR | `COLOR_HSV2BGR` |
+| Gray to BGR | `COLOR_GRAY2BGR` |
+
+<Tip>
+  For color-based object detection, HSV color space is generally more robust than BGR/RGB because it separates color information (Hue) from lighting conditions (Value).
+</Tip>

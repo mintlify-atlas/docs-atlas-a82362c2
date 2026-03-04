@@ -1,0 +1,247 @@
+---
+title: Color Space Conversions
+description: Functions for converting images between different color spaces
+---
+
+OpenCV provides extensive support for color space conversions, allowing you to convert images between various color representations.
+
+## Main Function
+
+### cvtColor
+
+Converts an image from one color space to another.
+
+```cpp
+void cvtColor(InputArray src, OutputArray dst, int code, 
+              int dstCn = 0, AlgorithmHint hint = cv::ALGO_HINT_DEFAULT);
+```
+
+<ParamField path="src" type="InputArray">
+  Input image: 8-bit unsigned, 16-bit unsigned (CV_16UC...), or single-precision floating-point.
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Output image of the same size and depth as src.
+</ParamField>
+
+<ParamField path="code" type="int">
+  Color space conversion code. See ColorConversionCodes.
+</ParamField>
+
+<ParamField path="dstCn" type="int" default="0">
+  Number of channels in the destination image; if the parameter is 0, the number of the channels is derived automatically from src and code.
+</ParamField>
+
+<ParamField path="hint" type="AlgorithmHint" default="ALGO_HINT_DEFAULT">
+  Implementation modification flags.
+</ParamField>
+
+The function converts an input image from one color space to another. The function ignores the colorModel indicator in IplImage header, and determines the source color space from the number of channels.
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    Mat src = imread("image.jpg");
+    Mat gray, hsv;
+    
+    // Convert BGR to grayscale
+    cvtColor(src, gray, COLOR_BGR2GRAY);
+    
+    // Convert BGR to HSV
+    cvtColor(src, hsv, COLOR_BGR2HSV);
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    src = cv2.imread('image.jpg')
+    
+    # Convert BGR to grayscale
+    gray = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
+    
+    # Convert BGR to HSV
+    hsv = cv2.cvtColor(src, cv2.COLOR_BGR2HSV)
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  The source image (src) must be of an appropriate type for the desired color conversion. Different conversion codes support different input types.
+</Note>
+
+---
+
+### cvtColorTwoPlane
+
+Converts an image from one color space to another where the source image is stored in two planes.
+
+```cpp
+void cvtColorTwoPlane(InputArray src1, InputArray src2, OutputArray dst, 
+                      int code, AlgorithmHint hint = cv::ALGO_HINT_DEFAULT);
+```
+
+<ParamField path="src1" type="InputArray">
+  8-bit image (CV_8U) of the Y plane.
+</ParamField>
+
+<ParamField path="src2" type="InputArray">
+  Image containing interleaved U/V plane.
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Output image.
+</ParamField>
+
+<ParamField path="code" type="int">
+  Specifies the type of conversion. Supported codes: COLOR_YUV2BGR_NV12, COLOR_YUV2RGB_NV12, COLOR_YUV2BGRA_NV12, COLOR_YUV2RGBA_NV12, COLOR_YUV2BGR_NV21, COLOR_YUV2RGB_NV21, COLOR_YUV2BGRA_NV21, COLOR_YUV2RGBA_NV21.
+</ParamField>
+
+This function only supports YUV420 to RGB conversion as of now.
+
+---
+
+## ColorConversionCodes Enum
+
+The color conversion codes specify the type of conversion to perform. Here are the most commonly used ones:
+
+### RGB/BGR Conversions
+
+- `COLOR_BGR2BGRA` - Add alpha channel to BGR image [8U/16U/32F]
+- `COLOR_RGB2RGBA` - Add alpha channel to RGB image [8U/16U/32F]
+- `COLOR_BGRA2BGR` - Remove alpha channel from BGR image [8U/16U/32F]
+- `COLOR_RGBA2RGB` - Remove alpha channel from RGB image [8U/16U/32F]
+- `COLOR_BGR2RGB` - Convert between RGB and BGR [8U/16U/32F]
+- `COLOR_BGRA2RGBA` - Convert between RGBA and BGRA [8U/16U/32F]
+
+### Grayscale Conversions
+
+- `COLOR_BGR2GRAY` - Convert BGR to grayscale [8U/16U/32F]
+- `COLOR_RGB2GRAY` - Convert RGB to grayscale [8U/16U/32F]
+- `COLOR_GRAY2BGR` - Convert grayscale to BGR [8U/16U/32F]
+- `COLOR_GRAY2BGRA` - Convert grayscale to BGRA [8U/16U/32F]
+- `COLOR_BGRA2GRAY` - Convert BGRA to grayscale [8U/16U/32F]
+- `COLOR_RGBA2GRAY` - Convert RGBA to grayscale [8U/16U/32F]
+
+### HSV Conversions
+
+- `COLOR_BGR2HSV` - Convert BGR to HSV with H range 0..180 if 8 bit image [8U/32F]
+- `COLOR_RGB2HSV` - Convert RGB to HSV [8U/32F]
+- `COLOR_HSV2BGR` - Convert HSV to BGR [8U/32F]
+- `COLOR_HSV2RGB` - Convert HSV to RGB [8U/32F]
+- `COLOR_BGR2HSV_FULL` - Convert BGR to HSV with H range 0..255 if 8 bit image [8U/32F]
+- `COLOR_HSV2BGR_FULL` - Convert HSV to BGR with full H range [8U/32F]
+
+### HLS Conversions
+
+- `COLOR_BGR2HLS` - Convert BGR to HLS (hue lightness saturation) [8U/32F]
+- `COLOR_RGB2HLS` - Convert RGB to HLS [8U/32F]
+- `COLOR_HLS2BGR` - Convert HLS to BGR [8U/32F]
+- `COLOR_HLS2RGB` - Convert HLS to RGB [8U/32F]
+- `COLOR_BGR2HLS_FULL` - Convert BGR to HLS with H range 0..255 [8U/32F]
+- `COLOR_HLS2BGR_FULL` - Convert HLS to BGR with full H range [8U/32F]
+
+### CIE Lab Conversions
+
+- `COLOR_BGR2Lab` - Convert BGR to CIE Lab [8U/32F]
+- `COLOR_RGB2Lab` - Convert RGB to CIE Lab [8U/32F]
+- `COLOR_Lab2BGR` - Convert CIE Lab to BGR [8U/32F]
+- `COLOR_Lab2RGB` - Convert CIE Lab to RGB [8U/32F]
+
+### CIE Luv Conversions
+
+- `COLOR_BGR2Luv` - Convert BGR to CIE Luv [8U/32F]
+- `COLOR_RGB2Luv` - Convert RGB to CIE Luv [8U/32F]
+- `COLOR_Luv2BGR` - Convert CIE Luv to BGR [8U/32F]
+- `COLOR_Luv2RGB` - Convert CIE Luv to RGB [8U/32F]
+
+### CIE XYZ Conversions
+
+- `COLOR_BGR2XYZ` - Convert BGR to CIE XYZ [8U/16U/32F]
+- `COLOR_RGB2XYZ` - Convert RGB to CIE XYZ [8U/16U/32F]
+- `COLOR_XYZ2BGR` - Convert CIE XYZ to BGR [8U/16U/32F]
+- `COLOR_XYZ2RGB` - Convert CIE XYZ to RGB [8U/16U/32F]
+
+### YCrCb Conversions
+
+- `COLOR_BGR2YCrCb` - Convert BGR to YCrCb (luma-chroma) [8U/16U/32F]
+- `COLOR_RGB2YCrCb` - Convert RGB to YCrCb [8U/16U/32F]
+- `COLOR_YCrCb2BGR` - Convert YCrCb to BGR [8U/16U/32F]
+- `COLOR_YCrCb2RGB` - Convert YCrCb to RGB [8U/16U/32F]
+
+### YUV Conversions
+
+- `COLOR_BGR2YUV` - Convert between RGB/BGR and YUV [8U/16U/32F]
+- `COLOR_RGB2YUV` - Convert RGB to YUV [8U/16U/32F]
+- `COLOR_YUV2BGR` - Convert YUV to BGR [8U/16U/32F]
+- `COLOR_YUV2RGB` - Convert YUV to RGB [8U/16U/32F]
+
+### YUV 4:2:0 Conversions (NV12/NV21)
+
+- `COLOR_YUV2RGB_NV12` - YUV NV12 to RGB [8U]
+- `COLOR_YUV2BGR_NV12` - YUV NV12 to BGR [8U]
+- `COLOR_YUV2RGB_NV21` - YUV NV21 to RGB [8U]
+- `COLOR_YUV2BGR_NV21` - YUV NV21 to BGR [8U]
+- `COLOR_YUV2RGBA_NV12` - YUV NV12 to RGBA [8U]
+- `COLOR_YUV2BGRA_NV12` - YUV NV12 to BGRA [8U]
+
+### YUV 4:2:0 Conversions (YV12/IYUV)
+
+- `COLOR_YUV2RGB_YV12` - YUV YV12 to RGB [8U]
+- `COLOR_YUV2BGR_YV12` - YUV YV12 to BGR [8U]
+- `COLOR_YUV2RGB_IYUV` - YUV IYUV/I420 to RGB [8U]
+- `COLOR_YUV2BGR_IYUV` - YUV IYUV/I420 to BGR [8U]
+
+### Bayer Pattern Conversions
+
+- `COLOR_BayerBG2BGR` - Bayer BG/RGGB pattern to BGR [8U/16U]
+- `COLOR_BayerGB2BGR` - Bayer GB/GRBG pattern to BGR [8U/16U]
+- `COLOR_BayerRG2BGR` - Bayer RG/BGGR pattern to BGR [8U/16U]
+- `COLOR_BayerGR2BGR` - Bayer GR/GBRG pattern to BGR [8U/16U]
+- `COLOR_BayerBG2GRAY` - Bayer BG/RGGB pattern to grayscale [8U/16U]
+- `COLOR_BayerGB2GRAY` - Bayer GB/GRBG pattern to grayscale [8U/16U]
+
+### Bayer VNG (Variable Number of Gradients)
+
+- `COLOR_BayerBG2BGR_VNG` - Bayer BG to BGR using VNG [8U]
+- `COLOR_BayerGB2BGR_VNG` - Bayer GB to BGR using VNG [8U]
+- `COLOR_BayerRG2BGR_VNG` - Bayer RG to BGR using VNG [8U]
+- `COLOR_BayerGR2BGR_VNG` - Bayer GR to BGR using VNG [8U]
+
+### Bayer Edge-Aware
+
+- `COLOR_BayerBG2BGR_EA` - Bayer BG to BGR using edge-aware [8U/16U]
+- `COLOR_BayerGB2BGR_EA` - Bayer GB to BGR using edge-aware [8U/16U]
+- `COLOR_BayerRG2BGR_EA` - Bayer RG to BGR using edge-aware [8U/16U]
+- `COLOR_BayerGR2BGR_EA` - Bayer GR to BGR using edge-aware [8U/16U]
+
+## Color Space Information
+
+### RGB/BGR
+
+The default color space in OpenCV is BGR (Blue-Green-Red), not RGB. When you read an image using imread(), it returns a BGR image. Many other libraries (like matplotlib) expect RGB format.
+
+### Grayscale
+
+Grayscale images have a single channel. The conversion from RGB/BGR to grayscale uses:
+
+$$
+\text{Gray} = 0.299 \cdot R + 0.587 \cdot G + 0.114 \cdot B
+$$
+
+### HSV (Hue, Saturation, Value)
+
+HSV separates image intensity (value) from color information (hue and saturation). The hue range is:
+- 0..180 for 8-bit images (default)
+- 0..255 for 8-bit images (FULL variant)
+- 0..360 for 32-bit images
+
+### HLS (Hue, Lightness, Saturation)
+
+Similar to HSV but uses lightness instead of value. The hue range is the same as HSV.
+
+### Lab/Luv
+
+CIE Lab and Luv are perceptually uniform color spaces, useful for color-based segmentation and comparison.
+
+### YCrCb/YUV
+
+Luma-chroma color spaces commonly used in video encoding. Y represents luminance (brightness), while Cr/Cb (or U/V) represent chrominance (color information).

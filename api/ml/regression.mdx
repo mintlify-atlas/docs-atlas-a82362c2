@@ -1,0 +1,517 @@
+---
+title: Regression Algorithms
+description: Machine learning regression algorithms including Logistic Regression and linear regression methods for predicting continuous and categorical outputs
+---
+
+Regression algorithms predict continuous or categorical output values based on input features.
+
+## LogisticRegression - Logistic Regression Classifier
+
+Logistic Regression is a statistical method for binary and multi-class classification problems. Despite its name, it's primarily used for classification rather than regression.
+
+### Creating a Logistic Regression Model
+
+```cpp
+Ptr<LogisticRegression> lr = LogisticRegression::create();
+```
+
+### Key Methods
+
+<ParamField path="setLearningRate" type="void">
+  Sets the learning rate for gradient descent
+  
+  **Parameters:**
+  - `val` (double): Learning rate (step size for parameter updates)
+  
+  Typical values: 0.001 to 0.1. Higher values train faster but may overshoot the optimal solution.
+</ParamField>
+
+<ParamField path="setIterations" type="void">
+  Sets the number of training iterations
+  
+  **Parameters:**
+  - `val` (int): Maximum number of iterations
+  
+  More iterations can lead to better convergence but increase training time.
+</ParamField>
+
+<ParamField path="setRegularization" type="void">
+  Sets the kind of regularization to be applied
+  
+  **Parameters:**
+  - `val` (int): Regularization type
+  
+  **Types:**
+  - `LogisticRegression::REG_DISABLE` (-1): No regularization
+  - `LogisticRegression::REG_L1` (0): L1 norm regularization (promotes sparsity)
+  - `LogisticRegression::REG_L2` (1): L2 norm regularization (prevents overfitting)
+</ParamField>
+
+<ParamField path="setTrainMethod" type="void">
+  Sets the training method used
+  
+  **Parameters:**
+  - `val` (int): Training method
+  
+  **Methods:**
+  - `LogisticRegression::BATCH` (0): Batch gradient descent
+  - `LogisticRegression::MINI_BATCH` (1): Mini-batch gradient descent
+</ParamField>
+
+<ParamField path="setMiniBatchSize" type="void">
+  Sets the number of training samples taken in each Mini-Batch Gradient Descent step
+  
+  **Parameters:**
+  - `val` (int): Mini-batch size (must be less than total training samples)
+  
+  Only used when training method is `MINI_BATCH`. Smaller batches provide more frequent updates but noisier gradients.
+</ParamField>
+
+<ParamField path="setTermCriteria" type="void">
+  Sets the termination criteria of the algorithm
+  
+  **Parameters:**
+  - `val` (TermCriteria): Criteria for stopping training
+  
+  Example: `TermCriteria(TermCriteria::MAX_ITER + TermCriteria::EPS, 1000, 0.001)`
+</ParamField>
+
+<ParamField path="train" type="bool">
+  Trains the logistic regression model
+  
+  **Parameters:**
+  - `samples` (InputArray): Training samples (CV_32F type)
+  - `layout` (int): Sample layout (ROW_SAMPLE or COL_SAMPLE)
+  - `responses` (InputArray): Training labels/responses
+  
+  **Returns:** bool - true if training succeeded
+</ParamField>
+
+<ParamField path="predict" type="float">
+  Predicts responses for input samples
+  
+  **Parameters:**
+  - `samples` (InputArray): Input data for prediction (CV_32F type, m × n matrix)
+  - `results` (OutputArray): Predicted labels as column matrix (CV_32S type)
+  - `flags` (int): Optional flags (not used)
+  
+  **Returns:** float - predicted value for single sample
+</ParamField>
+
+<ParamField path="get_learnt_thetas" type="Mat">
+  Returns the trained parameters
+  
+  **Returns:** Mat - learnt parameters of Logistic Regression (CV_32F type)
+  
+  For two-class classification, returns a row matrix. These are the weights/coefficients learned during training.
+</ParamField>
+
+### Example Usage
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/ml.hpp>
+    #include <iostream>
+    
+    using namespace cv;
+    using namespace cv::ml;
+    using namespace std;
+    
+    int main() {
+        // Prepare training data (binary classification)
+        Mat trainData = (Mat_<float>(6, 2) << 
+            1.0, 1.0,   // Class 0
+            2.0, 1.0,
+            1.0, 2.0,
+            6.0, 6.0,   // Class 1
+            5.0, 6.0,
+            6.0, 5.0
+        );
+        
+        Mat labels = (Mat_<int>(6, 1) << 0, 0, 0, 1, 1, 1);
+        
+        // Create and configure Logistic Regression
+        Ptr<LogisticRegression> lr = LogisticRegression::create();
+        lr->setLearningRate(0.001);
+        lr->setIterations(10000);
+        lr->setRegularization(LogisticRegression::REG_L2);
+        lr->setTrainMethod(LogisticRegression::BATCH);
+        lr->setMiniBatchSize(1);
+        
+        // Train the model
+        Ptr<TrainData> tData = TrainData::create(
+            trainData, ROW_SAMPLE, labels
+        );
+        lr->train(tData);
+        
+        // Get learned parameters
+        Mat theta = lr->get_learnt_thetas();
+        cout << "Learned parameters (theta):\n" << theta << endl;
+        
+        // Predict on test data
+        Mat testData = (Mat_<float>(2, 2) << 
+            1.5, 1.5,  // Should predict class 0
+            5.5, 5.5   // Should predict class 1
+        );
+        
+        Mat predictions;
+        lr->predict(testData, predictions);
+        
+        cout << "Predictions:\n" << predictions << endl;
+        
+        // Evaluate accuracy
+        Mat trainPredictions;
+        lr->predict(trainData, trainPredictions);
+        int correct = 0;
+        for (int i = 0; i < labels.rows; i++) {
+            if (trainPredictions.at<float>(i) == labels.at<int>(i))
+                correct++;
+        }
+        cout << "Training accuracy: " 
+             << (100.0 * correct / labels.rows) << "%" << endl;
+        
+        return 0;
+    }
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+    
+    # Prepare training data (binary classification)
+    train_data = np.array([
+        [1.0, 1.0],   # Class 0
+        [2.0, 1.0],
+        [1.0, 2.0],
+        [6.0, 6.0],   # Class 1
+        [5.0, 6.0],
+        [6.0, 5.0]
+    ], dtype=np.float32)
+    
+    labels = np.array([[0], [0], [0], [1], [1], [1]], dtype=np.int32)
+    
+    # Create and configure Logistic Regression
+    lr = cv.ml.LogisticRegression_create()
+    lr.setLearningRate(0.001)
+    lr.setIterations(10000)
+    lr.setRegularization(cv.ml.LogisticRegression_REG_L2)
+    lr.setTrainMethod(cv.ml.LogisticRegression_BATCH)
+    lr.setMiniBatchSize(1)
+    
+    # Train the model
+    lr.train(train_data, cv.ml.ROW_SAMPLE, labels)
+    
+    # Get learned parameters
+    theta = lr.get_learnt_thetas()
+    print(f"Learned parameters (theta):\n{theta}")
+    
+    # Predict on test data
+    test_data = np.array([
+        [1.5, 1.5],  # Should predict class 0
+        [5.5, 5.5]   # Should predict class 1
+    ], dtype=np.float32)
+    
+    retval, predictions = lr.predict(test_data)
+    print(f"Predictions:\n{predictions}")
+    
+    # Evaluate accuracy
+    retval, train_predictions = lr.predict(train_data)
+    accuracy = np.mean(train_predictions.flatten() == labels.flatten()) * 100
+    print(f"Training accuracy: {accuracy}%")
+    ```
+  </Tab>
+</Tabs>
+
+### Multi-Class Classification
+
+For multi-class problems (more than 2 classes), Logistic Regression uses a one-vs-rest approach:
+
+```cpp
+// Multi-class example (3 classes)
+Mat trainData = (Mat_<float>(9, 2) << 
+    1.0, 1.0,   // Class 0
+    2.0, 1.0,
+    1.0, 2.0,
+    6.0, 6.0,   // Class 1
+    5.0, 6.0,
+    6.0, 5.0,
+    3.0, 8.0,   // Class 2
+    4.0, 9.0,
+    3.5, 8.5
+);
+
+Mat labels = (Mat_<int>(9, 1) << 0, 0, 0, 1, 1, 1, 2, 2, 2);
+
+// Train and predict as before
+Ptr<LogisticRegression> lr = LogisticRegression::create();
+lr->setLearningRate(0.01);
+lr->setIterations(5000);
+lr->train(trainData, ROW_SAMPLE, labels);
+
+Mat predictions;
+lr->predict(testData, predictions);
+```
+
+<Note>
+  For binary classification, ensure your labels are 0 and 1. For multi-class classification, use consecutive integers starting from 0 (e.g., 0, 1, 2, 3...).
+</Note>
+
+---
+
+## Linear Regression with Normal Equations
+
+While OpenCV doesn't have a dedicated linear regression class, you can perform linear regression using the `solve()` function with normal equations or use the `SVM` class with `SVM::EPS_SVR` type.
+
+### Method 1: Using Normal Equations
+
+Linear regression can be solved directly using the normal equation: θ = (X^T X)^(-1) X^T y
+
+```cpp
+#include <opencv2/core.hpp>
+#include <iostream>
+
+using namespace cv;
+using namespace std;
+
+int main() {
+    // Training data: y = 2x + 3
+    Mat X = (Mat_<float>(5, 2) << 
+        1.0, 1.0,
+        1.0, 2.0,
+        1.0, 3.0,
+        1.0, 4.0,
+        1.0, 5.0
+    ); // First column is bias term (1s)
+    
+    Mat y = (Mat_<float>(5, 1) << 5.0, 7.0, 9.0, 11.0, 13.0);
+    
+    // Solve normal equation: theta = (X^T * X)^(-1) * X^T * y
+    Mat theta;
+    solve(X, y, theta, DECOMP_SVD);
+    
+    cout << "Learned parameters:\n" << theta << endl;
+    // Should be approximately [3.0, 2.0] (intercept, slope)
+    
+    // Make predictions
+    Mat testX = (Mat_<float>(3, 2) << 
+        1.0, 6.0,
+        1.0, 7.0,
+        1.0, 8.0
+    );
+    
+    Mat predictions = testX * theta;
+    cout << "Predictions:\n" << predictions << endl;
+    
+    return 0;
+}
+```
+
+### Method 2: Using SVM for Regression
+
+For more robust regression with regularization, use `SVM::EPS_SVR`:
+
+```cpp
+#include <opencv2/ml.hpp>
+
+using namespace cv;
+using namespace cv::ml;
+
+// Prepare training data
+Mat trainData = (Mat_<float>(5, 1) << 1.0, 2.0, 3.0, 4.0, 5.0);
+Mat responses = (Mat_<float>(5, 1) << 5.0, 7.0, 9.0, 11.0, 13.0);
+
+// Create SVM for regression
+Ptr<SVM> svm = SVM::create();
+svm->setType(SVM::EPS_SVR);
+svm->setKernel(SVM::LINEAR);
+svm->setC(1.0);
+svm->setP(0.1); // epsilon parameter
+
+// Train
+Ptr<TrainData> tData = TrainData::create(
+    trainData, ROW_SAMPLE, responses
+);
+svm->train(tData);
+
+// Predict
+Mat testData = (Mat_<float>(3, 1) << 6.0, 7.0, 8.0);
+Mat predictions;
+svm->predict(testData, predictions);
+```
+
+### Method 3: Using Decision Trees for Regression
+
+`DTrees` can also be used for regression by setting appropriate parameters:
+
+```cpp
+#include <opencv2/ml.hpp>
+
+using namespace cv::ml;
+
+Ptr<DTrees> dtree = DTrees::create();
+dtree->setMaxDepth(10);
+dtree->setMinSampleCount(2);
+dtree->setRegressionAccuracy(0.01f);
+
+// Train with continuous response values
+Ptr<TrainData> trainData = TrainData::create(
+    samples, 
+    ROW_SAMPLE, 
+    continuousResponses  // Regression targets
+);
+
+dtree->train(trainData);
+
+// Predict
+float prediction = dtree->predict(testSample);
+```
+
+---
+
+## Polynomial Regression
+
+For polynomial regression, transform your input features to include polynomial terms:
+
+```cpp
+#include <opencv2/core.hpp>
+
+using namespace cv;
+
+// Function to create polynomial features
+Mat createPolynomialFeatures(const Mat& X, int degree) {
+    int rows = X.rows;
+    int cols = X.cols;
+    
+    // Calculate number of output features
+    int outCols = 1; // bias term
+    for (int d = 1; d <= degree; d++) {
+        outCols += cols; // Add linear terms, squared terms, etc.
+    }
+    
+    Mat polyFeatures(rows, outCols, CV_32F);
+    
+    for (int i = 0; i < rows; i++) {
+        int colIdx = 0;
+        polyFeatures.at<float>(i, colIdx++) = 1.0f; // bias
+        
+        for (int d = 1; d <= degree; d++) {
+            for (int j = 0; j < cols; j++) {
+                float val = X.at<float>(i, j);
+                polyFeatures.at<float>(i, colIdx++) = pow(val, d);
+            }
+        }
+    }
+    
+    return polyFeatures;
+}
+
+// Example usage
+Mat X = (Mat_<float>(5, 1) << 1.0, 2.0, 3.0, 4.0, 5.0);
+Mat y = (Mat_<float>(5, 1) << 1.0, 4.0, 9.0, 16.0, 25.0); // y = x^2
+
+// Create polynomial features (degree 2)
+Mat X_poly = createPolynomialFeatures(X, 2);
+
+// Solve using normal equations
+Mat theta;
+solve(X_poly, y, theta, DECOMP_SVD);
+```
+
+<Note>
+  When using polynomial features, consider normalizing your data first to prevent numerical instability. Higher degree polynomials can lead to overfitting.
+</Note>
+
+---
+
+## Regularized Regression
+
+For Ridge Regression (L2 regularization), modify the normal equation:
+
+θ = (X^T X + λI)^(-1) X^T y
+
+```cpp
+Mat XtX = X.t() * X;
+Mat identity = Mat::eye(XtX.rows, XtX.cols, XtX.type());
+float lambda = 0.1; // Regularization parameter
+
+Mat regularized = XtX + lambda * identity;
+Mat Xty = X.t() * y;
+Mat theta;
+solve(regularized, Xty, theta, DECOMP_CHOLESKY);
+```
+
+---
+
+## Best Practices
+
+### Feature Scaling
+
+Always normalize features when using gradient-based methods:
+
+```cpp
+// Normalize features to [0, 1] or standardize to mean=0, std=1
+Mat mean, stddev;
+cv::meanStdDev(trainData, mean, stddev);
+
+Mat normalizedData = (trainData - mean) / stddev;
+```
+
+### Cross-Validation
+
+Use cross-validation to evaluate model performance:
+
+```cpp
+Ptr<TrainData> data = TrainData::create(
+    samples, ROW_SAMPLE, responses
+);
+
+// Split into train and test
+data->setTrainTestSplitRatio(0.8, true);
+
+Ptr<LogisticRegression> lr = LogisticRegression::create();
+lr->train(data->getTrainSamples(), 
+          ROW_SAMPLE, 
+          data->getTrainResponses());
+
+float trainError = lr->calcError(data, false, noArray());
+float testError = lr->calcError(data, true, noArray());
+```
+
+### Hyperparameter Tuning
+
+Try different learning rates and regularization parameters:
+
+```cpp
+vector<double> learningRates = {0.001, 0.01, 0.1};
+vector<int> regularizations = {
+    LogisticRegression::REG_DISABLE,
+    LogisticRegression::REG_L1,
+    LogisticRegression::REG_L2
+};
+
+float bestError = FLT_MAX;
+Ptr<LogisticRegression> bestModel;
+
+for (double lr : learningRates) {
+    for (int reg : regularizations) {
+        Ptr<LogisticRegression> model = LogisticRegression::create();
+        model->setLearningRate(lr);
+        model->setRegularization(reg);
+        model->train(trainData);
+        
+        float error = model->calcError(testData, true, noArray());
+        if (error < bestError) {
+            bestError = error;
+            bestModel = model;
+        }
+    }
+}
+```
+
+## See Also
+
+- [Classification Algorithms](/api/ml/classification) - SVM, Decision Trees, and classifiers
+- [Clustering Algorithms](/api/ml/clustering) - K-means and EM clustering
+- [StatModel Base Class](https://docs.opencv.org/4.x/dd/ded/classcv_1_1ml_1_1StatModel.html) - Base class for all ML models

@@ -1,0 +1,538 @@
+---
+title: Optical Flow
+description: Dense and sparse optical flow algorithms including Lucas-Kanade, Farneback, DIS, and variational refinement methods
+---
+
+Optical flow algorithms estimate motion between two consecutive frames by analyzing pixel displacement patterns. OpenCV provides both sparse (feature-based) and dense (per-pixel) optical flow methods.
+
+## calcOpticalFlowPyrLK
+
+Calculates sparse optical flow using the iterative Lucas-Kanade method with pyramids.
+
+```cpp
+void calcOpticalFlowPyrLK(
+    InputArray prevImg,
+    InputArray nextImg,
+    InputArray prevPts,
+    InputOutputArray nextPts,
+    OutputArray status,
+    OutputArray err,
+    Size winSize = Size(21, 21),
+    int maxLevel = 3,
+    TermCriteria criteria = TermCriteria(TermCriteria::COUNT+TermCriteria::EPS, 30, 0.01),
+    int flags = 0,
+    double minEigThreshold = 1e-4
+);
+```
+
+<ParamField path="prevImg" type="InputArray" required>
+  First 8-bit input image or pyramid constructed by `buildOpticalFlowPyramid`.
+</ParamField>
+
+<ParamField path="nextImg" type="InputArray" required>
+  Second input image or pyramid of the same size and type as prevImg.
+</ParamField>
+
+<ParamField path="prevPts" type="InputArray" required>
+  Vector of 2D points for which the flow needs to be found. Point coordinates must be single-precision floating-point.
+</ParamField>
+
+<ParamField path="nextPts" type="InputOutputArray" required>
+  Output vector of 2D points containing the calculated new positions of input features in the second image.
+</ParamField>
+
+<ParamField path="status" type="OutputArray" required>
+  Output status vector (unsigned chars). Each element is set to 1 if flow was found for the corresponding feature, otherwise 0.
+</ParamField>
+
+<ParamField path="err" type="OutputArray" required>
+  Output vector of errors for each feature. The error type depends on the flags parameter.
+</ParamField>
+
+<ParamField path="winSize" type="Size">
+  Size of the search window at each pyramid level. Default: Size(21, 21)
+</ParamField>
+
+<ParamField path="maxLevel" type="int">
+  0-based maximal pyramid level number. 0 means no pyramid (single level), 1 means two levels, etc. Default: 3
+</ParamField>
+
+<ParamField path="criteria" type="TermCriteria">
+  Termination criteria for the iterative search algorithm. Default: 30 iterations or epsilon of 0.01
+</ParamField>
+
+<ParamField path="flags" type="int">
+  Operation flags:
+  - `OPTFLOW_USE_INITIAL_FLOW`: Use initial estimations stored in nextPts
+  - `OPTFLOW_LK_GET_MIN_EIGENVALS`: Use minimum eigen values as error measure
+  
+  Default: 0
+</ParamField>
+
+<ParamField path="minEigThreshold" type="double">
+  Minimum eigen value threshold. Features with smaller values are filtered out. Default: 1e-4
+</ParamField>
+
+<Note>
+The function implements a sparse iterative version of the Lucas-Kanade optical flow in pyramids. It is parallelized with TBB for better performance. The algorithm calculates the minimum eigen value of a 2×2 spatial gradient matrix; if this value is less than minEigThreshold, the feature is filtered out.
+</Note>
+
+### Example
+
+```cpp
+vector<Point2f> prevPts, nextPts;
+vector<uchar> status;
+vector<float> err;
+
+// Detect features in first frame
+goodFeaturesToTrack(prevGray, prevPts, 100, 0.3, 7);
+
+// Calculate optical flow
+calcOpticalFlowPyrLK(prevGray, nextGray, prevPts, nextPts, status, err);
+
+// Draw tracked points
+for (size_t i = 0; i < prevPts.size(); i++) {
+    if (status[i]) {
+        line(frame, prevPts[i], nextPts[i], Scalar(0, 255, 0), 2);
+        circle(frame, nextPts[i], 3, Scalar(0, 255, 0), -1);
+    }
+}
+```
+
+## buildOpticalFlowPyramid
+
+Constructs an image pyramid for use with calcOpticalFlowPyrLK.
+
+```cpp
+int buildOpticalFlowPyramid(
+    InputArray img,
+    OutputArrayOfArrays pyramid,
+    Size winSize,
+    int maxLevel,
+    bool withDerivatives = true,
+    int pyrBorder = BORDER_REFLECT_101,
+    int derivBorder = BORDER_CONSTANT,
+    bool tryReuseInputImage = true
+);
+```
+
+<ParamField path="img" type="InputArray" required>
+  8-bit input image.
+</ParamField>
+
+<ParamField path="pyramid" type="OutputArrayOfArrays" required>
+  Output pyramid.
+</ParamField>
+
+<ParamField path="winSize" type="Size" required>
+  Window size of optical flow algorithm. Must be at least as large as the winSize argument of calcOpticalFlowPyrLK.
+</ParamField>
+
+<ParamField path="maxLevel" type="int" required>
+  0-based maximal pyramid level number.
+</ParamField>
+
+<ParamField path="withDerivatives" type="bool">
+  Set to precompute gradients for every pyramid level. If false, calcOpticalFlowPyrLK will compute them internally. Default: true
+</ParamField>
+
+<ParamField path="pyrBorder" type="int">
+  Border mode for pyramid layers. Default: BORDER_REFLECT_101
+</ParamField>
+
+<ParamField path="derivBorder" type="int">
+  Border mode for gradients. Default: BORDER_CONSTANT
+</ParamField>
+
+<ParamField path="tryReuseInputImage" type="bool">
+  Put ROI of input image into the pyramid if possible. Set to false to force data copying. Default: true
+</ParamField>
+
+**Returns:** Number of levels in the constructed pyramid (can be less than maxLevel).
+
+## calcOpticalFlowFarneback
+
+Computes dense optical flow using the Gunnar Farneback algorithm.
+
+```cpp
+void calcOpticalFlowFarneback(
+    InputArray prev,
+    InputArray next,
+    InputOutputArray flow,
+    double pyr_scale,
+    int levels,
+    int winsize,
+    int iterations,
+    int poly_n,
+    double poly_sigma,
+    int flags
+);
+```
+
+<ParamField path="prev" type="InputArray" required>
+  First 8-bit single-channel input image.
+</ParamField>
+
+<ParamField path="next" type="InputArray" required>
+  Second input image of the same size and type as prev.
+</ParamField>
+
+<ParamField path="flow" type="InputOutputArray" required>
+  Computed flow image with the same size as prev and type CV_32FC2.
+</ParamField>
+
+<ParamField path="pyr_scale" type="double" required>
+  Image scale (&lt;1) to build pyramids. 0.5 means a classical pyramid where each next layer is twice smaller.
+</ParamField>
+
+<ParamField path="levels" type="int" required>
+  Number of pyramid layers including the initial image. levels=1 means no extra layers.
+</ParamField>
+
+<ParamField path="winsize" type="int" required>
+  Averaging window size. Larger values increase robustness to noise and detect fast motion better, but yield more blurred motion fields.
+</ParamField>
+
+<ParamField path="iterations" type="int" required>
+  Number of iterations the algorithm does at each pyramid level.
+</ParamField>
+
+<ParamField path="poly_n" type="int" required>
+  Size of pixel neighborhood used to find polynomial expansion. Larger values mean smoother surfaces. Typically 5 or 7.
+</ParamField>
+
+<ParamField path="poly_sigma" type="double" required>
+  Standard deviation of the Gaussian used to smooth derivatives. For poly_n=5, use poly_sigma=1.1; for poly_n=7, use poly_sigma=1.5.
+</ParamField>
+
+<ParamField path="flags" type="int" required>
+  Operation flags:
+  - `OPTFLOW_USE_INITIAL_FLOW`: Use input flow as initial approximation
+  - `OPTFLOW_FARNEBACK_GAUSSIAN`: Use Gaussian filter instead of box filter (more accurate but slower)
+</ParamField>
+
+The function finds optical flow for each pixel using the Farneback algorithm:
+
+$$
+\texttt{prev}(y,x) \sim \texttt{next}(y + \texttt{flow}(y,x)[1], x + \texttt{flow}(y,x)[0])
+$$
+
+### Example
+
+```cpp
+Mat flow;
+calcOpticalFlowFarneback(
+    prevGray, nextGray, flow,
+    0.5,    // pyr_scale
+    3,      // levels
+    15,     // winsize
+    3,      // iterations
+    5,      // poly_n
+    1.2,    // poly_sigma
+    0       // flags
+);
+
+// Visualize flow
+for (int y = 0; y < flow.rows; y += 10) {
+    for (int x = 0; x < flow.cols; x += 10) {
+        Point2f f = flow.at<Point2f>(y, x);
+        line(frame, Point(x, y), Point(x + f.x, y + f.y), Scalar(0, 255, 0));
+    }
+}
+```
+
+## readOpticalFlow / writeOpticalFlow
+
+Read and write optical flow files in .flo format.
+
+```cpp
+Mat readOpticalFlow(const String& path);
+bool writeOpticalFlow(const String& path, InputArray flow);
+```
+
+<ParamField path="path" type="const String&" required>
+  Path to the .flo file.
+</ParamField>
+
+<ParamField path="flow" type="InputArray" required>
+  Flow field to be stored. Must be 2-channel, floating-point (CV_32FC2). First channel is horizontal (u), second is vertical (v).
+</ParamField>
+
+## DenseOpticalFlow Interface
+
+Base class for dense optical flow algorithms.
+
+```cpp
+class DenseOpticalFlow : public Algorithm {
+public:
+    virtual void calc(InputArray I0, InputArray I1, InputOutputArray flow) = 0;
+    virtual void collectGarbage() = 0;
+};
+```
+
+### calc
+
+Calculates optical flow between two frames.
+
+<ParamField path="I0" type="InputArray" required>
+  First 8-bit single-channel input image.
+</ParamField>
+
+<ParamField path="I1" type="InputArray" required>
+  Second input image of the same size and type.
+</ParamField>
+
+<ParamField path="flow" type="InputOutputArray" required>
+  Computed flow image that has the same size as I0 and type CV_32FC2.
+</ParamField>
+
+### collectGarbage
+
+Releases all inner buffers to free memory.
+
+## SparseOpticalFlow Interface
+
+Base interface for sparse optical flow algorithms.
+
+```cpp
+class SparseOpticalFlow : public Algorithm {
+public:
+    virtual void calc(
+        InputArray prevImg,
+        InputArray nextImg,
+        InputArray prevPts,
+        InputOutputArray nextPts,
+        OutputArray status,
+        OutputArray err = cv::noArray()
+    ) = 0;
+};
+```
+
+## FarnebackOpticalFlow
+
+Class computing dense optical flow using the Gunnar Farneback algorithm.
+
+```cpp
+class FarnebackOpticalFlow : public DenseOpticalFlow {
+public:
+    static Ptr<FarnebackOpticalFlow> create(
+        int numLevels = 5,
+        double pyrScale = 0.5,
+        bool fastPyramids = false,
+        int winSize = 13,
+        int numIters = 10,
+        int polyN = 5,
+        double polySigma = 1.1,
+        int flags = 0
+    );
+    
+    virtual int getNumLevels() const = 0;
+    virtual void setNumLevels(int numLevels) = 0;
+    
+    virtual double getPyrScale() const = 0;
+    virtual void setPyrScale(double pyrScale) = 0;
+    
+    // ... additional getters/setters for all parameters
+};
+```
+
+### Example
+
+```cpp
+Ptr<FarnebackOpticalFlow> farneback = FarnebackOpticalFlow::create();
+farneback->setNumLevels(3);
+farneback->setPyrScale(0.5);
+farneback->setWinSize(15);
+
+Mat flow;
+farneback->calc(prevGray, nextGray, flow);
+```
+
+## SparsePyrLKOpticalFlow
+
+Class for calculating sparse optical flow using the iterative Lucas-Kanade method with pyramids.
+
+```cpp
+class SparsePyrLKOpticalFlow : public SparseOpticalFlow {
+public:
+    static Ptr<SparsePyrLKOpticalFlow> create(
+        Size winSize = Size(21, 21),
+        int maxLevel = 3,
+        TermCriteria crit = TermCriteria(TermCriteria::COUNT+TermCriteria::EPS, 30, 0.01),
+        int flags = 0,
+        double minEigThreshold = 1e-4
+    );
+    
+    virtual Size getWinSize() const = 0;
+    virtual void setWinSize(Size winSize) = 0;
+    
+    virtual int getMaxLevel() const = 0;
+    virtual void setMaxLevel(int maxLevel) = 0;
+    
+    // ... additional getters/setters
+};
+```
+
+### Example
+
+```cpp
+Ptr<SparsePyrLKOpticalFlow> lk = SparsePyrLKOpticalFlow::create();
+lk->setWinSize(Size(21, 21));
+lk->setMaxLevel(3);
+
+vector<Point2f> prevPts, nextPts;
+vector<uchar> status;
+vector<float> err;
+
+goodFeaturesToTrack(prevGray, prevPts, 100, 0.3, 7);
+lk->calc(prevGray, nextGray, prevPts, nextPts, status, err);
+```
+
+## DISOpticalFlow
+
+Dense Inverse Search (DIS) optical flow algorithm with configurable speed/quality presets.
+
+```cpp
+class DISOpticalFlow : public DenseOpticalFlow {
+public:
+    enum {
+        PRESET_ULTRAFAST = 0,
+        PRESET_FAST = 1,
+        PRESET_MEDIUM = 2
+    };
+    
+    static Ptr<DISOpticalFlow> create(int preset = PRESET_FAST);
+    
+    virtual int getFinestScale() const = 0;
+    virtual void setFinestScale(int val) = 0;
+    
+    virtual int getPatchSize() const = 0;
+    virtual void setPatchSize(int val) = 0;
+    
+    virtual int getPatchStride() const = 0;
+    virtual void setPatchStride(int val) = 0;
+    
+    virtual bool getUseSpatialPropagation() const = 0;
+    virtual void setUseSpatialPropagation(bool val) = 0;
+    
+    // ... additional parameters
+};
+```
+
+<Note>
+DIS includes several enhancements over the paper implementation, including spatial propagation of flow vectors and support for initial flow approximation. Even the slowest preset is relatively fast; use DeepFlow if you need better quality and don't care about speed.
+</Note>
+
+### Presets
+
+<Tabs>
+  <Tab title="PRESET_ULTRAFAST">
+    Fastest preset with basic quality. Suitable for real-time applications where speed is critical.
+  </Tab>
+  
+  <Tab title="PRESET_FAST">
+    Default preset offering good balance between speed and quality. Recommended for most applications.
+  </Tab>
+  
+  <Tab title="PRESET_MEDIUM">
+    Higher quality at the cost of some speed. Still relatively fast compared to other dense methods.
+  </Tab>
+</Tabs>
+
+### Example
+
+```cpp
+Ptr<DISOpticalFlow> dis = DISOpticalFlow::create(DISOpticalFlow::PRESET_FAST);
+dis->setFinestScale(2);
+dis->setPatchStride(4);
+
+Mat flow;
+dis->calc(prevGray, nextGray, flow);
+```
+
+## VariationalRefinement
+
+Variational optical flow refinement for improving existing flow fields.
+
+```cpp
+class VariationalRefinement : public DenseOpticalFlow {
+public:
+    static Ptr<VariationalRefinement> create();
+    
+    virtual void calcUV(InputArray I0, InputArray I1, 
+                        InputOutputArray flow_u, InputOutputArray flow_v) = 0;
+    
+    virtual int getFixedPointIterations() const = 0;
+    virtual void setFixedPointIterations(int val) = 0;
+    
+    virtual int getSorIterations() const = 0;
+    virtual void setSorIterations(int val) = 0;
+    
+    virtual float getAlpha() const = 0;  // Smoothness weight
+    virtual void setAlpha(float val) = 0;
+    
+    virtual float getDelta() const = 0;  // Color constancy weight
+    virtual void setDelta(float val) = 0;
+    
+    virtual float getGamma() const = 0;  // Gradient constancy weight
+    virtual void setGamma(float val) = 0;
+};
+```
+
+This class implements variational refinement of input flow fields. It uses the input flow to initialize minimization of the following functional:
+
+$$
+E(U) = \int_{\Omega} \delta \Psi(E_I) + \gamma \Psi(E_G) + \alpha \Psi(E_S)
+$$
+
+where $E_I$, $E_G$, $E_S$ are color constancy, gradient constancy, and smoothness terms respectively.
+
+### Example
+
+```cpp
+// First compute initial flow with DIS
+Ptr<DISOpticalFlow> dis = DISOpticalFlow::create();
+Mat flow;
+dis->calc(prevGray, nextGray, flow);
+
+// Refine the flow
+Ptr<VariationalRefinement> variational = VariationalRefinement::create();
+variational->setAlpha(20.0f);
+variational->setDelta(5.0f);
+variational->setGamma(10.0f);
+variational->calc(prevGray, nextGray, flow);
+```
+
+## Algorithm Comparison
+
+<Tabs>
+  <Tab title="Sparse Methods">
+    **Lucas-Kanade (calcOpticalFlowPyrLK)**
+    - Type: Sparse (feature points)
+    - Speed: Very fast
+    - Accuracy: Good for well-textured features
+    - Use case: Feature tracking, structure from motion
+  </Tab>
+  
+  <Tab title="Dense - Fast">
+    **Farneback (calcOpticalFlowFarneback)**
+    - Type: Dense
+    - Speed: Medium
+    - Accuracy: Good
+    - Use case: General dense flow estimation
+    
+    **DIS (Dense Inverse Search)**
+    - Type: Dense
+    - Speed: Fast (with presets)
+    - Accuracy: Good to excellent (preset-dependent)
+    - Use case: Real-time dense flow with quality/speed tradeoff
+  </Tab>
+  
+  <Tab title="Refinement">
+    **VariationalRefinement**
+    - Type: Post-processing
+    - Speed: Medium
+    - Accuracy: Improves existing flow
+    - Use case: Refining flow from other algorithms
+  </Tab>
+</Tabs>

@@ -1,0 +1,407 @@
+---
+title: Image Filtering
+description: Functions for performing linear and non-linear filtering operations on 2D images
+---
+
+This module provides functions to perform various linear or non-linear filtering operations on 2D images. For each pixel location in the source image, its neighborhood is considered and used to compute the response.
+
+## Border Extrapolation
+
+Many filtering functions need to extrapolate values of non-existing pixels (e.g., when processing pixels near image borders). OpenCV provides several border extrapolation methods via the `BorderTypes` enum.
+
+## Smoothing Filters
+
+### blur
+
+Blurs an image using the normalized box filter.
+
+```cpp
+void blur(InputArray src, OutputArray dst, Size ksize, 
+          Point anchor = Point(-1,-1), int borderType = BORDER_DEFAULT);
+```
+
+<ParamField path="src" type="InputArray">
+  Input image; it can have any number of channels, which are processed independently, but the depth should be CV_8U, CV_16U, CV_16S, CV_32F or CV_64F.
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Output image of the same size and type as src.
+</ParamField>
+
+<ParamField path="ksize" type="Size">
+  Blurring kernel size.
+</ParamField>
+
+<ParamField path="anchor" type="Point" default="Point(-1,-1)">
+  Anchor point; default value Point(-1,-1) means that the anchor is at the kernel center.
+</ParamField>
+
+<ParamField path="borderType" type="int" default="BORDER_DEFAULT">
+  Border mode used to extrapolate pixels outside of the image. BORDER_WRAP is not supported.
+</ParamField>
+
+The function smooths an image using the kernel:
+
+$$
+\texttt{K} = \frac{1}{\texttt{ksize.width*ksize.height}} \begin{bmatrix} 1 & 1 & 1 & \cdots & 1 & 1 \\ 1 & 1 & 1 & \cdots & 1 & 1 \\ \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\ 1 & 1 & 1 & \cdots & 1 & 1 \end{bmatrix}
+$$
+
+---
+
+### GaussianBlur
+
+Blurs an image using a Gaussian filter.
+
+```cpp
+void GaussianBlur(InputArray src, OutputArray dst, Size ksize,
+                  double sigmaX, double sigmaY = 0,
+                  int borderType = BORDER_DEFAULT,
+                  AlgorithmHint hint = cv::ALGO_HINT_DEFAULT);
+```
+
+<ParamField path="src" type="InputArray">
+  Input image; the image can have any number of channels, which are processed independently, but the depth should be CV_8U, CV_16U, CV_16S, CV_32F or CV_64F.
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Output image of the same size and type as src.
+</ParamField>
+
+<ParamField path="ksize" type="Size">
+  Gaussian kernel size. ksize.width and ksize.height can differ but they both must be positive and odd. Or, they can be zeros and then they are computed from sigma.
+</ParamField>
+
+<ParamField path="sigmaX" type="double">
+  Gaussian kernel standard deviation in X direction.
+</ParamField>
+
+<ParamField path="sigmaY" type="double" default="0">
+  Gaussian kernel standard deviation in Y direction; if sigmaY is zero, it is set to be equal to sigmaX.
+</ParamField>
+
+<ParamField path="borderType" type="int" default="BORDER_DEFAULT">
+  Pixel extrapolation method. BORDER_WRAP is not supported.
+</ParamField>
+
+The function convolves the source image with the specified Gaussian kernel. In-place filtering is supported.
+
+---
+
+### medianBlur
+
+Blurs an image using the median filter.
+
+```cpp
+void medianBlur(InputArray src, OutputArray dst, int ksize);
+```
+
+<ParamField path="src" type="InputArray">
+  Input 1-, 3-, or 4-channel image; when ksize is 3 or 5, the image depth should be CV_8U, CV_16U, or CV_32F, for larger aperture sizes, it can only be CV_8U.
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Destination array of the same size and type as src.
+</ParamField>
+
+<ParamField path="ksize" type="int">
+  Aperture linear size; it must be odd and greater than 1, for example: 3, 5, 7 ...
+</ParamField>
+
+The function smoothes an image using the median filter with the ksize × ksize aperture. Each channel of a multi-channel image is processed independently. In-place operation is supported.
+
+<Note>
+  The median filter uses BORDER_REPLICATE internally to cope with border pixels.
+</Note>
+
+---
+
+### bilateralFilter
+
+Applies the bilateral filter to an image.
+
+```cpp
+void bilateralFilter(InputArray src, OutputArray dst, int d,
+                     double sigmaColor, double sigmaSpace,
+                     int borderType = BORDER_DEFAULT);
+```
+
+<ParamField path="src" type="InputArray">
+  Source 8-bit or floating-point, 1-channel or 3-channel image.
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Destination image of the same size and type as src.
+</ParamField>
+
+<ParamField path="d" type="int">
+  Diameter of each pixel neighborhood that is used during filtering. If it is non-positive, it is computed from sigmaSpace.
+</ParamField>
+
+<ParamField path="sigmaColor" type="double">
+  Filter sigma in the color space. A larger value means that farther colors within the pixel neighborhood will be mixed together.
+</ParamField>
+
+<ParamField path="sigmaSpace" type="double">
+  Filter sigma in the coordinate space. A larger value means that farther pixels will influence each other as long as their colors are close enough.
+</ParamField>
+
+<ParamField path="borderType" type="int" default="BORDER_DEFAULT">
+  Border mode used to extrapolate pixels outside of the image.
+</ParamField>
+
+The bilateral filter can reduce unwanted noise very well while keeping edges fairly sharp. However, it is very slow compared to most filters.
+
+**Sigma values**: For simplicity, you can set the 2 sigma values to be the same. If they are small (< 10), the filter will not have much effect, whereas if they are large (> 150), they will have a very strong effect.
+
+**Filter size**: Large filters (d > 5) are very slow, so it is recommended to use d=5 for real-time applications, and perhaps d=9 for offline applications.
+
+<Note>
+  This filter does not work inplace.
+</Note>
+
+---
+
+### boxFilter
+
+Blurs an image using the box filter.
+
+```cpp
+void boxFilter(InputArray src, OutputArray dst, int ddepth,
+               Size ksize, Point anchor = Point(-1,-1),
+               bool normalize = true,
+               int borderType = BORDER_DEFAULT);
+```
+
+<ParamField path="src" type="InputArray">
+  Input image.
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Output image of the same size and type as src.
+</ParamField>
+
+<ParamField path="ddepth" type="int">
+  The output image depth (-1 to use src.depth()).
+</ParamField>
+
+<ParamField path="ksize" type="Size">
+  Blurring kernel size.
+</ParamField>
+
+<ParamField path="anchor" type="Point" default="Point(-1,-1)">
+  Anchor point; default value Point(-1,-1) means that the anchor is at the kernel center.
+</ParamField>
+
+<ParamField path="normalize" type="bool" default="true">
+  Flag, specifying whether the kernel is normalized by its area or not.
+</ParamField>
+
+<ParamField path="borderType" type="int" default="BORDER_DEFAULT">
+  Border mode used to extrapolate pixels outside of the image. BORDER_WRAP is not supported.
+</ParamField>
+
+Unnormalized box filter is useful for computing various integral characteristics over each pixel neighborhood, such as covariance matrices of image derivatives.
+
+---
+
+## Custom Filters
+
+### filter2D
+
+Convolves an image with the kernel.
+
+```cpp
+void filter2D(InputArray src, OutputArray dst, int ddepth,
+              InputArray kernel, Point anchor = Point(-1,-1),
+              double delta = 0, int borderType = BORDER_DEFAULT);
+```
+
+<ParamField path="src" type="InputArray">
+  Input image.
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Output image of the same size and the same number of channels as src.
+</ParamField>
+
+<ParamField path="ddepth" type="int">
+  Desired depth of the destination image. See combinations in the documentation.
+</ParamField>
+
+<ParamField path="kernel" type="InputArray">
+  Convolution kernel (or rather a correlation kernel), a single-channel floating point matrix.
+</ParamField>
+
+<ParamField path="anchor" type="Point" default="Point(-1,-1)">
+  Anchor of the kernel that indicates the relative position of a filtered point within the kernel; default value (-1,-1) means that the anchor is at the kernel center.
+</ParamField>
+
+<ParamField path="delta" type="double" default="0">
+  Optional value added to the filtered pixels before storing them in dst.
+</ParamField>
+
+<ParamField path="borderType" type="int" default="BORDER_DEFAULT">
+  Pixel extrapolation method. BORDER_WRAP is not supported.
+</ParamField>
+
+The function applies an arbitrary linear filter to an image. In-place operation is supported. The function uses the DFT-based algorithm in case of sufficiently large kernels (~11 x 11 or larger) and the direct algorithm for small kernels.
+
+<Note>
+  The function actually computes correlation, not convolution. If you need a real convolution, flip the kernel using flip() and set the new anchor.
+</Note>
+
+---
+
+### sepFilter2D
+
+Applies a separable linear filter to an image.
+
+```cpp
+void sepFilter2D(InputArray src, OutputArray dst, int ddepth,
+                 InputArray kernelX, InputArray kernelY,
+                 Point anchor = Point(-1,-1),
+                 double delta = 0, int borderType = BORDER_DEFAULT);
+```
+
+<ParamField path="src" type="InputArray">
+  Source image.
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Destination image of the same size and the same number of channels as src.
+</ParamField>
+
+<ParamField path="ddepth" type="int">
+  Destination image depth.
+</ParamField>
+
+<ParamField path="kernelX" type="InputArray">
+  Coefficients for filtering each row.
+</ParamField>
+
+<ParamField path="kernelY" type="InputArray">
+  Coefficients for filtering each column.
+</ParamField>
+
+<ParamField path="anchor" type="Point" default="Point(-1,-1)">
+  Anchor position within the kernel. The default value (-1,-1) means that the anchor is at the kernel center.
+</ParamField>
+
+<ParamField path="delta" type="double" default="0">
+  Value added to the filtered results before storing them.
+</ParamField>
+
+<ParamField path="borderType" type="int" default="BORDER_DEFAULT">
+  Pixel extrapolation method. BORDER_WRAP is not supported.
+</ParamField>
+
+The function applies a separable linear filter to the image. First, every row of src is filtered with the 1D kernel kernelX. Then, every column of the result is filtered with the 1D kernel kernelY.
+
+---
+
+## Helper Functions
+
+### getGaussianKernel
+
+Returns Gaussian filter coefficients.
+
+```cpp
+Mat getGaussianKernel(int ksize, double sigma, int ktype = CV_64F);
+```
+
+<ParamField path="ksize" type="int">
+  Aperture size. It should be odd and positive.
+</ParamField>
+
+<ParamField path="sigma" type="double">
+  Gaussian standard deviation. If it is non-positive, it is computed from ksize as sigma = 0.3*((ksize-1)*0.5 - 1) + 0.8.
+</ParamField>
+
+<ParamField path="ktype" type="int" default="CV_64F">
+  Type of filter coefficients. It can be CV_32F or CV_64F.
+</ParamField>
+
+The function computes and returns the ksize × 1 matrix of Gaussian filter coefficients. Two of such generated kernels can be passed to sepFilter2D or used with GaussianBlur.
+
+---
+
+### getDerivKernels
+
+Returns filter coefficients for computing spatial image derivatives.
+
+```cpp
+void getDerivKernels(OutputArray kx, OutputArray ky,
+                     int dx, int dy, int ksize,
+                     bool normalize = false, int ktype = CV_32F);
+```
+
+<ParamField path="kx" type="OutputArray">
+  Output matrix of row filter coefficients.
+</ParamField>
+
+<ParamField path="ky" type="OutputArray">
+  Output matrix of column filter coefficients.
+</ParamField>
+
+<ParamField path="dx" type="int">
+  Derivative order in respect of x.
+</ParamField>
+
+<ParamField path="dy" type="int">
+  Derivative order in respect of y.
+</ParamField>
+
+<ParamField path="ksize" type="int">
+  Aperture size. It can be FILTER_SCHARR, 1, 3, 5, or 7.
+</ParamField>
+
+<ParamField path="normalize" type="bool" default="false">
+  Flag indicating whether to normalize (scale down) the filter coefficients or not.
+</ParamField>
+
+<ParamField path="ktype" type="int" default="CV_32F">
+  Type of filter coefficients. It can be CV_32F or CV_64F.
+</ParamField>
+
+The function computes and returns the filter coefficients for spatial image derivatives. When ksize=FILTER_SCHARR, the Scharr 3 × 3 kernels are generated. Otherwise, Sobel kernels are generated.
+
+---
+
+### getStructuringElement
+
+Returns a structuring element of the specified size and shape for morphological operations.
+
+```cpp
+Mat getStructuringElement(int shape, Size ksize, Point anchor = Point(-1,-1));
+```
+
+<ParamField path="shape" type="int">
+  Element shape that could be one of MorphShapes: MORPH_RECT, MORPH_CROSS, MORPH_ELLIPSE, MORPH_DIAMOND.
+</ParamField>
+
+<ParamField path="ksize" type="Size">
+  Size of the structuring element.
+</ParamField>
+
+<ParamField path="anchor" type="Point" default="Point(-1,-1)">
+  Anchor position within the element. The default value (-1, -1) means that the anchor is at the center.
+</ParamField>
+
+The function constructs and returns the structuring element that can be further passed to erode, dilate or morphologyEx.
+
+---
+
+## Enumerations
+
+### MorphShapes
+
+Shape of the structuring element:
+
+- `MORPH_RECT` - A rectangular structuring element
+- `MORPH_CROSS` - A cross-shaped structuring element
+- `MORPH_ELLIPSE` - An elliptic structuring element
+- `MORPH_DIAMOND` - A diamond structuring element defined by Manhattan distance
+
+### SpecialFilter
+
+- `FILTER_SCHARR` - Scharr filter (-1)

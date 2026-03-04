@@ -1,0 +1,671 @@
+---
+title: Building OpenCV for iOS
+description: Complete guide for building OpenCV frameworks for iOS with Swift and Objective-C support
+---
+
+OpenCV provides native iOS support through frameworks that can be integrated into Xcode projects with both Objective-C and Swift.
+
+## Quick Start
+
+Get OpenCV running on iOS in minutes:
+
+<Steps>
+  <Step title="Prerequisites">
+    Install required tools:
+    
+    ```bash
+    # Install Xcode from App Store (12.2 or later)
+    # Install command line tools
+    xcode-select --install
+    
+    # Install CMake (3.19.0 or later)
+    brew install cmake
+    # Or download from https://cmake.org/download/
+    ```
+  </Step>
+  
+  <Step title="Clone OpenCV">
+    ```bash
+    cd ~/
+    git clone https://github.com/opencv/opencv.git
+    ```
+  </Step>
+  
+  <Step title="Build Framework">
+    ```bash
+    cd opencv/platforms/ios
+    python3 build_framework.py ios
+    ```
+    
+    <Note>
+    This builds for iOS devices (arm64) and simulators (x86_64, arm64). Takes 15-30 minutes.
+    </Note>
+  </Step>
+  
+  <Step title="Find Output">
+    The framework will be at:
+    ```
+    ~/ios/opencv2.framework
+    ```
+  </Step>
+</Steps>
+
+## System Requirements
+
+- **macOS**: 10.15 (Catalina) or later
+- **Xcode**: 12.2 or later
+- **CMake**: 3.19.0 or later (3.17+ for older Xcode)
+- **Python**: 3.6 or later
+- **iOS Deployment Target**: 9.0 or later (default)
+
+<Warning>
+Building iOS frameworks is only supported on macOS with Xcode installed.
+</Warning>
+
+## Supported Architectures
+
+OpenCV iOS framework includes:
+
+| Platform | Architectures | Usage |
+|----------|--------------|-------|
+| **iOS Device** | arm64, armv7, armv7s | Physical iPhones and iPads |
+| **iOS Simulator** | x86_64, arm64 | Testing on Mac (Intel and Apple Silicon) |
+
+<Note>
+By default, `build_framework.py` builds for arm64 (devices) and x86_64 + arm64 (simulators). Older armv7/armv7s can be included if needed.
+</Note>
+
+## Building OpenCV Framework
+
+### Standard Build
+
+The simplest way to build OpenCV for iOS:
+
+```bash
+cd ~/
+git clone https://github.com/opencv/opencv.git
+cd opencv/platforms/ios
+
+python3 build_framework.py ios
+```
+
+Output location: `~/ios/opencv2.framework`
+
+### Build with opencv_contrib Modules
+
+Include extra modules:
+
+```bash
+# Clone opencv_contrib
+cd ~/
+git clone https://github.com/opencv/opencv_contrib.git
+
+# Build with contrib
+cd opencv/platforms/ios
+python3 build_framework.py ios --contrib ~/opencv_contrib
+```
+
+### Custom Build Options
+
+<Tabs>
+  <Tab title="Specify Output Directory">
+    ```bash
+    python3 build_framework.py ~/my_build_dir
+    ```
+  </Tab>
+  
+  <Tab title="Exclude Modules">
+    ```bash
+    # Reduce framework size by excluding modules
+    python3 build_framework.py ios --without video --without objc
+    ```
+  </Tab>
+  
+  <Tab title="Specific Architectures">
+    ```bash
+    # Build only for arm64 devices and arm64 simulator
+    python3 build_framework.py ios \
+            --iphoneos_archs arm64 \
+            --iphonesimulator_archs arm64
+    ```
+  </Tab>
+  
+  <Tab title="Dynamic Framework">
+    ```bash
+    # Build dynamic framework (iOS 8+ only)
+    python3 build_framework.py ios --dynamic
+    ```
+  </Tab>
+</Tabs>
+
+### Complete Build Command
+
+```bash
+python3 build_framework.py ios \
+        --contrib ~/opencv_contrib \
+        --iphoneos_archs arm64 \
+        --iphonesimulator_archs "x86_64,arm64" \
+        --without optflow \
+        --enable_nonfree
+```
+
+### Build Script Options
+
+Key options for `build_framework.py`:
+
+```bash
+--opencv DIR              # OpenCV repository path (default: ../..)
+--contrib DIR             # opencv_contrib path
+--without MODULE          # Exclude module (repeat for multiple)
+--disable FEATURE         # Disable feature (e.g., --disable tbb)
+--dynamic                 # Build dynamic framework
+--enable_nonfree          # Enable non-free modules
+--iphoneos_archs          # Device architectures (default: arm64)
+--iphonesimulator_archs   # Simulator architectures (default: x86_64,arm64)
+--iphoneos_deployment_target # Minimum iOS version (default: 9.0)
+--debug                   # Build debug version
+--framework_name NAME     # Framework name (default: opencv2)
+--disable-swift           # Disable Swift wrapper generation
+```
+
+## Building for Specific iOS Versions
+
+Set minimum deployment target:
+
+```bash
+# For iOS 12.0 and later
+export IPHONEOS_DEPLOYMENT_TARGET=12.0
+python3 build_framework.py ios
+
+# Or specify in command
+python3 build_framework.py ios --iphoneos_deployment_target=12.0
+```
+
+## Building visionOS Framework
+
+For Apple Vision Pro:
+
+```bash
+cd opencv/platforms/ios
+python3 build_visionos_framework.py ~/visionos_build
+```
+
+## Framework Structure
+
+The built framework contains:
+
+```
+opencv2.framework/
+  opencv2                 # Binary (fat library with all architectures)
+  Headers/                # C++ headers
+  Modules/                # Swift module files (if enabled)
+  Info.plist             # Framework metadata
+```
+
+Verify architectures:
+
+```bash
+lipo -info ~/ios/opencv2.framework/opencv2
+# Output: Architectures in the fat file: opencv2 are: arm64 x86_64 arm64
+```
+
+## Integrating into Xcode Projects
+
+### Method 1: Drag and Drop (Quick)
+
+<Steps>
+  <Step title="Add Framework">
+    1. Drag `opencv2.framework` into your Xcode project
+    2. Check "Copy items if needed"
+    3. Select your target
+  </Step>
+  
+  <Step title="Link Framework">
+    Ensure framework is in **Target → General → Frameworks, Libraries, and Embedded Content**
+    
+    Set to "Embed & Sign" for dynamic frameworks or "Do Not Embed" for static.
+  </Step>
+  
+  <Step title="Add System Frameworks">
+    Add required iOS frameworks:
+    - `Accelerate.framework`
+    - `AVFoundation.framework`
+    - `CoreGraphics.framework`
+    - `CoreMedia.framework`
+    - `CoreVideo.framework`
+    - `UIKit.framework`
+  </Step>
+</Steps>
+
+### Method 2: CocoaPods
+
+For released versions:
+
+```ruby
+# Podfile
+platform :ios, '11.0'
+
+target 'YourApp' do
+  pod 'OpenCV', '~> 4.5.0'
+  # or
+  pod 'OpenCV2', '~> 4.5.0'  # Official pod
+end
+```
+
+Then:
+```bash
+pod install
+```
+
+### Method 3: Swift Package Manager
+
+For projects using SPM:
+
+1. **File → Add Packages**
+2. Enter OpenCV repository URL
+3. Select version
+
+<Note>
+Official SPM support may be limited. Check OpenCV repository for latest status.
+</Note>
+
+## Using OpenCV in Code
+
+### Objective-C
+
+Simple usage:
+
+```objectivec
+#import <opencv2/opencv.hpp>
+
+@implementation ViewController
+
+- (void)processImage:(UIImage *)image {
+    // Convert UIImage to cv::Mat
+    cv::Mat mat;
+    UIImageToMat(image, mat);
+    
+    // Process image
+    cv::Mat gray;
+    cv::cvtColor(mat, gray, cv::COLOR_BGR2GRAY);
+    
+    // Convert back to UIImage
+    UIImage *result = MatToUIImage(gray);
+}
+
+@end
+```
+
+### Objective-C++ Bridge for Swift
+
+Create a wrapper class:
+
+```objectivec
+// OpenCVWrapper.h
+#import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
+
+@interface OpenCVWrapper : NSObject
+
++ (UIImage *)processImage:(UIImage *)image;
++ (UIImage *)detectEdges:(UIImage *)image;
+
+@end
+```
+
+```objectivec
+// OpenCVWrapper.mm (note .mm extension)
+#import "OpenCVWrapper.h"
+#import <opencv2/opencv.hpp>
+#import <opencv2/imgcodecs/ios.h>
+
+@implementation OpenCVWrapper
+
++ (UIImage *)processImage:(UIImage *)image {
+    cv::Mat mat;
+    UIImageToMat(image, mat);
+    
+    cv::Mat gray;
+    cv::cvtColor(mat, gray, cv::COLOR_BGR2GRAY);
+    
+    return MatToUIImage(gray);
+}
+
++ (UIImage *)detectEdges:(UIImage *)image {
+    cv::Mat mat, edges;
+    UIImageToMat(image, mat);
+    
+    cv::Canny(mat, edges, 50, 150);
+    
+    return MatToUIImage(edges);
+}
+
+@end
+```
+
+### Swift
+
+Use through Objective-C++ wrapper:
+
+```swift
+import UIKit
+
+class ViewController: UIViewController {
+    
+    func processImage() {
+        guard let image = UIImage(named: "sample") else { return }
+        
+        // Use OpenCV through wrapper
+        let processed = OpenCVWrapper.processImage(image)
+        imageView.image = processed
+        
+        let edges = OpenCVWrapper.detectEdges(image)
+        edgesView.image = edges
+    }
+}
+```
+
+### Advanced Objective-C++ Integration
+
+Direct Mat usage in .mm files:
+
+```objectivec
+// ImageProcessor.mm
+#import "ImageProcessor.h"
+#import <opencv2/opencv.hpp>
+#import <opencv2/imgcodecs/ios.h>
+
+using namespace cv;
+
+@implementation ImageProcessor
+
++ (UIImage *)applyGaussianBlur:(UIImage *)image kernelSize:(int)size {
+    Mat mat;
+    UIImageToMat(image, mat);
+    
+    Mat blurred;
+    GaussianBlur(mat, blurred, Size(size, size), 0);
+    
+    return MatToUIImage(blurred);
+}
+
++ (NSArray<NSValue *> *)detectFaces:(UIImage *)image {
+    Mat mat;
+    UIImageToMat(image, mat);
+    
+    // Load cascade classifier
+    NSString *cascadePath = [[NSBundle mainBundle]
+        pathForResource:@"haarcascade_frontalface_default"
+        ofType:@"xml"];
+    
+    CascadeClassifier face_cascade;
+    face_cascade.load([cascadePath UTF8String]);
+    
+    // Detect faces
+    std::vector<Rect> faces;
+    face_cascade.detectMultiScale(mat, faces);
+    
+    // Convert to NSArray
+    NSMutableArray *result = [NSMutableArray array];
+    for (const auto& face : faces) {
+        CGRect rect = CGRectMake(face.x, face.y, face.width, face.height);
+        [result addObject:[NSValue valueWithCGRect:rect]];
+    }
+    
+    return result;
+}
+
+@end
+```
+
+## Camera Integration
+
+Real-time camera processing:
+
+```objectivec
+// CameraViewController.mm
+#import <AVFoundation/AVFoundation.h>
+#import <opencv2/opencv.hpp>
+#import <opencv2/imgcodecs/ios.h>
+
+@interface CameraViewController () <AVCaptureVideoDataOutputSampleBufferDelegate>
+@property (strong, nonatomic) AVCaptureSession *captureSession;
+@property (strong, nonatomic) AVCaptureVideoPreviewLayer *previewLayer;
+@end
+
+@implementation CameraViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    [self setupCamera];
+}
+
+- (void)setupCamera {
+    self.captureSession = [[AVCaptureSession alloc] init];
+    
+    AVCaptureDevice *camera = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
+    AVCaptureDeviceInput *input = [AVCaptureDeviceInput deviceInputWithDevice:camera error:nil];
+    [self.captureSession addInput:input];
+    
+    AVCaptureVideoDataOutput *output = [[AVCaptureVideoDataOutput alloc] init];
+    [output setSampleBufferDelegate:self queue:dispatch_get_main_queue()];
+    [self.captureSession addOutput:output];
+    
+    [self.captureSession startRunning];
+}
+
+- (void)captureOutput:(AVCaptureOutput *)output
+    didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
+    fromConnection:(AVCaptureConnection *)connection {
+    
+    // Convert CMSampleBuffer to cv::Mat
+    CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+    CVPixelBufferLockBaseAddress(imageBuffer, 0);
+    
+    void *baseAddress = CVPixelBufferGetBaseAddress(imageBuffer);
+    size_t width = CVPixelBufferGetWidth(imageBuffer);
+    size_t height = CVPixelBufferGetHeight(imageBuffer);
+    
+    cv::Mat mat(height, width, CV_8UC4, baseAddress);
+    
+    // Process frame
+    cv::Mat gray;
+    cv::cvtColor(mat, gray, cv::COLOR_BGR2GRAY);
+    
+    CVPixelBufferUnlockBaseAddress(imageBuffer, 0);
+    
+    // Update UI with processed frame
+}
+
+@end
+```
+
+## Core Image Integration
+
+Convert between OpenCV Mat and CIImage:
+
+```objectivec
+UIImage *MatToUIImage(const cv::Mat& mat) {
+    NSData *data = [NSData dataWithBytes:mat.data length:mat.elemSize() * mat.total()];
+    CGColorSpaceRef colorSpace;
+    
+    if (mat.elemSize() == 1) {
+        colorSpace = CGColorSpaceCreateDeviceGray();
+    } else {
+        colorSpace = CGColorSpaceCreateDeviceRGB();
+    }
+    
+    CGDataProviderRef provider = CGDataProviderCreateWithCFData((__bridge CFDataRef)data);
+    
+    CGImageRef imageRef = CGImageCreate(
+        mat.cols, mat.rows, 8, 8 * mat.elemSize(), mat.step[0],
+        colorSpace, kCGImageAlphaNone | kCGBitmapByteOrderDefault,
+        provider, NULL, false, kCGRenderingIntentDefault
+    );
+    
+    UIImage *image = [UIImage imageWithCGImage:imageRef];
+    
+    CGImageRelease(imageRef);
+    CGDataProviderRelease(provider);
+    CGColorSpaceRelease(colorSpace);
+    
+    return image;
+}
+
+void UIImageToMat(UIImage *image, cv::Mat& mat) {
+    CGImageRef imageRef = image.CGImage;
+    CGColorSpaceRef colorSpace = CGImageGetColorSpace(imageRef);
+    
+    size_t width = CGImageGetWidth(imageRef);
+    size_t height = CGImageGetHeight(imageRef);
+    
+    mat.create(height, width, CV_8UC4);
+    
+    CGContextRef context = CGBitmapContextCreate(
+        mat.data, width, height, 8, mat.step[0],
+        colorSpace, kCGImageAlphaPremultipliedLast | kCGBitmapByteOrderDefault
+    );
+    
+    CGContextDrawImage(context, CGRectMake(0, 0, width, height), imageRef);
+    CGContextRelease(context);
+}
+```
+
+## Performance Optimization
+
+### Use Accelerate Framework
+
+OpenCV automatically uses iOS's Accelerate framework for optimized BLAS/LAPACK operations.
+
+### Enable NEON Instructions
+
+Built by default for ARM architectures:
+
+```bash
+python3 build_framework.py ios --iphoneos_archs arm64
+```
+
+### Multi-threading
+
+```objectivec
+// Process images in background
+dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+    cv::Mat processed = processImage(inputMat);
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+        // Update UI
+    });
+});
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Build fails with CMake version error">
+    Update CMake:
+    ```bash
+    brew upgrade cmake
+    # Or download latest from cmake.org
+    ```
+    
+    Xcode 12.2+ requires CMake 3.19.0 or later.
+  </Accordion>
+  
+  <Accordion title="Undefined symbols for architecture">
+    1. Ensure all required system frameworks are linked
+    2. Check framework was built for correct architecture
+    3. Verify bitcode settings match between app and framework
+    
+    ```bash
+    # Check framework architectures
+    lipo -info opencv2.framework/opencv2
+    ```
+  </Accordion>
+  
+  <Accordion title="File not found: opencv2/opencv.hpp">
+    1. Ensure framework is added to project
+    2. Check **Build Settings → Framework Search Paths**
+    3. Verify **Header Search Paths** includes framework
+    
+    ```
+    $(PROJECT_DIR)/opencv2.framework/Headers
+    ```
+  </Accordion>
+  
+  <Accordion title="Swift cannot find OpenCVWrapper">
+    1. Ensure .mm file is in your target
+    2. Add bridging header if needed:
+    
+    ```objectivec
+    // BridgingHeader.h
+    #import "OpenCVWrapper.h"
+    ```
+    
+    3. Set in **Build Settings → Objective-C Bridging Header**
+  </Accordion>
+</AccordionGroup>
+
+## Sample Applications
+
+Explore example apps in the OpenCV repository:
+
+```bash
+cd opencv/samples/ios
+open *.xcodeproj
+```
+
+Samples include:
+- **HelloWorld** - Basic OpenCV integration
+- **FaceDetection** - Real-time face detection
+- **VideoFilters** - Video processing effects
+- **SquareDetection** - Shape detection
+
+## App Store Submission
+
+### Privacy Permissions
+
+Add to `Info.plist`:
+
+```xml
+<key>NSCameraUsageDescription</key>
+<string>This app requires camera access for image processing</string>
+
+<key>NSPhotoLibraryUsageDescription</key>
+<string>This app needs to access your photos</string>
+```
+
+### Bitcode
+
+If using dynamic framework, ensure bitcode settings match:
+
+```bash
+# Build framework with bitcode enabled
+python3 build_framework.py ios --dynamic
+```
+
+### Framework Size Optimization
+
+```bash
+# Build with only needed architectures
+python3 build_framework.py ios \
+        --iphoneos_archs arm64 \
+        --iphonesimulator_archs arm64 \
+        --without video --without objc
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Swift Integration" icon="swift" href="/ios/swift">
+    Advanced Swift usage patterns
+  </Card>
+  <Card title="Camera Processing" icon="camera" href="/ios/camera">
+    Real-time camera applications
+  </Card>
+  <Card title="Core ML Integration" icon="brain" href="/ios/coreml">
+    Combine OpenCV with Core ML
+  </Card>
+  <Card title="Sample Apps" icon="mobile" href="/examples/ios">
+    Explore example projects
+  </Card>
+</CardGroup>

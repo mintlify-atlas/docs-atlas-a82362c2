@@ -1,0 +1,622 @@
+---
+title: Face Detection and Recognition
+description: API reference for DNN-based face detection and recognition classes
+---
+
+# Face Detection and Recognition
+
+DNN-based face detection and recognition using the FaceDetectorYN and FaceRecognizerSF classes.
+
+## FaceDetectorYN
+
+DNN-based face detector class.
+
+Model download link: [Face Detection YuNet](https://github.com/opencv/opencv_zoo/tree/master/models/face_detection_yunet)
+
+### Constructor
+
+Use the static `create()` method to create an instance.
+
+#### create (from file)
+
+```cpp
+static Ptr<FaceDetectorYN> create(
+    const String& model,
+    const String& config,
+    const Size& input_size,
+    float score_threshold = 0.9f,
+    float nms_threshold = 0.3f,
+    int top_k = 5000,
+    int backend_id = 0,
+    int target_id = 0
+)
+```
+
+<ParamField path="model" type="String">
+  Path to the requested model file
+</ParamField>
+
+<ParamField path="config" type="String">
+  Path to the config file for compatibility (not requested for ONNX models)
+</ParamField>
+
+<ParamField path="input_size" type="Size">
+  Size of the input image
+</ParamField>
+
+<ParamField path="score_threshold" type="float" default="0.9">
+  Threshold to filter out bounding boxes of score less than the given value
+</ParamField>
+
+<ParamField path="nms_threshold" type="float" default="0.3">
+  Threshold to suppress bounding boxes that have IoU greater than the given value
+</ParamField>
+
+<ParamField path="top_k" type="int" default="5000">
+  Number of bounding boxes to preserve from top rank based on score before NMS
+</ParamField>
+
+<ParamField path="backend_id" type="int" default="0">
+  ID of the backend (DNN backend)
+</ParamField>
+
+<ParamField path="target_id" type="int" default="0">
+  ID of the target device
+</ParamField>
+
+**Returns:** Pointer to FaceDetectorYN instance
+
+#### create (from buffer)
+
+```cpp
+static Ptr<FaceDetectorYN> create(
+    const String& framework,
+    const std::vector<uchar>& bufferModel,
+    const std::vector<uchar>& bufferConfig,
+    const Size& input_size,
+    float score_threshold = 0.9f,
+    float nms_threshold = 0.3f,
+    int top_k = 5000,
+    int backend_id = 0,
+    int target_id = 0
+)
+```
+
+<ParamField path="framework" type="String">
+  Name of origin framework
+</ParamField>
+
+<ParamField path="bufferModel" type="std::vector<uchar>">
+  Buffer with content of binary file with model weights
+</ParamField>
+
+<ParamField path="bufferConfig" type="std::vector<uchar>">
+  Buffer with content of text file containing network configuration
+</ParamField>
+
+### Methods
+
+#### setInputSize
+
+Sets the size for the network input.
+
+```cpp
+void setInputSize(const Size& input_size)
+```
+
+<ParamField path="input_size" type="Size">
+  Size of the input image. This overwrites the input size used when creating the model.
+</ParamField>
+
+<Note>
+Call this method when the size of the input image does not match the input size when creating the model.
+</Note>
+
+#### getInputSize
+
+Gets the current input size.
+
+```cpp
+Size getInputSize()
+```
+
+**Returns:** Current input size
+
+#### setScoreThreshold
+
+Sets the score threshold to filter out bounding boxes.
+
+```cpp
+void setScoreThreshold(float score_threshold)
+```
+
+<ParamField path="score_threshold" type="float">
+  Threshold for filtering out bounding boxes
+</ParamField>
+
+#### getScoreThreshold
+
+Gets the current score threshold.
+
+```cpp
+float getScoreThreshold()
+```
+
+**Returns:** Current score threshold
+
+#### setNMSThreshold
+
+Sets the Non-maximum-suppression threshold.
+
+```cpp
+void setNMSThreshold(float nms_threshold)
+```
+
+<ParamField path="nms_threshold" type="float">
+  Threshold for NMS operation to suppress bounding boxes that have IoU greater than the given value
+</ParamField>
+
+#### getNMSThreshold
+
+Gets the current NMS threshold.
+
+```cpp
+float getNMSThreshold()
+```
+
+**Returns:** Current NMS threshold
+
+#### setTopK
+
+Sets the number of bounding boxes preserved before NMS.
+
+```cpp
+void setTopK(int top_k)
+```
+
+<ParamField path="top_k" type="int">
+  Number of bounding boxes to preserve from top rank based on score
+</ParamField>
+
+#### getTopK
+
+Gets the current top K value.
+
+```cpp
+int getTopK()
+```
+
+**Returns:** Current top K value
+
+#### detect
+
+Detects faces in the input image.
+
+```cpp
+int detect(InputArray image, OutputArray faces)
+```
+
+<ParamField path="image" type="InputArray">
+  Input image to detect faces in
+</ParamField>
+
+<ParamField path="faces" type="OutputArray">
+  Detection results stored in a 2D cv::Mat of shape [num_faces, 15]:
+  - 0-1: x, y of bbox top left corner
+  - 2-3: width, height of bbox
+  - 4-5: x, y of right eye
+  - 6-7: x, y of left eye
+  - 8-9: x, y of nose tip
+  - 10-11: x, y of right corner of mouth
+  - 12-13: x, y of left corner of mouth
+  - 14: face score
+</ParamField>
+
+**Returns:** Number of faces detected
+
+### Example Usage
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/objdetect/face.hpp>
+    #include <opencv2/imgproc.hpp>
+    
+    // Create face detector
+    auto detector = cv::FaceDetectorYN::create(
+        "face_detection_yunet_2023mar.onnx",
+        "",
+        cv::Size(320, 320),
+        0.9f,
+        0.3f,
+        5000
+    );
+    
+    // Set input size to match image
+    detector->setInputSize(image.size());
+    
+    // Detect faces
+    cv::Mat faces;
+    detector->detect(image, faces);
+    
+    // Draw bounding boxes and landmarks
+    for (int i = 0; i < faces.rows; i++) {
+        // Get bounding box
+        int x = faces.at<float>(i, 0);
+        int y = faces.at<float>(i, 1);
+        int w = faces.at<float>(i, 2);
+        int h = faces.at<float>(i, 3);
+        
+        cv::rectangle(image, cv::Rect(x, y, w, h), cv::Scalar(0, 255, 0), 2);
+        
+        // Draw facial landmarks
+        for (int j = 4; j < 14; j += 2) {
+            cv::circle(image, 
+                      cv::Point(faces.at<float>(i, j), faces.at<float>(i, j+1)),
+                      2, cv::Scalar(255, 0, 0), -1);
+        }
+    }
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    import cv2
+    
+    # Create face detector
+    detector = cv2.FaceDetectorYN.create(
+        'face_detection_yunet_2023mar.onnx',
+        '',
+        (320, 320),
+        0.9,
+        0.3,
+        5000
+    )
+    
+    # Set input size to match image
+    detector.setInputSize(image.shape[1::-1])
+    
+    # Detect faces
+    _, faces = detector.detect(image)
+    
+    if faces is not None:
+        for face in faces:
+            # Get bounding box
+            x, y, w, h = face[:4].astype(int)
+            cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            
+            # Draw facial landmarks
+            for i in range(4, 14, 2):
+                cv2.circle(image, (int(face[i]), int(face[i+1])), 
+                          2, (255, 0, 0), -1)
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## FaceRecognizerSF
+
+DNN-based face recognizer class.
+
+Model download link: [Face Recognition SFace](https://github.com/opencv/opencv_zoo/tree/master/models/face_recognition_sface)
+
+### Constructor
+
+Use the static `create()` method to create an instance.
+
+#### create (from file)
+
+```cpp
+static Ptr<FaceRecognizerSF> create(
+    const String& model,
+    const String& config,
+    int backend_id = 0,
+    int target_id = 0
+)
+```
+
+<ParamField path="model" type="String">
+  Path to the ONNX model used for face recognition
+</ParamField>
+
+<ParamField path="config" type="String">
+  Path to the config file for compatibility (not requested for ONNX models)
+</ParamField>
+
+<ParamField path="backend_id" type="int" default="0">
+  ID of the backend
+</ParamField>
+
+<ParamField path="target_id" type="int" default="0">
+  ID of the target device
+</ParamField>
+
+**Returns:** Pointer to FaceRecognizerSF instance
+
+#### create (from buffer)
+
+```cpp
+static Ptr<FaceRecognizerSF> create(
+    const String& framework,
+    const std::vector<uchar>& bufferModel,
+    const std::vector<uchar>& bufferConfig,
+    int backend_id = 0,
+    int target_id = 0
+)
+```
+
+<ParamField path="framework" type="String">
+  Name of the framework (ONNX, etc.)
+</ParamField>
+
+<ParamField path="bufferModel" type="std::vector<uchar>">
+  Buffer containing the binary model weights
+</ParamField>
+
+<ParamField path="bufferConfig" type="std::vector<uchar>">
+  Buffer containing the network configuration
+</ParamField>
+
+### Enums
+
+#### DisType
+
+Distance types for calculating distance between face features.
+
+```cpp
+enum DisType {
+    FR_COSINE = 0,   // Cosine distance
+    FR_NORM_L2 = 1   // L2 norm distance
+}
+```
+
+### Methods
+
+#### alignCrop
+
+Aligns detected face with the source input image and crops it.
+
+```cpp
+void alignCrop(
+    InputArray src_img,
+    InputArray face_box,
+    OutputArray aligned_img
+) const
+```
+
+<ParamField path="src_img" type="InputArray">
+  Input image
+</ParamField>
+
+<ParamField path="face_box" type="InputArray">
+  Detected face result from the input image (from FaceDetectorYN)
+</ParamField>
+
+<ParamField path="aligned_img" type="OutputArray">
+  Output aligned and cropped face image
+</ParamField>
+
+#### feature
+
+Extracts face feature from aligned image.
+
+```cpp
+void feature(
+    InputArray aligned_img,
+    OutputArray face_feature
+)
+```
+
+<ParamField path="aligned_img" type="InputArray">
+  Input aligned face image
+</ParamField>
+
+<ParamField path="face_feature" type="OutputArray">
+  Output face feature vector
+</ParamField>
+
+#### match
+
+Calculates the distance between two face features.
+
+```cpp
+double match(
+    InputArray face_feature1,
+    InputArray face_feature2,
+    int dis_type = FaceRecognizerSF::FR_COSINE
+) const
+```
+
+<ParamField path="face_feature1" type="InputArray">
+  First input feature vector
+</ParamField>
+
+<ParamField path="face_feature2" type="InputArray">
+  Second input feature vector of the same size and type as face_feature1
+</ParamField>
+
+<ParamField path="dis_type" type="int" default="FR_COSINE">
+  Distance calculation method: FR_COSINE (cosine distance) or FR_NORM_L2 (L2 norm distance)
+</ParamField>
+
+**Returns:** Distance between the two face features. Lower values indicate more similar faces.
+
+### Example Usage
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/objdetect/face.hpp>
+    
+    // Create face recognizer
+    auto recognizer = cv::FaceRecognizerSF::create(
+        "face_recognition_sface_2021dec.onnx",
+        ""
+    );
+    
+    // Assume we have detected faces using FaceDetectorYN
+    cv::Mat face1_aligned, face2_aligned;
+    
+    // Align and crop faces
+    recognizer->alignCrop(image1, face1_box, face1_aligned);
+    recognizer->alignCrop(image2, face2_box, face2_aligned);
+    
+    // Extract features
+    cv::Mat feature1, feature2;
+    recognizer->feature(face1_aligned, feature1);
+    recognizer->feature(face2_aligned, feature2);
+    
+    // Calculate similarity
+    double cosine_score = recognizer->match(
+        feature1, feature2, 
+        cv::FaceRecognizerSF::FR_COSINE
+    );
+    
+    // Threshold for face matching (typical: 0.363 for cosine)
+    bool is_same_person = cosine_score >= 0.363;
+    
+    std::cout << "Cosine similarity: " << cosine_score << std::endl;
+    std::cout << "Same person: " << (is_same_person ? "Yes" : "No") << std::endl;
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    import cv2
+    
+    # Create face recognizer
+    recognizer = cv2.FaceRecognizerSF.create(
+        'face_recognition_sface_2021dec.onnx',
+        ''
+    )
+    
+    # Assume we have detected faces using FaceDetectorYN
+    # Align and crop faces
+    face1_aligned = recognizer.alignCrop(image1, face1_box)
+    face2_aligned = recognizer.alignCrop(image2, face2_box)
+    
+    # Extract features
+    feature1 = recognizer.feature(face1_aligned)
+    feature2 = recognizer.feature(face2_aligned)
+    
+    # Calculate similarity
+    cosine_score = recognizer.match(
+        feature1, feature2, 
+        cv2.FaceRecognizerSF_FR_COSINE
+    )
+    
+    # Threshold for face matching (typical: 0.363 for cosine)
+    is_same_person = cosine_score >= 0.363
+    
+    print(f"Cosine similarity: {cosine_score}")
+    print(f"Same person: {'Yes' if is_same_person else 'No'}")
+    ```
+  </Tab>
+</Tabs>
+
+## Complete Workflow Example
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/objdetect/face.hpp>
+    #include <opencv2/imgproc.hpp>
+    #include <opencv2/highgui.hpp>
+    
+    int main() {
+        // Load images
+        cv::Mat img1 = cv::imread("person1.jpg");
+        cv::Mat img2 = cv::imread("person2.jpg");
+        
+        // Create detector and recognizer
+        auto detector = cv::FaceDetectorYN::create(
+            "face_detection_yunet_2023mar.onnx", "",
+            cv::Size(320, 320)
+        );
+        
+        auto recognizer = cv::FaceRecognizerSF::create(
+            "face_recognition_sface_2021dec.onnx", ""
+        );
+        
+        // Detect faces in both images
+        detector->setInputSize(img1.size());
+        cv::Mat faces1;
+        detector->detect(img1, faces1);
+        
+        detector->setInputSize(img2.size());
+        cv::Mat faces2;
+        detector->detect(img2, faces2);
+        
+        if (faces1.rows > 0 && faces2.rows > 0) {
+            // Get first face from each image
+            cv::Mat face1_box = faces1.row(0);
+            cv::Mat face2_box = faces2.row(0);
+            
+            // Align and extract features
+            cv::Mat aligned1, aligned2;
+            recognizer->alignCrop(img1, face1_box, aligned1);
+            recognizer->alignCrop(img2, face2_box, aligned2);
+            
+            cv::Mat feature1, feature2;
+            recognizer->feature(aligned1, feature1);
+            recognizer->feature(aligned2, feature2);
+            
+            // Compare faces
+            double score = recognizer->match(feature1, feature2);
+            std::cout << "Match score: " << score << std::endl;
+        }
+        
+        return 0;
+    }
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    import cv2
+    
+    # Load images
+    img1 = cv2.imread('person1.jpg')
+    img2 = cv2.imread('person2.jpg')
+    
+    # Create detector and recognizer
+    detector = cv2.FaceDetectorYN.create(
+        'face_detection_yunet_2023mar.onnx',
+        '',
+        (320, 320)
+    )
+    
+    recognizer = cv2.FaceRecognizerSF.create(
+        'face_recognition_sface_2021dec.onnx',
+        ''
+    )
+    
+    # Detect faces in both images
+    detector.setInputSize((img1.shape[1], img1.shape[0]))
+    _, faces1 = detector.detect(img1)
+    
+    detector.setInputSize((img2.shape[1], img2.shape[0]))
+    _, faces2 = detector.detect(img2)
+    
+    if faces1 is not None and faces2 is not None:
+        # Get first face from each image
+        face1_box = faces1[0]
+        face2_box = faces2[0]
+        
+        # Align and extract features
+        aligned1 = recognizer.alignCrop(img1, face1_box)
+        aligned2 = recognizer.alignCrop(img2, face2_box)
+        
+        feature1 = recognizer.feature(aligned1)
+        feature2 = recognizer.feature(aligned2)
+        
+        # Compare faces
+        score = recognizer.match(feature1, feature2)
+        print(f"Match score: {score}")
+    ```
+  </Tab>
+</Tabs>
+
+## See Also
+
+- [Cascade Classifier](/api/objdetect/cascade)
+- [ArUco Detection](/api/objdetect/aruco)
+- [QR Code Detection](/api/objdetect/qrcode)

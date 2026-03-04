@@ -1,0 +1,453 @@
+---
+title: Real-Time Object Tracking
+description: Track objects across video frames using various tracking algorithms including Lucas-Kanade, MIL, GOTURN, DaSiamRPN, and NanoTrack
+---
+
+## Overview
+
+OpenCV provides multiple tracking algorithms for different use cases:
+
+- **Optical Flow (Lucas-Kanade)**: Track sparse feature points
+- **MIL Tracker**: Multiple Instance Learning, CPU-friendly
+- **GOTURN**: Deep learning tracker using Caffe models
+- **DaSiamRPN**: State-of-the-art Siamese network tracker
+- **NanoTrack**: Lightweight deep learning tracker
+- **Planar Tracking**: Track planar objects using feature matching
+
+## Lucas-Kanade Optical Flow Tracker
+
+Sparse optical flow tracking with automatic feature detection and back-tracking for verification.
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import numpy as np
+    import cv2 as cv
+    from video import create_capture
+    from common import anorm2, draw_str
+
+    # Lucas-Kanade parameters
+    lk_params = dict(
+        winSize=(15, 15),
+        maxLevel=2,
+        criteria=(cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_COUNT, 10, 0.03)
+    )
+
+    # Feature detection parameters
+    feature_params = dict(
+        maxCorners=500,
+        qualityLevel=0.3,
+        minDistance=7,
+        blockSize=7
+    )
+
+    class LKTracker:
+        def __init__(self, video_src):
+            self.track_len = 10
+            self.detect_interval = 5
+            self.tracks = []
+            self.cam = create_capture(video_src)
+            self.frame_idx = 0
+
+        def run(self):
+            while True:
+                _ret, frame = self.cam.read()
+                frame_gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+                vis = frame.copy()
+
+                if len(self.tracks) > 0:
+                    img0, img1 = self.prev_gray, frame_gray
+                    p0 = np.float32([tr[-1] for tr in self.tracks]).reshape(-1, 1, 2)
+                    
+                    # Forward optical flow
+                    p1, _st, _err = cv.calcOpticalFlowPyrLK(img0, img1, p0, None, **lk_params)
+                    # Backward optical flow for verification
+                    p0r, _st, _err = cv.calcOpticalFlowPyrLK(img1, img0, p1, None, **lk_params)
+                    
+                    # Compute back-tracking error
+                    d = abs(p0 - p0r).reshape(-1, 2).max(-1)
+                    good = d < 1
+                    
+                    new_tracks = []
+                    for tr, (x, y), good_flag in zip(self.tracks, p1.reshape(-1, 2), good):
+                        if not good_flag:
+                            continue
+                        tr.append((x, y))
+                        if len(tr) > self.track_len:
+                            del tr[0]
+                        new_tracks.append(tr)
+                        cv.circle(vis, (int(x), int(y)), 2, (0, 255, 0), -1)
+                    
+                    self.tracks = new_tracks
+                    cv.polylines(vis, [np.int32(tr) for tr in self.tracks], 
+                               False, (0, 255, 0))
+                    draw_str(vis, (20, 20), f'track count: {len(self.tracks)}')
+
+                # Detect new features periodically
+                if self.frame_idx % self.detect_interval == 0:
+                    mask = np.zeros_like(frame_gray)
+                    mask[:] = 255
+                    for x, y in [np.int32(tr[-1]) for tr in self.tracks]:
+                        cv.circle(mask, (x, y), 5, 0, -1)
+                    
+                    p = cv.goodFeaturesToTrack(frame_gray, mask=mask, **feature_params)
+                    if p is not None:
+                        for x, y in np.float32(p).reshape(-1, 2):
+                            self.tracks.append([(x, y)])
+
+                self.frame_idx += 1
+                self.prev_gray = frame_gray
+                cv.imshow('lk_track', vis)
+
+                if cv.waitKey(1) == 27:
+                    break
+
+    # Run tracker
+    tracker = LKTracker(0)
+    tracker.run()
+    cv.destroyAllWindows()
+    ```
+  </Tab>
+</Tabs>
+
+## Modern DNN-Based Trackers
+
+High-performance trackers using deep learning models.
+
+```python
+import cv2 as cv
+import numpy as np
+from video import create_capture
+
+class ObjectTracker:
+    def __init__(self, tracker_type='nanotrack'):
+        self.tracker_type = tracker_type
+        self.tracker = self.create_tracker()
+    
+    def create_tracker(self):
+        """Create tracker based on type"""
+        if self.tracker_type == 'mil':
+            # Multiple Instance Learning tracker
+            return cv.TrackerMIL_create()
+        
+        elif self.tracker_type == 'goturn':
+            # GOTURN deep learning tracker
+            params = cv.TrackerGOTURN_Params()
+            params.modelTxt = 'goturn.prototxt'
+            params.modelBin = 'goturn.caffemodel'
+            return cv.TrackerGOTURN_create(params)
+        
+        elif self.tracker_type == 'dasiamrpn':
+            # DaSiamRPN tracker
+            params = cv.TrackerDaSiamRPN_Params()
+            params.model = 'dasiamrpn_model.onnx'
+            params.kernel_cls1 = 'dasiamrpn_kernel_cls1.onnx'
+            params.kernel_r1 = 'dasiamrpn_kernel_r1.onnx'
+            params.backend = cv.dnn.DNN_BACKEND_OPENCV
+            params.target = cv.dnn.DNN_TARGET_CPU
+            return cv.TrackerDaSiamRPN_create(params)
+        
+        elif self.tracker_type == 'nanotrack':
+            # NanoTrack lightweight tracker
+            params = cv.TrackerNano_Params()
+            params.backbone = 'nanotrack_backbone_sim.onnx'
+            params.neckhead = 'nanotrack_head_sim.onnx'
+            params.backend = cv.dnn.DNN_BACKEND_OPENCV
+            params.target = cv.dnn.DNN_TARGET_CPU
+            return cv.TrackerNano_create(params)
+        
+        elif self.tracker_type == 'vittrack':
+            # Vision Transformer tracker
+            params = cv.TrackerVit_Params()
+            params.net = 'vitTracker.onnx'
+            params.tracking_score_threshold = 0.3
+            params.backend = cv.dnn.DNN_BACKEND_OPENCV
+            params.target = cv.dnn.DNN_TARGET_CPU
+            return cv.TrackerVit_create(params)
+        
+        else:
+            raise ValueError(f"Unknown tracker: {self.tracker_type}")
+    
+    def initialize_tracker(self, image):
+        """Select ROI and initialize tracker"""
+        print('Select object ROI for tracker...')
+        bbox = cv.selectROI('tracking', image)
+        print(f'ROI: {bbox}')
+        
+        if bbox[2] <= 0 or bbox[3] <= 0:
+            raise ValueError("Invalid ROI selected")
+        
+        self.tracker.init(image, bbox)
+    
+    def run(self, video_path=0):
+        """Run tracking on video"""
+        camera = create_capture(video_path)
+        
+        if not camera.isOpened():
+            raise RuntimeError(f"Can't open video: {video_path}")
+        
+        # Read first frame and initialize
+        ok, image = camera.read()
+        if not ok:
+            raise RuntimeError("Can't read first frame")
+        
+        cv.namedWindow('tracking')
+        self.initialize_tracker(image)
+        
+        print("Tracking started. Press SPACE to re-init, ESC to exit...")
+        
+        while camera.isOpened():
+            ok, image = camera.read()
+            if not ok:
+                print("Can't read frame")
+                break
+            
+            # Update tracker
+            ok, newbox = self.tracker.update(image)
+            
+            if ok:
+                # Draw bounding box
+                p1 = (int(newbox[0]), int(newbox[1]))
+                p2 = (int(newbox[0] + newbox[2]), int(newbox[1] + newbox[3]))
+                cv.rectangle(image, p1, p2, (0, 255, 0), 2)
+            else:
+                # Tracking failure
+                cv.putText(image, "Tracking failure", (10, 80),
+                          cv.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
+            
+            # Display tracker type
+            cv.putText(image, f"Tracker: {self.tracker_type}", (10, 20),
+                      cv.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
+            
+            cv.imshow("tracking", image)
+            k = cv.waitKey(1)
+            
+            if k == 32:  # SPACE - reinitialize
+                self.initialize_tracker(image)
+            if k == 27:  # ESC - exit
+                break
+        
+        camera.release()
+        cv.destroyAllWindows()
+
+# Example usage
+tracker = ObjectTracker('nanotrack')
+tracker.run('video.mp4')
+```
+
+## Planar Object Tracker
+
+Track planar objects using feature matching with ORB and FLANN.
+
+```python
+import numpy as np
+import cv2 as cv
+from collections import namedtuple
+
+FLANN_INDEX_LSH = 6
+flann_params = dict(
+    algorithm=FLANN_INDEX_LSH,
+    table_number=6,
+    key_size=12,
+    multi_probe_level=1
+)
+
+MIN_MATCH_COUNT = 10
+
+PlanarTarget = namedtuple('PlaneTarget', 
+                         'image, rect, keypoints, descrs, data')
+TrackedTarget = namedtuple('TrackedTarget', 
+                          'target, p0, p1, H, quad')
+
+class PlaneTracker:
+    def __init__(self):
+        self.detector = cv.ORB_create(nfeatures=1000)
+        self.matcher = cv.FlannBasedMatcher(flann_params, {})
+        self.targets = []
+    
+    def add_target(self, image, rect, data=None):
+        """Add new tracking target"""
+        x0, y0, x1, y1 = rect
+        raw_points, raw_descrs = self.detector.detectAndCompute(image, None)
+        
+        # Filter keypoints within rect
+        points, descs = [], []
+        for kp, desc in zip(raw_points, raw_descrs):
+            x, y = kp.pt
+            if x0 <= x <= x1 and y0 <= y <= y1:
+                points.append(kp)
+                descs.append(desc)
+        
+        descs = np.uint8(descs)
+        self.matcher.add([descs])
+        target = PlanarTarget(
+            image=image, rect=rect, 
+            keypoints=points, descrs=descs, data=data
+        )
+        self.targets.append(target)
+    
+    def track(self, frame):
+        """Track targets in frame"""
+        frame_points, frame_descrs = self.detector.detectAndCompute(frame, None)
+        
+        if len(frame_points) < MIN_MATCH_COUNT:
+            return []
+        
+        # Match features
+        matches = self.matcher.knnMatch(frame_descrs, k=2)
+        matches = [m[0] for m in matches 
+                  if len(m) == 2 and m[0].distance < m[1].distance * 0.75]
+        
+        if len(matches) < MIN_MATCH_COUNT:
+            return []
+        
+        # Group matches by target
+        matches_by_id = [[] for _ in range(len(self.targets))]
+        for m in matches:
+            matches_by_id[m.imgIdx].append(m)
+        
+        tracked = []
+        for imgIdx, matches in enumerate(matches_by_id):
+            if len(matches) < MIN_MATCH_COUNT:
+                continue
+            
+            target = self.targets[imgIdx]
+            p0 = [target.keypoints[m.trainIdx].pt for m in matches]
+            p1 = [frame_points[m.queryIdx].pt for m in matches]
+            p0, p1 = np.float32((p0, p1))
+            
+            # Find homography
+            H, status = cv.findHomography(p0, p1, cv.RANSAC, 3.0)
+            status = status.ravel() != 0
+            
+            if status.sum() < MIN_MATCH_COUNT:
+                continue
+            
+            p0, p1 = p0[status], p1[status]
+            
+            # Transform target rectangle
+            x0, y0, x1, y1 = target.rect
+            quad = np.float32([[x0, y0], [x1, y0], [x1, y1], [x0, y1]])
+            quad = cv.perspectiveTransform(quad.reshape(1, -1, 2), H).reshape(-1, 2)
+            
+            track = TrackedTarget(target=target, p0=p0, p1=p1, H=H, quad=quad)
+            tracked.append(track)
+        
+        tracked.sort(key=lambda t: len(t.p0), reverse=True)
+        return tracked
+
+# Example usage
+import video
+from common import RectSelector
+
+cap = video.create_capture(0)
+tracker = PlaneTracker()
+rect_sel = RectSelector('plane', tracker.add_target)
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+    
+    vis = frame.copy()
+    tracked = tracker.track(frame)
+    
+    for tr in tracked:
+        cv.polylines(vis, [np.int32(tr.quad)], True, (255, 255, 255), 2)
+        for (x, y) in np.int32(tr.p1):
+            cv.circle(vis, (x, y), 2, (255, 255, 255))
+    
+    cv.imshow('plane', vis)
+    if cv.waitKey(1) == 27:
+        break
+
+cv.destroyAllWindows()
+```
+
+## Tracker Comparison
+
+| Tracker | Speed | Accuracy | CPU/GPU | Use Case |
+|---------|-------|----------|---------|----------|
+| **Lucas-Kanade** | Very Fast | Medium | CPU | Feature tracking, motion analysis |
+| **MIL** | Fast | Good | CPU | General object tracking |
+| **GOTURN** | Fast | Good | CPU/GPU | Real-time tracking |
+| **DaSiamRPN** | Medium | Excellent | CPU/GPU | High accuracy requirements |
+| **NanoTrack** | Fast | Very Good | CPU/GPU | Mobile/embedded |
+| **Planar** | Medium | Excellent | CPU | Textured planar objects |
+
+## Key Parameters
+
+### Lucas-Kanade
+
+```python
+lk_params = dict(
+    winSize=(15, 15),      # Search window size
+    maxLevel=2,            # Pyramid levels
+    criteria=(cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_COUNT, 10, 0.03)
+)
+```
+
+### Feature Detection
+
+```python
+feature_params = dict(
+    maxCorners=500,        # Maximum number of corners
+    qualityLevel=0.3,      # Quality threshold (0-1)
+    minDistance=7,         # Minimum distance between corners
+    blockSize=7            # Size of averaging block
+)
+```
+
+<Note>
+**Model Downloads**: Deep learning tracker models are available from:
+- [GOTURN Models](https://github.com/opencv/opencv_extra/tree/master/testdata/tracking)
+- [DaSiamRPN](https://github.com/opencv/opencv_zoo)
+- [NanoTrack](https://github.com/HonglinChu/SiamTrackers/tree/master/NanoTrack)
+</Note>
+
+## Best Practices
+
+<Steps>
+  <Step title="Choose Right Tracker">
+    Select based on your requirements:
+    - **Speed critical**: Lucas-Kanade or NanoTrack
+    - **Accuracy critical**: DaSiamRPN
+    - **CPU-only**: MIL or Lucas-Kanade
+    - **Planar objects**: Planar tracker
+  </Step>
+  
+  <Step title="Handle Tracking Failures">
+    Implement recovery mechanisms:
+    ```python
+    if not ok:
+        # Reinitialize or use detection
+        tracker.init(frame, new_bbox)
+    ```
+  </Step>
+  
+  <Step title="Combine with Detection">
+    Use detector periodically to recover from failures:
+    ```python
+    if frame_idx % 30 == 0:
+        bbox = detector.detect(frame)
+        tracker.init(frame, bbox)
+    ```
+  </Step>
+  
+  <Step title="Optimize Performance">
+    - Resize frames for faster processing
+    - Use GPU backend when available
+    - Reduce detection frequency in optical flow
+  </Step>
+</Steps>
+
+<Warning>
+**Tracker Initialization**: All trackers require a good initial bounding box. Poor initialization will lead to immediate tracking failure.
+</Warning>
+
+## Next Steps
+
+- Explore [Video I/O](/api/videoio) for video handling
+- Learn about [Feature Detection](/modules/features2d) for custom trackers
+- Check [Optical Flow](/api/video/optical-flow) for motion estimation
+- See [DNN Module](/modules/dnn) for deep learning models

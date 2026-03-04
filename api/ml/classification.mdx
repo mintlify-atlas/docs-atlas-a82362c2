@@ -1,0 +1,491 @@
+---
+title: Classification Algorithms
+description: Machine learning classification algorithms including SVM, K-Nearest Neighbors, Decision Trees, Boosting, Random Trees, and Naive Bayes classifier
+---
+
+The OpenCV Machine Learning module provides several powerful classification algorithms for supervised learning tasks.
+
+## SVM - Support Vector Machines
+
+Support Vector Machines are powerful classifiers that work well for both linear and non-linear classification problems.
+
+### Creating an SVM Model
+
+```cpp
+Ptr<SVM> svm = SVM::create();
+```
+
+### Key Methods
+
+<ParamField path="setType" type="void">
+  Sets the type of SVM formulation
+  
+  **Parameters:**
+  - `val` (int): SVM type. See `SVM::Types`
+  
+  **Types:**
+  - `SVM::C_SVC` (100): C-Support Vector Classification for n-class classification
+  - `SVM::NU_SVC` (101): ν-Support Vector Classification with parameter ν
+  - `SVM::ONE_CLASS` (102): Distribution Estimation (One-class SVM)
+  - `SVM::EPS_SVR` (103): ε-Support Vector Regression
+  - `SVM::NU_SVR` (104): ν-Support Vector Regression
+</ParamField>
+
+<ParamField path="setKernel" type="void">
+  Initialize with one of predefined kernels
+  
+  **Parameters:**
+  - `kernelType` (int): Kernel type. See `SVM::KernelTypes`
+  
+  **Kernel Types:**
+  - `SVM::LINEAR` (0): Linear kernel, no mapping done
+  - `SVM::POLY` (1): Polynomial kernel
+  - `SVM::RBF` (2): Radial basis function, good choice in most cases
+  - `SVM::SIGMOID` (3): Sigmoid kernel
+  - `SVM::CHI2` (4): Exponential Chi2 kernel
+  - `SVM::INTER` (5): Histogram intersection kernel
+</ParamField>
+
+<ParamField path="setC" type="void">
+  Sets parameter C of a SVM optimization problem
+  
+  **Parameters:**
+  - `val` (double): Parameter C for C_SVC, EPS_SVR or NU_SVR
+</ParamField>
+
+<ParamField path="setGamma" type="void">
+  Sets parameter γ of a kernel function
+  
+  **Parameters:**
+  - `val` (double): Parameter gamma for POLY, RBF, SIGMOID or CHI2 kernels
+</ParamField>
+
+<ParamField path="train" type="bool">
+  Trains the SVM model
+  
+  **Parameters:**
+  - `trainData` (Ptr\<TrainData\>): Training data
+  - `flags` (int): Optional flags
+  
+  **Returns:** bool - true if training succeeded
+</ParamField>
+
+<ParamField path="predict" type="float">
+  Predicts response for input samples
+  
+  **Parameters:**
+  - `samples` (InputArray): Input samples, floating-point matrix
+  - `results` (OutputArray): Optional output matrix of results
+  - `flags` (int): Optional flags
+  
+  **Returns:** float - predicted response for single sample
+</ParamField>
+
+<ParamField path="trainAuto" type="bool">
+  Trains an SVM with optimal parameters using cross-validation
+  
+  **Parameters:**
+  - `data` (Ptr\<TrainData\>): Training data
+  - `kFold` (int): Cross-validation parameter (default: 10)
+  - `Cgrid` (ParamGrid): Grid for C parameter
+  - `gammaGrid` (ParamGrid): Grid for gamma parameter
+  - `pGrid` (ParamGrid): Grid for p parameter
+  - `nuGrid` (ParamGrid): Grid for nu parameter
+  - `coeffGrid` (ParamGrid): Grid for coeff parameter
+  - `degreeGrid` (ParamGrid): Grid for degree parameter
+  - `balanced` (bool): Create balanced cross-validation subsets
+  
+  **Returns:** bool - true if training succeeded
+</ParamField>
+
+<ParamField path="getSupportVectors" type="Mat">
+  Retrieves all the support vectors
+  
+  **Returns:** Mat - matrix where support vectors are stored as rows
+</ParamField>
+
+### Example Usage
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/ml.hpp>
+    
+    using namespace cv::ml;
+    
+    // Create and configure SVM
+    Ptr<SVM> svm = SVM::create();
+    svm->setType(SVM::C_SVC);
+    svm->setKernel(SVM::RBF);
+    svm->setGamma(0.5);
+    svm->setC(1.0);
+    svm->setTermCriteria(TermCriteria(TermCriteria::MAX_ITER, 100, 1e-6));
+    
+    // Train the SVM
+    Ptr<TrainData> trainData = TrainData::create(samples, ROW_SAMPLE, labels);
+    svm->train(trainData);
+    
+    // Predict
+    Mat results;
+    svm->predict(testSamples, results);
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+    
+    # Create and configure SVM
+    svm = cv.ml.SVM_create()
+    svm.setType(cv.ml.SVM_C_SVC)
+    svm.setKernel(cv.ml.SVM_RBF)
+    svm.setGamma(0.5)
+    svm.setC(1.0)
+    svm.setTermCriteria((cv.TERM_CRITERIA_MAX_ITER, 100, 1e-6))
+    
+    # Train the SVM
+    svm.train(samples, cv.ml.ROW_SAMPLE, labels)
+    
+    # Predict
+    result = svm.predict(test_samples)
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## KNearest - K-Nearest Neighbors
+
+The K-Nearest Neighbors algorithm finds the k nearest neighbors and predicts the response based on their values.
+
+### Creating a KNearest Model
+
+```cpp
+Ptr<KNearest> knn = KNearest::create();
+```
+
+### Key Methods
+
+<ParamField path="setDefaultK" type="void">
+  Sets the default number of neighbors to use in predict method
+  
+  **Parameters:**
+  - `val` (int): Number of neighbors (must be greater than 1)
+</ParamField>
+
+<ParamField path="setIsClassifier" type="void">
+  Sets whether classification or regression model should be trained
+  
+  **Parameters:**
+  - `val` (bool): true for classification, false for regression
+</ParamField>
+
+<ParamField path="setAlgorithmType" type="void">
+  Sets the algorithm type
+  
+  **Parameters:**
+  - `val` (int): Algorithm type
+  
+  **Types:**
+  - `KNearest::BRUTE_FORCE` (1): Brute force search
+  - `KNearest::KDTREE` (2): KD-tree based search
+</ParamField>
+
+<ParamField path="findNearest" type="float">
+  Finds the neighbors and predicts responses for input vectors
+  
+  **Parameters:**
+  - `samples` (InputArray): Input samples (rows are samples)
+  - `k` (int): Number of nearest neighbors
+  - `results` (OutputArray): Vector with prediction results
+  - `neighborResponses` (OutputArray): Optional output for neighbor responses
+  - `dist` (OutputArray): Optional output distances to neighbors
+  
+  **Returns:** float - predicted value for single input vector
+</ParamField>
+
+### Example Usage
+
+```cpp
+#include <opencv2/ml.hpp>
+
+using namespace cv::ml;
+
+// Create KNN classifier
+Ptr<KNearest> knn = KNearest::create();
+knn->setDefaultK(5);
+knn->setIsClassifier(true);
+knn->setAlgorithmType(KNearest::BRUTE_FORCE);
+
+// Train
+knn->train(trainSamples, ROW_SAMPLE, trainLabels);
+
+// Predict
+Mat results, neighbors, distances;
+knn->findNearest(testSamples, 5, results, neighbors, distances);
+```
+
+---
+
+## DTrees - Decision Trees
+
+Decision trees are tree-based classifiers that split data based on feature values.
+
+### Creating a Decision Tree Model
+
+```cpp
+Ptr<DTrees> dtree = DTrees::create();
+```
+
+### Key Methods
+
+<ParamField path="setMaxDepth" type="void">
+  Sets the maximum possible depth of the tree
+  
+  **Parameters:**
+  - `val` (int): Maximum depth (root node has depth 0)
+</ParamField>
+
+<ParamField path="setMinSampleCount" type="void">
+  Sets the minimum number of samples required to split a node
+  
+  **Parameters:**
+  - `val` (int): Minimum sample count (default: 10)
+</ParamField>
+
+<ParamField path="setMaxCategories" type="void">
+  Sets the maximum number of categories for clustering
+  
+  **Parameters:**
+  - `val` (int): Maximum categories (default: 10)
+</ParamField>
+
+<ParamField path="setCVFolds" type="void">
+  Sets the number of folds for cross-validation pruning
+  
+  **Parameters:**
+  - `val` (int): Number of folds (default: 10)
+</ParamField>
+
+<ParamField path="setPriors" type="void">
+  Sets a priori class probabilities
+  
+  **Parameters:**
+  - `val` (Mat): Array of class probabilities sorted by label
+</ParamField>
+
+### Example Usage
+
+```cpp
+// Create and configure decision tree
+Ptr<DTrees> dtree = DTrees::create();
+dtree->setMaxDepth(10);
+dtree->setMinSampleCount(10);
+dtree->setCVFolds(10);
+
+// Train
+dtree->train(trainData);
+
+// Predict
+float response = dtree->predict(testSample);
+```
+
+---
+
+## Boost - Boosted Trees
+
+Boosted tree classifier that combines multiple weak classifiers into a strong one.
+
+### Creating a Boost Model
+
+```cpp
+Ptr<Boost> boost = Boost::create();
+```
+
+### Key Methods
+
+<ParamField path="setBoostType" type="void">
+  Sets the type of boosting algorithm
+  
+  **Parameters:**
+  - `val` (int): Boost type
+  
+  **Types:**
+  - `Boost::DISCRETE` (0): Discrete AdaBoost
+  - `Boost::REAL` (1): Real AdaBoost (default, works well with categorical data)
+  - `Boost::LOGIT` (2): LogitBoost (good for regression)
+  - `Boost::GENTLE` (3): Gentle AdaBoost (good with regression data)
+</ParamField>
+
+<ParamField path="setWeakCount" type="void">
+  Sets the number of weak classifiers
+  
+  **Parameters:**
+  - `val` (int): Number of weak classifiers (default: 100)
+</ParamField>
+
+<ParamField path="setWeightTrimRate" type="void">
+  Sets the threshold for computational time savings
+  
+  **Parameters:**
+  - `val` (double): Weight trim rate between 0 and 1 (default: 0.95)
+</ParamField>
+
+### Example Usage
+
+```cpp
+// Create and configure Boost
+Ptr<Boost> boost = Boost::create();
+boost->setBoostType(Boost::REAL);
+boost->setWeakCount(100);
+boost->setWeightTrimRate(0.95);
+boost->setMaxDepth(1);
+
+// Train
+boost->train(trainData);
+
+// Predict
+float result = boost->predict(testSample);
+```
+
+---
+
+## RTrees - Random Trees (Random Forest)
+
+Random Forest is an ensemble learning method that constructs multiple decision trees.
+
+### Creating a Random Trees Model
+
+```cpp
+Ptr<RTrees> rtrees = RTrees::create();
+```
+
+### Key Methods
+
+<ParamField path="setCalculateVarImportance" type="void">
+  Enable/disable variable importance calculation
+  
+  **Parameters:**
+  - `val` (bool): true to calculate variable importance
+</ParamField>
+
+<ParamField path="setActiveVarCount" type="void">
+  Sets the size of randomly selected subset of features at each tree node
+  
+  **Parameters:**
+  - `val` (int): Number of active variables (0 = sqrt of total features)
+</ParamField>
+
+<ParamField path="setTermCriteria" type="void">
+  Sets termination criteria for training
+  
+  **Parameters:**
+  - `val` (TermCriteria): Criteria specifying max iterations or accuracy
+</ParamField>
+
+<ParamField path="getVarImportance" type="Mat">
+  Returns the variable importance array
+  
+  **Returns:** Mat - variable importance vector (if enabled during training)
+</ParamField>
+
+<ParamField path="getVotes" type="void">
+  Returns the result of each individual tree in the forest
+  
+  **Parameters:**
+  - `samples` (InputArray): Samples for which votes will be calculated
+  - `results` (OutputArray): Matrix where results will be written
+  - `flags` (int): Flags for defining the type of RTrees
+</ParamField>
+
+### Example Usage
+
+```cpp
+// Create and configure Random Forest
+Ptr<RTrees> rtrees = RTrees::create();
+rtrees->setMaxDepth(10);
+rtrees->setMinSampleCount(10);
+rtrees->setCalculateVarImportance(true);
+rtrees->setActiveVarCount(0); // sqrt of total features
+rtrees->setTermCriteria(TermCriteria(TermCriteria::MAX_ITER, 100, 0));
+
+// Train
+rtrees->train(trainData);
+
+// Get variable importance
+Mat varImportance = rtrees->getVarImportance();
+
+// Predict
+float result = rtrees->predict(testSample);
+```
+
+---
+
+## NormalBayesClassifier - Naive Bayes
+
+Bayes classifier for normally distributed data using Bayesian statistics.
+
+### Creating a Naive Bayes Model
+
+```cpp
+Ptr<NormalBayesClassifier> bayes = NormalBayesClassifier::create();
+```
+
+### Key Methods
+
+<ParamField path="train" type="bool">
+  Trains the Bayes classifier
+  
+  **Parameters:**
+  - `trainData` (Ptr\<TrainData\>): Training data
+  - `flags` (int): Optional flags
+  
+  **Returns:** bool - true if training succeeded
+</ParamField>
+
+<ParamField path="predict" type="float">
+  Predicts response for input samples
+  
+  **Parameters:**
+  - `samples` (InputArray): Input samples
+  - `results` (OutputArray): Output predictions
+  - `flags` (int): Optional flags
+  
+  **Returns:** float - predicted class for single sample
+</ParamField>
+
+<ParamField path="predictProb" type="float">
+  Predicts the response and returns probabilities
+  
+  **Parameters:**
+  - `inputs` (InputArray): Input vectors (one or more)
+  - `outputs` (OutputArray): Predicted classes
+  - `outputProbs` (OutputArray): Output probabilities for each class
+  - `flags` (int): Optional flags
+  
+  **Returns:** float - predicted class for single input
+</ParamField>
+
+### Example Usage
+
+```cpp
+// Create Naive Bayes classifier
+Ptr<NormalBayesClassifier> bayes = NormalBayesClassifier::create();
+
+// Train
+bayes->train(trainData);
+
+// Predict with probabilities
+Mat results, probs;
+bayes->predictProb(testSamples, results, probs);
+```
+
+<Note>
+  The Naive Bayes classifier assumes that features are normally distributed and independent. It works best when these assumptions hold true.
+</Note>
+
+## See Also
+
+- [Regression Algorithms](/api/ml/regression) - Linear and logistic regression methods
+- [Clustering Algorithms](/api/ml/clustering) - K-means and EM clustering
+- [StatModel Base Class](https://docs.opencv.org/4.x/dd/ded/classcv_1_1ml_1_1StatModel.html) - Base class for all ML models

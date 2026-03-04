@@ -1,0 +1,369 @@
+---
+title: "G-API Module"
+description: "Graph-based API for efficient image processing pipelines"
+---
+
+## Overview
+
+G-API (Graph API) is OpenCV's graph-based framework for building efficient, portable image processing pipelines. It provides:
+- **Lazy evaluation**: Build computation graph, execute later
+- **Backend abstraction**: CPU, GPU, neural network accelerators
+- **Performance optimization**: Automatic fusion and optimization
+- **Heterogeneous execution**: Mix different backends
+
+## Key Concepts
+
+### Computation Graph
+
+G-API separates graph **construction** from **execution**:
+
+1. **Build graph** - Define operations
+2. **Compile** - Optimize for target backend
+3. **Execute** - Run on actual data
+
+### Data Types
+
+- **GMat**: Graph matrix (image/matrix)
+- **GScalar**: Graph scalar value
+- **GArray**: Graph array of values
+- **GOpaque**: Graph opaque type
+- **GFrame**: Graph video frame
+
+## Basic Example
+
+```cpp
+#include <opencv2/gapi.hpp>
+#include <opencv2/gapi/core.hpp>
+#include <opencv2/gapi/imgproc.hpp>
+
+using namespace cv;
+
+int main() {
+    // 1. Declare computation
+    GMat in;  // Input placeholder
+    GMat gray = gapi::RGB2Gray(in);
+    GMat blurred = gapi::blur(gray, Size(5, 5));
+    GMat edges = gapi::Canny(blurred, 32, 128);
+    
+    // 2. Compile computation
+    GComputation ac(in, edges);
+    auto compiled = ac.compile(descr_of(input_mat));
+    
+    // 3. Execute on actual data
+    Mat input_mat = imread("image.jpg");
+    Mat output_mat;
+    compiled(input_mat, output_mat);
+    
+    return 0;
+}
+```
+
+## Available Operations
+
+### Image Processing
+
+```cpp
+// Color conversion
+GMat gray = gapi::RGB2Gray(rgb);
+GMat hsv = gapi::RGB2HSV(rgb);
+
+// Filtering
+GMat blurred = gapi::blur(src, Size(5, 5));
+GMat gaussian = gapi::gaussianBlur(src, Size(5, 5), 1.5);
+GMat median = gapi::medianBlur(src, 5);
+
+// Edge detection
+GMat edges = gapi::Canny(src, 50, 150);
+GMat sobel = gapi::Sobel(src, CV_8U, 1, 1);
+
+// Morphology
+Mat kernel = getStructuringElement(MORPH_RECT, Size(5,5));
+GMat dilated = gapi::dilate(src, kernel);
+GMat eroded = gapi::erode(src, kernel);
+
+// Geometric
+GMat resized = gapi::resize(src, Size(320, 240));
+GMat flipped = gapi::flip(src, 1);
+```
+
+### Core Operations
+
+```cpp
+// Arithmetic
+GMat sum = gapi::add(src1, src2);
+GMat diff = gapi::sub(src1, src2);
+GMat prod = gapi::mul(src1, src2);
+GMat quot = gapi::div(src1, src2);
+
+// Scalar operations
+GMat added = gapi::addC(src, Scalar(10));
+GMat scaled = gapi::mulC(src, 1.5);
+
+// Bitwise
+GMat anded = gapi::bitwise_and(src1, src2);
+GMat ored = gapi::bitwise_or(src1, src2);
+GMat inverted = gapi::bitwise_not(src);
+
+// Comparison
+GMat mask = gapi::cmpGT(src, Scalar(128));
+GMat result = gapi::select(mask, src1, src2);
+
+// Normalization
+GMat normalized = gapi::normalize(src, 0, 255, NORM_MINMAX);
+```
+
+## Computation
+
+### GComputation Class
+
+```cpp
+// Single input, single output
+GMat in;
+GMat out = gapi::blur(in, Size(5,5));
+GComputation c(in, out);
+
+// Multiple inputs
+GMat in1, in2;
+GMat out = gapi::add(in1, in2);
+GComputation c(GIn(in1, in2), GOut(out));
+
+// Multiple outputs  
+GMat in;
+GMat out1 = gapi::blur(in, Size(3,3));
+GMat out2 = gapi::blur(in, Size(5,5));
+GComputation c(GIn(in), GOut(out1, out2));
+```
+
+### Compilation
+
+```cpp
+// Compile for specific input
+GComputation c(in, out);
+Mat input_data = imread("img.jpg");
+auto compiled = c.compile(descr_of(input_data));
+
+// Execute
+Mat output_data;
+compiled(input_data, output_data);
+
+// Reuse compiled graph
+for(Mat frame : frames) {
+    compiled(frame, result);
+}
+```
+
+## Backends
+
+### CPU Backend (Default)
+
+```cpp
+GComputation c(in, out);
+auto compiled = c.compile(descr_of(input));
+// Uses CPU by default
+```
+
+### OpenCL Backend
+
+```cpp
+#include <opencv2/gapi/ocl/goclkernel.hpp>
+
+GComputation c(in, out);
+auto compiled = c.compile(
+    descr_of(input),
+    compile_args(gapi::use_only{gapi::ocl::kernels()})
+);
+```
+
+### Fluid Backend (Cache-Efficient)
+
+```cpp
+#include <opencv2/gapi/fluid/gfluidkernel.hpp>
+
+GComputation c(in, out);
+auto compiled = c.compile(
+    descr_of(input),
+    compile_args(gapi::use_only{gapi::fluid::kernels()})
+);
+```
+
+### Heterogeneous Execution
+
+```cpp
+// Mix CPU and OpenCL
+auto compiled = c.compile(
+    descr_of(input),
+    compile_args(
+        gapi::kernels<gapi::cpu::GOCVBlur>(),  // CPU blur
+        gapi::kernels<gapi::ocl::GOCLCanny>()  // OpenCL Canny
+    )
+);
+```
+
+## Streaming Mode
+
+### Video Processing
+
+```cpp
+#include <opencv2/gapi/streaming/cap.hpp>
+
+GMat in;
+GMat out = gapi::blur(in, Size(5,5));
+
+GComputation c(in, out);
+auto pipeline = c.compileStreaming();
+
+// Set source
+pipeline.setSource<gapi::wip::GCaptureSource>("video.mp4");
+
+// Process frames
+pipeline.start();
+while(pipeline.pull(output_mat)) {
+    imshow("Output", output_mat);
+    if(waitKey(1) == 27) break;
+}
+pipeline.stop();
+```
+
+### Camera Processing
+
+```cpp
+pipeline.setSource<gapi::wip::GCaptureSource>(0);  // Camera 0
+
+pipeline.start();
+while(pipeline.pull(frame)) {
+    // Process frame
+}
+```
+
+## Custom Operations
+
+### Define Custom Kernel
+
+```cpp
+// 1. Declare operation
+G_TYPED_KERNEL(GCustomOp, <GMat(GMat)>, "custom.op") {
+    static GMatDesc outMeta(GMatDesc in) {
+        return in;  // Same as input
+    }
+};
+
+// 2. Implement for CPU
+GAPI_OCV_KERNEL(GCPUCustomOp, GCustomOp) {
+    static void run(const Mat& in, Mat& out) {
+        // Custom processing
+        out = in * 2;
+    }
+};
+
+// 3. Use in graph
+GMat in;
+GMat out = GCustomOp::on(in);
+
+GComputation c(in, out);
+auto compiled = c.compile(
+    descr_of(input),
+    compile_args(gapi::kernels<GCPUCustomOp>())
+);
+```
+
+## Performance Optimization
+
+### Operation Fusion
+
+G-API automatically fuses operations:
+
+```cpp
+// These operations may be fused
+GMat gray = gapi::RGB2Gray(in);
+GMat blurred = gapi::blur(gray, Size(5,5));
+GMat edges = gapi::Canny(blurred, 50, 150);
+
+// Compiled as optimized pipeline
+auto compiled = c.compile(descr_of(input));
+```
+
+### Memory Optimization
+
+```cpp
+// Fluid backend minimizes memory usage
+auto compiled = c.compile(
+    descr_of(input),
+    compile_args(
+        gapi::use_only{gapi::fluid::kernels()}
+    )
+);
+```
+
+## Complete Example: Edge Detection Pipeline
+
+```cpp
+#include <opencv2/gapi.hpp>
+#include <opencv2/gapi/core.hpp>
+#include <opencv2/gapi/imgproc.hpp>
+#include <opencv2/gapi/streaming/cap.hpp>
+#include <opencv2/highgui.hpp>
+
+using namespace cv;
+
+int main() {
+    // Build graph
+    GMat in;
+    GMat gray = gapi::RGB2Gray(in);
+    GMat blurred = gapi::gaussianBlur(gray, Size(5,5), 1.5);
+    GMat edges = gapi::Canny(blurred, 32, 128, 3);
+    
+    // Compile for streaming
+    GComputation c(GIn(in), GOut(edges));
+    auto pipeline = c.compileStreaming();
+    
+    // Set video source
+    pipeline.setSource<gapi::wip::GCaptureSource>("video.mp4");
+    
+    // Process stream
+    pipeline.start();
+    Mat output;
+    
+    while(pipeline.pull(output)) {
+        imshow("Edges", output);
+        if(waitKey(1) == 27) break;
+    }
+    
+    pipeline.stop();
+    return 0;
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+<Card title="Build Once, Run Many" icon="recycle">
+Compile graph once, execute on multiple inputs
+</Card>
+
+<Card title="Choose Right Backend" icon="microchip">
+Use Fluid for cache-efficiency, OpenCL for GPU
+</Card>
+
+<Card title="Use Streaming" icon="video">
+Streaming mode for video processing
+</Card>
+
+<Card title="Custom Kernels" icon="code">
+Implement custom operations when needed
+</Card>
+</CardGroup>
+
+## Advantages Over Traditional API
+
+| Feature | Traditional API | G-API |
+|---------|----------------|-------|
+| **Optimization** | Manual | Automatic |
+| **Portability** | Backend-specific | Backend-agnostic |
+| **Efficiency** | Per-operation | Graph-level |
+| **Memory** | Allocates intermediate buffers | Optimizes memory |
+
+## See Also
+
+- [Core Module](/modules/core) - Basic operations
+- [ImgProc Module](/modules/imgproc) - Image processing
+- [G-API Tutorial](https://docs.opencv.org/master/d0/d1e/gapi.html)

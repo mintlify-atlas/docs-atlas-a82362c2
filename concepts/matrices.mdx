@@ -1,0 +1,157 @@
+---
+title: "Matrices (Mat)"
+description: "Understanding OpenCV's Mat class for n-dimensional dense array representation"
+---
+
+## Overview
+
+The `Mat` class is the fundamental data structure in OpenCV, representing an n-dimensional dense numerical array. It can store images, matrices, vectors, histograms, point clouds, and other multi-dimensional data.
+
+## Mat Structure
+
+### Key Properties
+
+A Mat object consists of:
+- **Header**: Contains metadata (dimensions, type, reference counter)
+- **Data pointer**: Points to the actual pixel/element data
+- **Step array**: Defines memory layout for multi-dimensional indexing
+
+### Memory Layout
+
+For a 2D matrix, element `M(i,j)` is located at:
+```
+addr(M[i,j]) = M.data + M.step[0]*i + M.step[1]*j
+```
+
+Matrices are stored **row-by-row** (row-major order), making row access more efficient than column access.
+
+## Creating Matrices
+
+### Basic Creation
+
+```cpp
+// Create 7x7 complex matrix filled with 1+3j
+Mat M(7, 7, CV_32FC2, Scalar(1, 3));
+
+// Create and initialize later
+Mat img(Size(320, 240), CV_8UC3);
+
+// Multi-dimensional array
+int sz[] = {100, 100, 100};
+Mat bigCube(3, sz, CV_8U, Scalar::all(0));
+```
+
+### From Existing Data
+
+```cpp
+// Wrap user-allocated data (no copy)
+unsigned char* pixels = /* your data */;
+Mat img(height, width, CV_8UC3, pixels, step);
+```
+
+## Data Types
+
+OpenCV supports various data types:
+- `CV_8U`: 8-bit unsigned integer
+- `CV_8S`: 8-bit signed integer  
+- `CV_16U`, `CV_16S`: 16-bit integers
+- `CV_32S`: 32-bit signed integer
+- `CV_32F`: 32-bit floating point
+- `CV_64F`: 64-bit floating point
+
+Channel specification: `CV_8UC1` (1 channel), `CV_8UC3` (3 channels), `CV_8UC(n)` (n channels, max 512)
+
+## Reference Counting
+
+Mat uses **shallow copying** by default:
+
+```cpp
+Mat A = Mat::eye(10, 10, CV_32S);
+Mat B = A;  // B points to same data as A
+```
+
+For a deep copy:
+```cpp
+Mat C = A.clone();
+```
+
+## Element Access
+
+### Direct Access
+
+```cpp
+// Single element access
+M.at<double>(i, j) += 1.0;
+
+// Row pointer access (faster)
+for(int i = 0; i < M.rows; i++) {
+    const double* Mi = M.ptr<double>(i);
+    for(int j = 0; j < M.cols; j++)
+        sum += std::max(Mi[j], 0.);
+}
+```
+
+### Iterator Access
+
+```cpp
+MatConstIterator_<double> it = M.begin<double>();
+MatConstIterator_<double> it_end = M.end<double>();
+for(; it != it_end; ++it)
+    sum += std::max(*it, 0.);
+```
+
+## ROI (Region of Interest)
+
+```cpp
+// Select rectangular region
+Mat roi(img, Rect(10, 10, 100, 100));
+
+// Row/column selection
+Mat row3 = M.row(3);
+Mat col7 = M.col(7);
+
+// Range selection
+Mat B = A(Range::all(), Range(1, 3));  // All rows, columns 1-2
+```
+
+<Note>
+ROI operations are O(1) as they only create a new header pointing to the same data.
+</Note>
+
+## Continuous Matrices
+
+Check if matrix data is continuous (no gaps between rows):
+
+```cpp
+if(M.isContinuous()) {
+    // Process as single row for better performance
+    cols *= rows;
+    rows = 1;
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+<Card title="Use ROI" icon="crop">
+Work with sub-matrices using ROI instead of copying data
+</Card>
+
+<Card title="Prefer Row Access" icon="bars">
+Access rows sequentially for better cache performance
+</Card>
+
+<Card title="Check Continuity" icon="link">
+Optimize processing for continuous matrices
+</Card>
+
+<Card title="Deep Copy When Needed" icon="copy">
+Use clone() when you need independent data
+</Card>
+</CardGroup>
+
+## See Also
+
+- [Image Basics](/concepts/image-basics) - Working with images as matrices
+- [Memory Management](/concepts/memory-management) - Understanding Mat memory model
+- [Core Module](/modules/core) - Basic Mat operations

@@ -1,0 +1,520 @@
+---
+title: "DNN Layer Types"
+description: "Built-in layer types and custom layer implementation"
+---
+
+## Overview
+
+OpenCV DNN module supports numerous layer types from different frameworks. This document covers common layers and how to implement custom ones.
+
+## Base Layer Class
+
+### Layer Interface
+
+```cpp
+class Layer : public Algorithm {
+public:
+    // Layer parameters
+    std::vector<Mat> blobs;
+    String name;
+    String type;
+    
+    // Initialize layer
+    virtual void finalize(
+        InputArrayOfArrays inputs,
+        OutputArrayOfArrays outputs
+    );
+    
+    // Forward pass
+    virtual void forward(
+        InputArrayOfArrays inputs,
+        OutputArrayOfArrays outputs,
+        OutputArrayOfArrays internals
+    );
+    
+    // Query methods
+    virtual int inputNameToIndex(String inputName);
+    virtual int outputNameToIndex(const String& outputName);
+};
+```
+
+## Convolution Layers
+
+### Convolution
+
+**Type**: `Convolution`
+
+**Parameters**:
+- `num_output`: Number of output channels
+- `kernel_size`: Kernel dimensions
+- `stride`: Stride
+- `pad`: Padding
+- `dilation`: Dilation
+- `group`: Number of groups
+
+**Example network**:
+```
+Convolution:
+  num_output: 64
+  kernel_size: 3
+  stride: 1
+  pad: 1
+```
+
+### Deconvolution
+
+**Type**: `Deconvolution` / `ConvolutionTranspose`
+
+Transposed convolution for upsampling.
+
+### Depthwise Convolution
+
+Implemented as regular convolution with `group = num_input`.
+
+## Pooling Layers
+
+### MaxPooling
+
+**Type**: `Pooling` with `pool: MAX`
+
+**Parameters**:
+- `kernel_size`: Pool window size
+- `stride`: Stride
+- `pad`: Padding
+
+**Example**:
+```
+Pooling:
+  pool: MAX
+  kernel_size: 2
+  stride: 2
+```
+
+### AveragePooling
+
+**Type**: `Pooling` with `pool: AVE`
+
+### GlobalPooling
+
+**Type**: `Pooling` with `global_pooling: true`
+
+Reduces spatial dimensions to 1x1.
+
+## Activation Layers
+
+### ReLU
+
+**Type**: `ReLU`
+
+```cpp
+class ActivationLayer : public Layer {
+public:
+    virtual void forwardSlice(
+        const float* src, float* dst,
+        int len, size_t planeSize, int cn
+    ) const = 0;
+};
+```
+
+### LeakyReLU
+
+**Type**: `ReLU` with `negative_slope`
+
+**Parameters**:
+- `negative_slope`: Slope for negative values (e.g., 0.1)
+
+### PReLU
+
+**Type**: `PReLU`
+
+Parametric ReLU with learned slopes.
+
+### ELU
+
+**Type**: `ELU`
+
+**Parameters**:
+- `alpha`: Scale factor
+
+### Sigmoid
+
+**Type**: `Sigmoid`
+
+### TanH
+
+**Type**: `TanH`
+
+### Swish / SiLU
+
+**Type**: `Swish`
+
+### Mish
+
+**Type**: `Mish`
+
+## Normalization Layers
+
+### BatchNormalization
+
+**Type**: `BatchNorm`
+
+**Parameters**:
+- `eps`: Epsilon for numerical stability
+- Learned parameters: gamma, beta, mean, variance
+
+```cpp
+// Batch norm stores 4 parameters:
+// blobs[0] - mean
+// blobs[1] - variance  
+// blobs[2] - scale (gamma)
+// blobs[3] - shift (beta)
+```
+
+### LayerNormalization
+
+**Type**: `LayerNorm`
+
+Normalizes across channel dimension.
+
+### InstanceNormalization
+
+**Type**: `InstanceNorm`
+
+Normalizes each sample independently.
+
+### GroupNormalization
+
+**Type**: `GroupNorm`
+
+**Parameters**:
+- `num_groups`: Number of groups
+
+## Fully Connected Layers
+
+### InnerProduct / Dense
+
+**Type**: `InnerProduct`
+
+**Parameters**:
+- `num_output`: Output dimension
+
+```cpp
+// Parameters stored in blobs:
+// blobs[0] - weights [num_output x num_input]
+// blobs[1] - biases [num_output] (optional)
+```
+
+## Reshape Layers
+
+### Reshape
+
+**Type**: `Reshape`
+
+**Parameters**:
+- `dim`: New dimensions (can use -1 for auto)
+
+### Flatten
+
+**Type**: `Flatten`
+
+Reshapes to 2D (batch_size, features).
+
+### Permute
+
+**Type**: `Permute`
+
+Transposes dimensions.
+
+**Parameters**:
+- `order`: New axis order (e.g., [0, 2, 3, 1])
+
+### Slice
+
+**Type**: `Slice`
+
+Slices along an axis.
+
+**Parameters**:
+- `axis`: Axis to slice
+- `slice_point`: Split points
+
+### Concat
+
+**Type**: `Concat`
+
+Concatenates along an axis.
+
+**Parameters**:
+- `axis`: Concatenation axis
+
+## Attention Layers
+
+### Attention (Generic)
+
+**Type**: `Attention`
+
+Multi-head self-attention mechanism.
+
+### ScaledDotProductAttention
+
+Implemented for transformer models.
+
+## Dropout
+
+**Type**: `Dropout`
+
+**Parameters**:
+- `dropout_ratio`: Probability of dropping (0-1)
+
+<Note>
+Dropout is typically disabled during inference (automatically handled).
+</Note>
+
+## Element-wise Operations
+
+### Eltwise
+
+**Type**: `Eltwise`
+
+**Operations**:
+- `SUM`: Element-wise addition
+- `PROD`: Element-wise multiplication
+- `MAX`: Element-wise maximum
+
+**Parameters**:
+- `operation`: Operation type
+- `coeff`: Optional coefficients for SUM
+
+### Scale
+
+**Type**: `Scale`
+
+Scales and shifts: `output = scale * input + bias`
+
+### Shift
+
+**Type**: `Shift`
+
+Adds a bias term.
+
+## Upsampling Layers
+
+### Resize
+
+**Type**: `Resize` / `Upsample`
+
+**Parameters**:
+- `zoom_factor`: Scale factor
+- `interpolation`: NEAREST, BILINEAR
+
+### UpsamplingNearest
+
+**Type**: `ResizeNearest`
+
+Nearest neighbor upsampling.
+
+### UpsamplingBilinear
+
+**Type**: `ResizeBilinear`
+
+Bilinear upsampling.
+
+## Utility Layers
+
+### Split
+
+**Type**: `Split`
+
+Duplicates input to multiple outputs.
+
+### Crop
+
+**Type**: `Crop`
+
+Crops spatial dimensions.
+
+### Padding
+
+**Type**: `Padding`
+
+Adds padding to input.
+
+### Exp
+
+**Type**: `Exp`
+
+Element-wise exponential.
+
+### Log
+
+**Type**: `Log`
+
+Element-wise logarithm.
+
+### Power
+
+**Type**: `Power`
+
+Raises to power: `output = (shift + scale * input) ^ power`
+
+### Abs
+
+**Type**: `AbsVal`
+
+Absolute value.
+
+### BNLL
+
+**Type**: `BNLL`
+
+Binomial normal log likelihood.
+
+## Custom Layers
+
+### Implementing Custom Layer
+
+```cpp
+class MyCustomLayer : public Layer {
+public:
+    MyCustomLayer(const LayerParams& params)
+        : Layer(params) {
+        // Initialize from params
+        myParam = params.get<int>("my_param", 0);
+    }
+    
+    virtual bool getMemoryShapes(
+        const std::vector<MatShape>& inputs,
+        const int requiredOutputs,
+        std::vector<MatShape>& outputs,
+        std::vector<MatShape>& internals
+    ) const override {
+        // Define output shapes
+        outputs.resize(1);
+        outputs[0] = inputs[0];  // Same as input
+        return false;
+    }
+    
+    virtual void forward(
+        InputArrayOfArrays inputs_arr,
+        OutputArrayOfArrays outputs_arr,
+        OutputArrayOfArrays internals_arr
+    ) override {
+        std::vector<Mat> inputs, outputs;
+        inputs_arr.getMatVector(inputs);
+        outputs_arr.getMatVector(outputs);
+        
+        const Mat& input = inputs[0];
+        Mat& output = outputs[0];
+        
+        // Implement forward pass
+        output = input * 2;  // Example: multiply by 2
+    }
+    
+private:
+    int myParam;
+};
+```
+
+### Registering Custom Layer
+
+```cpp
+CV_DNN_REGISTER_LAYER_CLASS(MyCustom, MyCustomLayer);
+```
+
+### Using Custom Layer
+
+The layer will be automatically used when loading models containing that layer type.
+
+## Layer Parameters
+
+### LayerParams Class
+
+```cpp
+class LayerParams : public Dict {
+public:
+    std::vector<Mat> blobs;  // Learned parameters
+    String name;             // Layer name
+    String type;             // Layer type
+    
+    // Get parameter
+    template<typename T>
+    T get(const String& key, const T& defaultValue) const;
+};
+```
+
+### Accessing Parameters
+
+```cpp
+// In custom layer constructor
+int numOutput = params.get<int>("num_output");
+float scale = params.get<float>("scale", 1.0f);  // With default
+
+// Access learned weights
+if(!params.blobs.empty()) {
+    Mat weights = params.blobs[0];
+    Mat biases = params.blobs[1];
+}
+```
+
+## Backend Support
+
+### CPU Implementation
+
+Default implementation for all layers.
+
+### OpenCL Implementation
+
+Many layers have optimized OpenCL kernels.
+
+### CUDA Implementation
+
+```cpp
+class Layer {
+public:
+    virtual Ptr<BackendNode> initCUDA(
+        void* context,
+        const std::vector<Ptr<BackendWrapper>>& inputs,
+        const std::vector<Ptr<BackendWrapper>>& outputs
+    );
+};
+```
+
+### Adding Backend Support
+
+```cpp
+virtual bool supportBackend(int backendId) override {
+    return backendId == DNN_BACKEND_OPENCV ||
+           backendId == DNN_BACKEND_CUDA;
+}
+
+virtual Ptr<BackendNode> initCUDA(...) override {
+    // Implement CUDA version
+    return Ptr<BackendNode>();
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+<Card title="Check Blob Sizes" icon="check">
+Validate parameter blob dimensions in constructor
+</Card>
+
+<Card title="Implement getMemoryShapes" icon="shapes">
+Define output shapes for memory allocation
+</Card>
+
+<Card title="Support Multiple Backends" icon="microchip">
+Provide CUDA/OpenCL implementations when possible
+</Card>
+
+<Card title="Test Thoroughly" icon="vial">
+Compare outputs with reference implementation
+</Card>
+</CardGroup>
+
+## See Also
+
+- [Net Class](/api/dnn/network) - Network loading and inference
+- [DNN Module](/modules/dnn) - DNN module overview
+- [DNN Inference](/api/dnn/inference) - Inference utilities

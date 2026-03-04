@@ -1,0 +1,577 @@
+---
+title: Image Codecs Module
+description: Image file reading and writing with support for multiple formats including JPEG, PNG, TIFF, WebP, AVIF, and animated formats
+---
+
+The Image Codecs (imgcodecs) module handles reading and writing images in various formats, supporting both static images and animations with metadata.
+
+## Overview
+
+From opencv2/imgcodecs.hpp:48-55:
+
+> This module provides image file reading and writing capabilities with support for various formats including JPEG, PNG, TIFF, WebP, AVIF, GIF, and more. It also handles multi-page images, animations, and metadata (EXIF, XMP, ICC profiles).
+
+<CardGroup cols={2}>
+  <Card title="imread" icon="file-import">
+    Load images from files with automatic format detection
+  </Card>
+  <Card title="imwrite" icon="file-export">
+    Save images to files with format-specific parameters
+  </Card>
+  <Card title="Animations" icon="film">
+    Read and write animated GIF, AVIF, APNG, and WebP
+  </Card>
+  <Card title="Metadata" icon="tags">
+    Handle EXIF, XMP, and ICC profile metadata
+  </Card>
+</CardGroup>
+
+## Reading Images
+
+### Basic Image Reading
+
+From imgcodecs.hpp:332-384:
+
+```cpp
+#include <opencv2/imgcodecs.hpp>
+using namespace cv;
+
+// Basic usage with default flags
+Mat img = imread("photo.jpg");
+
+// Check if image was loaded
+if (img.empty()) {
+    std::cerr << "Error: Could not load image" << std::endl;
+    return -1;
+}
+
+// Read as grayscale
+Mat gray = imread("photo.jpg", IMREAD_GRAYSCALE);
+
+// Read with alpha channel preserved
+Mat rgba = imread("image.png", IMREAD_UNCHANGED);
+```
+
+### Image Read Flags
+
+From imgcodecs.hpp:69-85:
+
+```cpp
+enum ImreadModes {
+    IMREAD_UNCHANGED = -1,       // Load as-is, including alpha
+    IMREAD_GRAYSCALE = 0,        // Convert to grayscale
+    IMREAD_COLOR_BGR = 1,        // Convert to 3-channel BGR (default)
+    IMREAD_COLOR = 1,            // Same as IMREAD_COLOR_BGR
+    IMREAD_ANYDEPTH = 2,         // Load 16-bit/32-bit when available
+    IMREAD_ANYCOLOR = 4,         // Read in any color format
+    IMREAD_LOAD_GDAL = 8,        // Use GDAL driver
+    IMREAD_REDUCED_GRAYSCALE_2 = 16,  // Grayscale at 1/2 size
+    IMREAD_REDUCED_COLOR_2 = 17,      // Color at 1/2 size
+    IMREAD_REDUCED_GRAYSCALE_4 = 32,  // Grayscale at 1/4 size
+    IMREAD_REDUCED_COLOR_4 = 33,      // Color at 1/4 size
+    IMREAD_REDUCED_GRAYSCALE_8 = 64,  // Grayscale at 1/8 size
+    IMREAD_REDUCED_COLOR_8 = 65,      // Color at 1/8 size
+    IMREAD_IGNORE_ORIENTATION = 128,  // Ignore EXIF orientation
+    IMREAD_COLOR_RGB = 256           // Convert to RGB instead of BGR
+};
+
+// Combine flags with bitwise OR
+Mat img = imread("hdr.tiff", IMREAD_ANYDEPTH | IMREAD_ANYCOLOR);
+```
+
+### Reading with Metadata
+
+From imgcodecs.hpp:397-412:
+
+```cpp
+// Read image with metadata
+std::vector<int> metadataTypes;
+std::vector<Mat> metadata;
+
+Mat img = imreadWithMetadata("photo.jpg", metadataTypes,
+                             metadata, IMREAD_ANYCOLOR);
+
+// Check what metadata was found
+for (size_t i = 0; i < metadataTypes.size(); i++) {
+    switch(metadataTypes[i]) {
+        case IMAGE_METADATA_EXIF:
+            std::cout << "Found EXIF data" << std::endl;
+            break;
+        case IMAGE_METADATA_XMP:
+            std::cout << "Found XMP data" << std::endl;
+            break;
+        case IMAGE_METADATA_ICCP:
+            std::cout << "Found ICC Profile" << std::endl;
+            break;
+    }
+}
+```
+
+## Supported Formats
+
+From imgcodecs.hpp:340-355, OpenCV supports:
+
+### Always Available
+- **BMP** - Windows Bitmap (*.bmp, *.dib)
+- **GIF** - Graphics Interchange Format (*.gif)
+- **PBM/PGM/PPM/PXM/PNM** - Portable image formats
+- **Sun Rasters** - (*.sr, *.ras)
+- **HDR** - Radiance HDR (*.hdr, *.pic)
+
+### With External Libraries
+- **JPEG** - (*.jpeg, *.jpg, *.jpe) - requires libjpeg
+- **JPEG 2000** - (*.jp2) - requires libjasper/OpenJPEG
+- **PNG** - (*.png) - requires libpng
+- **WebP** - (*.webp) - requires libwebp
+- **AVIF** - (*.avif) - requires libavif
+- **TIFF** - (*.tiff, *.tif) - requires libtiff
+- **OpenEXR** - (*.exr) - requires OpenEXR
+- **PFM** - Portable Float Map (*.pfm)
+- **JPEG XL** - (*.jxl) - requires libjxl
+
+<Note>
+**Format Detection:**
+OpenCV determines the image format by content, not by file extension. The extension is only used when writing images.
+</Note>
+
+## Writing Images
+
+### Basic Image Writing
+
+From imgcodecs.hpp:511-569:
+
+```cpp
+// Basic usage
+Mat img = imread("input.jpg");
+bool success = imwrite("output.png", img);
+
+if (!success) {
+    std::cerr << "Error: Could not save image" << std::endl;
+}
+
+// Write with compression parameters
+vector<int> compression_params;
+compression_params.push_back(IMWRITE_JPEG_QUALITY);
+compression_params.push_back(95);  // Quality 0-100
+
+imwrite("output.jpg", img, compression_params);
+```
+
+### Write Parameters
+
+From imgcodecs.hpp:88-130, format-specific parameters:
+
+```cpp
+// JPEG parameters
+vector<int> jpeg_params;
+jpeg_params.push_back(IMWRITE_JPEG_QUALITY);
+jpeg_params.push_back(95);  // Quality: 0-100 (default 95)
+jpeg_params.push_back(IMWRITE_JPEG_PROGRESSIVE);
+jpeg_params.push_back(1);   // Enable progressive JPEG
+jpeg_params.push_back(IMWRITE_JPEG_OPTIMIZE);
+jpeg_params.push_back(1);   // Optimize encoding
+
+imwrite("output.jpg", img, jpeg_params);
+
+// PNG parameters
+vector<int> png_params;
+png_params.push_back(IMWRITE_PNG_COMPRESSION);
+png_params.push_back(9);    // Compression: 0-9 (default 1)
+png_params.push_back(IMWRITE_PNG_STRATEGY);
+png_params.push_back(IMWRITE_PNG_STRATEGY_DEFAULT);
+
+imwrite("output.png", img, png_params);
+
+// WebP parameters
+vector<int> webp_params;
+webp_params.push_back(IMWRITE_WEBP_QUALITY);
+webp_params.push_back(90);  // Quality: 1-100
+
+imwrite("output.webp", img, webp_params);
+
+// AVIF parameters
+vector<int> avif_params;
+avif_params.push_back(IMWRITE_AVIF_QUALITY);
+avif_params.push_back(95);  // Quality: 0-100
+avif_params.push_back(IMWRITE_AVIF_SPEED);
+avif_params.push_back(9);   // Speed: 0 (slow) to 10 (fast)
+
+imwrite("output.avif", img, avif_params);
+
+// TIFF parameters
+vector<int> tiff_params;
+tiff_params.push_back(IMWRITE_TIFF_COMPRESSION);
+tiff_params.push_back(IMWRITE_TIFF_COMPRESSION_LZW);
+
+imwrite("output.tiff", img, tiff_params);
+```
+
+### Saving Images with Alpha Channel
+
+From imgcodecs.hpp:533-536:
+
+```cpp
+// Create 4-channel BGRA image
+Mat bgra(height, width, CV_8UC4);
+
+// Fill with color and alpha
+for (int y = 0; y < height; y++) {
+    for (int x = 0; x < width; x++) {
+        bgra.at<Vec4b>(y, x) = Vec4b(
+            b_value,    // Blue
+            g_value,    // Green  
+            r_value,    // Red
+            alpha_value // Alpha (0=transparent, 255=opaque)
+        );
+    }
+}
+
+// Save as PNG with alpha
+imwrite("transparent.png", bgra);
+```
+
+## Multi-Page Images
+
+From imgcodecs.hpp:414-434:
+
+```cpp
+// Read all pages from multi-page TIFF
+vector<Mat> pages;
+bool success = imreadmulti("document.tiff", pages);
+
+std::cout << "Loaded " << pages.size() << " pages" << std::endl;
+
+// Read specific range of pages
+vector<Mat> selectedPages;
+int startPage = 2;
+int pageCount = 5;
+imreadmulti("document.tiff", selectedPages, startPage, pageCount);
+
+// Write multiple images as TIFF
+vector<Mat> images;
+// ... fill images vector ...
+imwrite("output.tiff", images);
+
+// Count images in file
+size_t count = imcount("animation.avif");
+```
+
+## Animation Support
+
+From imgcodecs.hpp:290-330, OpenCV supports animated images:
+
+### Reading Animations
+
+```cpp
+// Animation structure (imgcodecs.hpp:294-330)
+Animation anim;
+
+// Load entire animation
+if (imreadanimation("animated.gif", anim)) {
+    std::cout << "Frames: " << anim.frames.size() << std::endl;
+    std::cout << "Loop count: " << anim.loop_count << std::endl;
+    
+    // Process each frame
+    for (size_t i = 0; i < anim.frames.size(); i++) {
+        Mat frame = anim.frames[i];
+        int duration = anim.durations[i];  // milliseconds
+        
+        // Process frame...
+    }
+}
+
+// Load specific range of frames
+Animation partialAnim;
+int startFrame = 10;
+int frameCount = 20;
+imreadanimation("video.avif", partialAnim, startFrame, frameCount);
+```
+
+### Writing Animations
+
+```cpp
+// Create animation
+Animation anim;
+anim.loop_count = 0;  // 0 = infinite loop
+anim.bgcolor = Scalar(255, 255, 255, 255);  // BGRA background
+
+// Add frames
+for (int i = 0; i < numFrames; i++) {
+    Mat frame = generateFrame(i);
+    anim.frames.push_back(frame);
+    anim.durations.push_back(100);  // 100ms per frame
+}
+
+// Save as animated GIF
+vector<int> gif_params;
+gif_params.push_back(IMWRITE_GIF_QUALITY);
+gif_params.push_back(5);  // Quality 1-8
+imwriteanimation("output.gif", anim, gif_params);
+
+// Save as animated AVIF
+vector<int> avif_params;
+avif_params.push_back(IMWRITE_AVIF_QUALITY);
+avif_params.push_back(90);
+imwriteanimation("output.avif", anim, avif_params);
+```
+
+<Note>
+**GIF Frame Duration:**
+GIF durations must be multiples of 10ms due to format limitations. Values are automatically rounded down.
+</Note>
+
+## Memory Buffer Operations
+
+From imgcodecs.hpp:595-694:
+
+### Decoding from Memory
+
+```cpp
+// Decode from buffer
+vector<uchar> buffer;
+// ... fill buffer with image data ...
+
+Mat img = imdecode(buffer, IMREAD_COLOR);
+
+// Decode with existing Mat (reuses memory)
+Mat output;
+imdecode(buffer, IMREAD_COLOR, &output);
+
+// Decode with metadata
+vector<int> metadataTypes;
+vector<Mat> metadata;
+Mat img = imdecodeWithMetadata(buffer, metadataTypes,
+                                metadata, IMREAD_ANYCOLOR);
+```
+
+### Encoding to Memory
+
+```cpp
+// Encode to buffer
+vector<uchar> buffer;
+vector<int> params;
+params.push_back(IMWRITE_JPEG_QUALITY);
+params.push_back(90);
+
+bool success = imencode(".jpg", img, buffer, params);
+
+// Buffer now contains JPEG-encoded image
+std::cout << "Encoded size: " << buffer.size() << " bytes" << std::endl;
+
+// Can send over network, save to database, etc.
+```
+
+## Format Capabilities
+
+### Checking Format Support
+
+From imgcodecs.hpp:696-726:
+
+```cpp
+// Check if file can be read
+if (haveImageReader("photo.jpg")) {
+    Mat img = imread("photo.jpg");
+}
+
+// Check if format can be written
+if (haveImageWriter(".png")) {
+    imwrite("output.png", img);
+}
+
+// Check by extension
+if (haveImageWriter(".avif")) {
+    std::cout << "AVIF encoding is available" << std::endl;
+}
+```
+
+### Image Collections
+
+From imgcodecs.hpp:728-758, iterate through multi-page images:
+
+```cpp
+// Create collection (lazy loading)
+ImageCollection collection("document.tiff");
+
+// Iterate through pages
+for (auto it = collection.begin(); it != collection.end(); ++it) {
+    Mat page = *it;
+    // Process page...
+}
+
+// Random access (less efficient)
+Mat page5 = *collection.at(5);
+
+// Release cached pages to save memory
+collection.releaseCache();
+```
+
+## Practical Examples
+
+### Convert Image Format
+
+```cpp
+#include <opencv2/imgcodecs.hpp>
+
+int main() {
+    // Read any format
+    Mat img = imread("input.bmp", IMREAD_UNCHANGED);
+    
+    if (img.empty()) {
+        std::cerr << "Failed to load image" << std::endl;
+        return -1;
+    }
+    
+    // Save as different format with quality settings
+    vector<int> params;
+    params.push_back(IMWRITE_PNG_COMPRESSION);
+    params.push_back(9);  // Maximum compression
+    
+    if (imwrite("output.png", img, params)) {
+        std::cout << "Conversion successful" << std::endl;
+    }
+    
+    return 0;
+}
+```
+
+### Batch Process Images
+
+```cpp
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
+#include <filesystem>
+
+namespace fs = std::filesystem;
+
+void processDirectory(const string& inputDir, const string& outputDir) {
+    for (const auto& entry : fs::directory_iterator(inputDir)) {
+        string path = entry.path().string();
+        
+        // Check if file can be read
+        if (!haveImageReader(path)) continue;
+        
+        // Load and process
+        Mat img = imread(path, IMREAD_COLOR);
+        if (img.empty()) continue;
+        
+        // Resize
+        Mat resized;
+        resize(img, resized, Size(800, 600));
+        
+        // Save with JPEG compression
+        string filename = entry.path().filename().string();
+        string outPath = outputDir + "/" + filename + ".jpg";
+        
+        vector<int> params = {IMWRITE_JPEG_QUALITY, 85};
+        imwrite(outPath, resized, params);
+    }
+}
+```
+
+### Create Thumbnail Grid
+
+```cpp
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
+
+Mat createThumbnailGrid(const vector<string>& imagePaths,
+                        int thumbSize, int cols) {
+    vector<Mat> thumbs;
+    
+    // Load and resize images
+    for (const auto& path : imagePaths) {
+        Mat img = imread(path, IMREAD_COLOR);
+        if (img.empty()) continue;
+        
+        Mat thumb;
+        resize(img, thumb, Size(thumbSize, thumbSize));
+        thumbs.push_back(thumb);
+    }
+    
+    // Calculate grid dimensions
+    int rows = (thumbs.size() + cols - 1) / cols;
+    Mat grid(rows * thumbSize, cols * thumbSize, CV_8UC3,
+             Scalar(255, 255, 255));
+    
+    // Place thumbnails
+    for (size_t i = 0; i < thumbs.size(); i++) {
+        int row = i / cols;
+        int col = i % cols;
+        Rect roi(col * thumbSize, row * thumbSize,
+                thumbSize, thumbSize);
+        thumbs[i].copyTo(grid(roi));
+    }
+    
+    return grid;
+}
+```
+
+## Best Practices
+
+<Note>
+**Always Check Return Values:**
+```cpp
+Mat img = imread("photo.jpg");
+if (img.empty()) {
+    // Handle error - file might not exist or be corrupted
+}
+
+bool success = imwrite("output.png", img);
+if (!success) {
+    // Handle error - disk full, permissions, invalid path
+}
+```
+</Note>
+
+<Note>
+**Choose the Right Format:**
+- **JPEG** - Best for photographs, lossy compression
+- **PNG** - Lossless, supports transparency, larger files
+- **WebP/AVIF** - Modern formats with better compression
+- **TIFF** - Multi-page, lossless, supports 16/32-bit
+- **EXR** - High dynamic range (HDR) images
+</Note>
+
+<Note>
+**Memory Considerations:**
+For large images or batch processing:
+```cpp
+// Read at reduced size
+Mat thumb = imread("large.jpg", IMREAD_REDUCED_COLOR_4);
+
+// Or use ImageCollection for multi-page
+ImageCollection col("huge.tiff");
+for (auto it = col.begin(); it != col.end(); ++it) {
+    processPage(*it);
+    col.releaseCache();  // Free memory
+}
+```
+</Note>
+
+## Color Channel Order
+
+<Note>
+**Important: BGR vs RGB**
+
+OpenCV uses **BGR** channel order by default (not RGB). When reading images:
+```cpp
+// Image is loaded as BGR
+Mat img = imread("photo.jpg");
+// img[y][x] = [Blue, Green, Red]
+
+// To get RGB order
+Mat rgb = imread("photo.jpg", IMREAD_COLOR_RGB);
+// Or convert after loading
+cvtColor(img, rgb, COLOR_BGR2RGB);
+```
+</Note>
+
+## Related Modules
+
+- [Core Module](/modules/core) - Mat data structure
+- [Image Processing](/modules/imgproc) - Process loaded images
+- [High-Level GUI](/modules/highgui) - Display images
+
+## Source Reference
+
+Main header: `~/workspace/source/modules/imgcodecs/include/opencv2/imgcodecs.hpp`

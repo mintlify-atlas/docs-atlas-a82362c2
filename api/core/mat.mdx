@@ -1,0 +1,493 @@
+---
+title: "Mat Class"
+description: "N-dimensional dense array class for storing images, matrices, and multi-dimensional data"
+---
+
+## Overview
+
+The `Mat` class is the primary data structure in OpenCV for representing n-dimensional dense arrays. It can store real or complex-valued vectors, matrices, grayscale or color images, voxel volumes, vector fields, point clouds, tensors, and histograms.
+
+## Constructors
+
+### Default Constructor
+
+```cpp
+Mat()
+```
+
+Creates an empty matrix with no allocated data.
+
+### Size and Type Constructor
+
+```cpp
+Mat(int rows, int cols, int type)
+Mat(Size size, int type)
+```
+
+<ParamField path="rows" type="int">
+  Number of rows in a 2D array
+</ParamField>
+
+<ParamField path="cols" type="int">
+  Number of columns in a 2D array
+</ParamField>
+
+<ParamField path="size" type="Size">
+  2D array size: Size(cols, rows)
+</ParamField>
+
+<ParamField path="type" type="int">
+  Array type. Use CV_8UC1, ..., CV_64FC4 to create 1-4 channel matrices, or CV_8UC(n), ..., CV_64FC(n) to create multi-channel matrices (up to CV_CN_MAX channels)
+</ParamField>
+
+**Example:**
+```cpp
+// Create a 100x100 8-bit unsigned single-channel matrix
+Mat img(100, 100, CV_8UC1);
+
+// Create a 640x480 8-bit 3-channel color image
+Mat colorImage(Size(640, 480), CV_8UC3);
+```
+
+### Constructor with Initialization
+
+```cpp
+Mat(int rows, int cols, int type, const Scalar& s)
+Mat(Size size, int type, const Scalar& s)
+```
+
+<ParamField path="s" type="Scalar">
+  Optional value to initialize each matrix element with
+</ParamField>
+
+**Example:**
+```cpp
+// Create a 7x7 complex matrix filled with 1+3j
+Mat M(7, 7, CV_32FC2, Scalar(1, 3));
+
+// Create a 100x100 matrix filled with zeros
+Mat zeros(100, 100, CV_64F, Scalar(0));
+```
+
+### Multi-dimensional Constructor
+
+```cpp
+Mat(int ndims, const int* sizes, int type)
+Mat(const std::vector<int>& sizes, int type)
+Mat(int ndims, const int* sizes, int type, const Scalar& s)
+```
+
+<ParamField path="ndims" type="int">
+  Array dimensionality
+</ParamField>
+
+<ParamField path="sizes" type="const int*">
+  Array of integers specifying an n-dimensional array shape
+</ParamField>
+
+**Example:**
+```cpp
+// Create a 100x100x100 8-bit 3D array
+int sz[] = {100, 100, 100};
+Mat bigCube(3, sz, CV_8U, Scalar::all(0));
+```
+
+### User Data Constructor
+
+```cpp
+Mat(int rows, int cols, int type, void* data, size_t step=AUTO_STEP)
+Mat(Size size, int type, void* data, size_t step=AUTO_STEP)
+```
+
+<ParamField path="data" type="void*">
+  Pointer to user data. No data is copied; the matrix header points to the specified data
+</ParamField>
+
+<ParamField path="step" type="size_t">
+  Number of bytes each matrix row occupies. If AUTO_STEP, no padding is assumed
+</ParamField>
+
+<Note>
+The external data is not automatically deallocated, so you should manage it manually.
+</Note>
+
+### Copy Constructor
+
+```cpp
+Mat(const Mat& m)
+```
+
+Creates a matrix header for the same data. This is an O(1) operation that does not copy data but increments the reference counter.
+
+### ROI Constructors
+
+```cpp
+Mat(const Mat& m, const Range& rowRange, const Range& colRange=Range::all())
+Mat(const Mat& m, const Rect& roi)
+Mat(const Mat& m, const Range* ranges)
+```
+
+<ParamField path="rowRange" type="Range">
+  Range of rows to take from the source matrix
+</ParamField>
+
+<ParamField path="colRange" type="Range">
+  Range of columns to take from the source matrix
+</ParamField>
+
+<ParamField path="roi" type="Rect">
+  Region of interest rectangle
+</ParamField>
+
+**Example:**
+```cpp
+Mat img(320, 240, CV_8UC3);
+// Select a ROI
+Mat roi(img, Rect(10, 10, 100, 100));
+// Fill the ROI with green color
+roi = Scalar(0, 255, 0);
+```
+
+## Key Methods
+
+### create
+
+```cpp
+void create(int rows, int cols, int type)
+void create(Size size, int type)
+void create(int ndims, const int* sizes, int type)
+```
+
+Allocates new array data if needed. If the array already has the specified size and type, the method does nothing.
+
+### clone
+
+```cpp
+Mat clone() const
+```
+
+Creates a full copy of the array and underlying data.
+
+**Example:**
+```cpp
+Mat A = Mat::eye(3, 3, CV_32F);
+Mat B = A.clone(); // B is an independent copy
+```
+
+### copyTo
+
+```cpp
+void copyTo(OutputArray m) const
+void copyTo(OutputArray m, InputArray mask) const
+```
+
+<ParamField path="m" type="OutputArray">
+  Destination matrix. Reallocated if needed
+</ParamField>
+
+<ParamField path="mask" type="InputArray">
+  Operation mask (8-bit single channel). Non-zero elements indicate which matrix elements to copy
+</ParamField>
+
+### convertTo
+
+```cpp
+void convertTo(OutputArray m, int rtype, double alpha=1, double beta=0) const
+```
+
+<ParamField path="m" type="OutputArray">
+  Output matrix
+</ParamField>
+
+<ParamField path="rtype" type="int">
+  Desired output matrix type or depth
+</ParamField>
+
+<ParamField path="alpha" type="double">
+  Optional scale factor
+</ParamField>
+
+<ParamField path="beta" type="double">
+  Optional delta added to scaled values
+</ParamField>
+
+Converts array to another data type with optional scaling: `m(x,y) = saturate_cast<rType>(alpha*(*this)(x,y) + beta)`
+
+### row / col
+
+```cpp
+Mat row(int y) const
+Mat col(int x) const
+```
+
+Creates a matrix header for the specified matrix row or column. This is an O(1) operation.
+
+<ParamField path="y" type="int">
+  0-based row index
+</ParamField>
+
+<ParamField path="x" type="int">
+  0-based column index
+</ParamField>
+
+**Example:**
+```cpp
+// Add the 5-th row, multiplied by 3 to the 3rd row
+M.row(3) = M.row(3) + M.row(5) * 3;
+```
+
+### rowRange / colRange
+
+```cpp
+Mat rowRange(int startrow, int endrow) const
+Mat rowRange(const Range& r) const
+Mat colRange(int startcol, int endcol) const
+Mat colRange(const Range& r) const
+```
+
+Creates a matrix header for the specified row or column span.
+
+### diag
+
+```cpp
+Mat diag(int d=0) const
+static Mat diag(const Mat& d)
+```
+
+<ParamField path="d" type="int">
+  Index of the diagonal. d=0 is the main diagonal, d&lt;0 is below, d&gt;0 is above
+</ParamField>
+
+Extracts a diagonal from a matrix or creates a diagonal matrix.
+
+### reshape
+
+```cpp
+Mat reshape(int cn, int rows=0) const
+Mat reshape(int cn, int newndims, const int* newsz) const
+```
+
+<ParamField path="cn" type="int">
+  New number of channels. If 0, the number of channels remains unchanged
+</ParamField>
+
+<ParamField path="rows" type="int">
+  New number of rows. If 0, the number of rows remains unchanged
+</ParamField>
+
+Changes the shape and/or number of channels without copying data.
+
+### at
+
+```cpp
+template<typename _Tp> _Tp& at(int i0, int i1)
+template<typename _Tp> const _Tp& at(int i0, int i1) const
+template<typename _Tp> _Tp& at(Point pt)
+template<typename _Tp> _Tp& at(int i0, int i1, int i2)
+```
+
+Returns a reference to the specified array element.
+
+**Example:**
+```cpp
+Mat M(100, 100, CV_64F);
+M.at<double>(i, j) += 1.0;
+
+Mat colorImage(480, 640, CV_8UC3);
+Vec3b& pixel = colorImage.at<Vec3b>(y, x);
+pixel[0] = 255; // Blue channel
+```
+
+<Warning>
+No bounds checking is performed in Release builds. Use with caution.
+</Warning>
+
+### ptr
+
+```cpp
+template<typename _Tp> _Tp* ptr(int i0=0)
+template<typename _Tp> const _Tp* ptr(int i0=0) const
+```
+
+Returns a pointer to the specified matrix row.
+
+**Example:**
+```cpp
+// Efficient row-wise processing
+for(int i = 0; i < M.rows; i++)
+{
+    const double* Mi = M.ptr<double>(i);
+    for(int j = 0; j < M.cols; j++)
+        sum += std::max(Mi[j], 0.);
+}
+```
+
+## Static Initialization Methods
+
+### zeros
+
+```cpp
+static Mat zeros(int rows, int cols, int type)
+static Mat zeros(Size size, int type)
+static Mat zeros(int ndims, const int* sz, int type)
+```
+
+Returns a zero array of the specified size and type.
+
+**Example:**
+```cpp
+Mat Z = Mat::zeros(3, 3, CV_32F);
+```
+
+### ones
+
+```cpp
+static Mat ones(int rows, int cols, int type)
+static Mat ones(Size size, int type)
+static Mat ones(int ndims, const int* sz, int type)
+```
+
+Returns an array of all 1's of the specified size and type.
+
+### eye
+
+```cpp
+static Mat eye(int rows, int cols, int type)
+static Mat eye(Size size, int type)
+```
+
+Returns an identity matrix of the specified size and type.
+
+**Example:**
+```cpp
+// Add identity matrix to M
+M += Mat::eye(M.rows, M.cols, CV_64F);
+```
+
+## Properties
+
+### Data Layout
+
+<ResponseField name="rows" type="int">
+  Number of rows (for 2D arrays)
+</ResponseField>
+
+<ResponseField name="cols" type="int">
+  Number of columns (for 2D arrays)
+</ResponseField>
+
+<ResponseField name="dims" type="int">
+  Number of matrix dimensions (≥ 2)
+</ResponseField>
+
+<ResponseField name="data" type="uchar*">
+  Pointer to the data
+</ResponseField>
+
+<ResponseField name="step" type="size_t[]">
+  Array of strides (step[0] contains the full row length in bytes)
+</ResponseField>
+
+### Type Information
+
+<ResponseField name="type()" type="int">
+  Returns the matrix element type (CV_8UC1, CV_32FC3, etc.)
+</ResponseField>
+
+<ResponseField name="depth()" type="int">
+  Returns the depth of the matrix elements (CV_8U, CV_32F, etc.)
+</ResponseField>
+
+<ResponseField name="channels()" type="int">
+  Returns the number of channels
+</ResponseField>
+
+<ResponseField name="elemSize()" type="size_t">
+  Returns element size in bytes
+</ResponseField>
+
+<ResponseField name="elemSize1()" type="size_t">
+  Returns size of each element channel in bytes
+</ResponseField>
+
+### Size Information
+
+<ResponseField name="size()" type="Size">
+  Returns the matrix size (for 2D matrices)
+</ResponseField>
+
+<ResponseField name="total()" type="size_t">
+  Returns the total number of array elements
+</ResponseField>
+
+<ResponseField name="empty()" type="bool">
+  Returns true if the array has no elements
+</ResponseField>
+
+<ResponseField name="isContinuous()" type="bool">
+  Returns true if the matrix is continuous (no gaps at the end of rows)
+</ResponseField>
+
+<ResponseField name="isSubmatrix()" type="bool">
+  Returns true if the matrix is a submatrix of another matrix
+</ResponseField>
+
+## Operators
+
+### Assignment
+
+```cpp
+Mat& operator=(const Mat& m)
+Mat& operator=(const MatExpr& expr)
+```
+
+Matrix assignment is an O(1) operation that copies the header and increments the reference counter.
+
+### Element Access
+
+```cpp
+template<typename _Tp> _Tp& operator()(int row, int col)
+template<typename _Tp> _Tp& operator()(Point pt)
+template<typename _Tp> _Tp& operator()(const int* idx)
+```
+
+Provides element access similar to at() method.
+
+### Arithmetic Operators
+
+Matrix arithmetic operators (+, -, *, /) are supported through matrix expressions:
+
+```cpp
+Mat A, B, C;
+C = A + B;  // Addition
+C = A - B;  // Subtraction
+C = A * B;  // Matrix multiplication
+C = A / 2.0; // Scalar division
+```
+
+## Memory Management
+
+Mat uses reference counting for automatic memory management. When no one references the data, it's automatically deallocated.
+
+**Example:**
+```cpp
+Mat A(100, 100, CV_32F);
+Mat B = A; // B references the same data (O(1) operation)
+Mat C = A.clone(); // C is an independent copy
+
+// Manually release data before destructor
+A.release();
+```
+
+## Data Layout
+
+For a 2D array, element (i,j) address is computed as:
+```
+addr(M[i,j]) = M.data + M.step[0]*i + M.step[1]*j
+```
+
+Matrices are stored row-by-row, with `step[0]` being the row length in bytes.
+
+<Note>
+The data is stored continuously if `isContinuous()` returns true, meaning there are no gaps between rows. This allows for more efficient processing.
+</Note>

@@ -1,0 +1,315 @@
+---
+title: "Object Detection Module"
+description: "Object detection including cascade classifiers, HOG, and QR code detection"
+---
+
+## Overview
+
+The `objdetect` module provides tools for detecting objects in images, including:
+- Cascade classifiers (Haar, LBP)
+- HOG (Histogram of Oriented Gradients) detector
+- QR code and barcode detection
+- ArUco marker detection
+- Face detection
+
+## Cascade Classifier
+
+### Overview
+
+Cascade classifiers detect objects using Haar-like or LBP features trained with boosting algorithms.
+
+### Basic Usage
+
+```cpp
+#include <opencv2/objdetect.hpp>
+
+// Load pre-trained classifier
+CascadeClassifier face_cascade;
+face_cascade.load("haarcascade_frontalface_default.xml");
+
+// Detect objects
+std::vector<Rect> faces;
+Mat gray;
+cvtColor(img, gray, COLOR_BGR2GRAY);
+
+face_cascade.detectMultiScale(
+    gray,
+    faces,
+    1.1,        // scaleFactor
+    3,          // minNeighbors  
+    0,          // flags
+    Size(30, 30)  // minSize
+);
+
+// Draw results
+for(const Rect& face : faces) {
+    rectangle(img, face, Scalar(0, 255, 0), 2);
+}
+```
+
+### Parameters
+
+- **scaleFactor**: Image pyramid scale (typically 1.05-1.4)
+- **minNeighbors**: Minimum neighbors for detection (3-6 typical)
+- **minSize/maxSize**: Size constraints for detected objects
+
+### Pre-trained Models
+
+OpenCV includes cascades for:
+- Face detection (frontal, profile)
+- Eye detection
+- Full body detection
+- Upper body detection
+- License plate detection
+
+## HOG Descriptor
+
+### Overview
+
+Histogram of Oriented Gradients (HOG) is a feature descriptor used for object detection, particularly for pedestrian detection.
+
+### Structure
+
+```cpp
+struct HOGDescriptor {
+    Size winSize;           // Detection window (64x128 default)
+    Size blockSize;         // Block size (16x16)
+    Size blockStride;       // Block stride (8x8)
+    Size cellSize;          // Cell size (8x8)
+    int nbins;              // Number of bins (9)
+    double winSigma;        // Gaussian smoothing
+    double L2HysThreshold;  // Normalization threshold
+    bool gammaCorrection;   // Gamma correction flag
+};
+```
+
+### Pedestrian Detection
+
+```cpp
+// Create HOG detector
+HOGDescriptor hog;
+hog.setSVMDetector(HOGDescriptor::getDefaultPeopleDetector());
+
+// Detect
+std::vector<Rect> found;
+std::vector<double> weights;
+
+hog.detectMultiScale(
+    img, 
+    found,
+    weights,
+    0,              // hitThreshold
+    Size(8, 8),     // winStride
+    Size(32, 32),   // padding
+    1.05,           // scale
+    2.0             // groupThreshold
+);
+
+// Draw detections
+for(const Rect& r : found) {
+    rectangle(img, r, Scalar(0, 255, 0), 2);
+}
+```
+
+### Custom Training
+
+```cpp
+// Compute HOG descriptors
+HOGDescriptor hog;
+std::vector<float> descriptors;
+hog.compute(img, descriptors);
+
+// Train with SVM (external)
+// ...
+
+// Set trained detector
+hog.setSVMDetector(trained_descriptors);
+```
+
+## QR Code Detection
+
+### QRCodeDetector
+
+```cpp
+QRCodeDetector qrDecoder;
+
+// Detect and decode
+std::vector<Point> points;
+String data = qrDecoder.detectAndDecode(img, points);
+
+if(!data.empty()) {
+    std::cout << "QR Code: " << data << std::endl;
+    
+    // Draw boundary
+    for(size_t i = 0; i < points.size(); i++) {
+        line(img, points[i], points[(i+1) % points.size()],
+             Scalar(0, 255, 0), 2);
+    }
+}
+```
+
+### Multiple QR Codes
+
+```cpp
+std::vector<String> decoded_info;
+std::vector<std::vector<Point>> points;
+
+if(qrDecoder.detectAndDecodeMulti(img, decoded_info, points)) {
+    for(size_t i = 0; i < decoded_info.size(); i++) {
+        std::cout << "QR " << i << ": " 
+                  << decoded_info[i] << std::endl;
+    }
+}
+```
+
+## ArUco Marker Detection
+
+### Basic Detection
+
+```cpp
+#include <opencv2/objdetect/aruco_detector.hpp>
+
+// Create dictionary and detector
+aruco::Dictionary dictionary = 
+    aruco::getPredefinedDictionary(aruco::DICT_6X6_250);
+aruco::DetectorParameters params;
+aruco::ArucoDetector detector(dictionary, params);
+
+// Detect markers
+std::vector<int> ids;
+std::vector<std::vector<Point2f>> corners, rejected;
+detector.detectMarkers(img, corners, ids, rejected);
+
+// Draw detected markers
+if(!ids.empty()) {
+    aruco::drawDetectedMarkers(img, corners, ids);
+}
+```
+
+## Face Detection
+
+### Modern DNN-based Detection
+
+```cpp
+#include <opencv2/objdetect/face.hpp>
+
+// Load face detector model
+Ptr<FaceDetectorYN> detector = FaceDetectorYN::create(
+    "face_detection_yunet_2023mar.onnx",
+    "",
+    Size(320, 320)
+);
+
+// Set input size
+detector->setInputSize(img.size());
+
+// Detect faces  
+Mat faces;
+detector->detect(img, faces);
+
+// Process results
+for(int i = 0; i < faces.rows; i++) {
+    float confidence = faces.at<float>(i, 14);
+    if(confidence > 0.9) {
+        int x = faces.at<float>(i, 0);
+        int y = faces.at<float>(i, 1);
+        int w = faces.at<float>(i, 2);
+        int h = faces.at<float>(i, 3);
+        rectangle(img, Rect(x, y, w, h), 
+                 Scalar(0, 255, 0), 2);
+    }
+}
+```
+
+## Complete Example: Face Detection
+
+```cpp
+#include <opencv2/opencv.hpp>
+#include <opencv2/objdetect.hpp>
+#include <opencv2/highgui.hpp>
+
+int main() {
+    // Load image
+    Mat img = imread("people.jpg");
+    
+    // Load cascade
+    CascadeClassifier face_cascade;
+    if(!face_cascade.load("haarcascade_frontalface_default.xml")) {
+        std::cerr << "Error loading cascade\n";
+        return -1;
+    }
+    
+    // Convert to grayscale
+    Mat gray;
+    cvtColor(img, gray, COLOR_BGR2GRAY);
+    equalizeHist(gray, gray);
+    
+    // Detect faces
+    std::vector<Rect> faces;
+    face_cascade.detectMultiScale(
+        gray, faces, 1.1, 3, 0, Size(30, 30)
+    );
+    
+    // Draw rectangles
+    for(const Rect& face : faces) {
+        rectangle(img, face, Scalar(255, 0, 0), 2);
+    }
+    
+    // Display
+    imshow("Faces", img);
+    waitKey(0);
+    
+    return 0;
+}
+```
+
+## Performance Tips
+
+<CardGroup cols={2}>
+<Card title="Use Grayscale" icon="image">
+Convert to grayscale before detection
+</Card>
+
+<Card title="Scale Down" icon="compress">
+Resize large images for faster processing
+</Card>
+
+<Card title="ROI Processing" icon="crop">
+Limit detection to region of interest
+</Card>
+
+<Card title="Adjust Parameters" icon="sliders">
+Tune scaleFactor and minNeighbors for speed/accuracy
+</Card>
+</CardGroup>
+
+## Algorithm Selection
+
+| Method | Speed | Accuracy | Use Case |
+|--------|-------|----------|----------|
+| **Cascade** | Fast | Good | Real-time face/object |
+| **HOG** | Medium | Good | Pedestrian detection |
+| **DNN** | Slow | Best | High accuracy needed |
+| **QR Detector** | Fast | High | QR/Barcode scanning |
+
+## Best Practices
+
+### Cascade Classifiers
+
+1. **Preprocess images**: Equalize histogram, reduce noise
+2. **Adjust minNeighbors**: Higher = fewer false positives
+3. **Set size constraints**: Filter by expected object size
+4. **Use appropriate cascade**: frontal vs profile faces
+
+### HOG Detector
+
+1. **Standard window**: Use 64x128 for pedestrians
+2. **Multi-scale detection**: Essential for varying sizes
+3. **Non-maximum suppression**: Remove overlapping detections
+4. **GPU acceleration**: Use cv::cuda::HOG for speed
+
+## See Also
+
+- [DNN Module](/modules/dnn) - Deep learning based detection
+- [Features2D](/modules/features2d) - Feature detection
+- [Face Recognition Tutorial](https://docs.opencv.org/master/da/d60/tutorial_face_main.html)

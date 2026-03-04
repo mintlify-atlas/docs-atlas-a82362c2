@@ -1,0 +1,233 @@
+---
+title: "Color Spaces"
+description: "Understanding and converting between different color representations in OpenCV"
+---
+
+## Overview
+
+Color spaces are different ways of representing colors numerically. OpenCV supports numerous color space conversions through the `cvtColor()` function.
+
+## BGR Color Space
+
+### Default in OpenCV
+
+OpenCV uses **BGR** (Blue-Green-Red) as its default color format:
+
+```cpp
+Mat img = imread("image.jpg");  // Loaded as BGR
+
+// Access pixel
+Vec3b pixel = img.at<Vec3b>(y, x);
+uchar blue = pixel[0];
+uchar green = pixel[1];
+uchar red = pixel[2];
+```
+
+<Warning>
+Most other libraries (including matplotlib, PIL) use RGB order. Always convert when needed.
+</Warning>
+
+## Common Color Spaces
+
+### RGB/BGR
+
+**Use case**: Display, most common representation
+
+```cpp
+// BGR to RGB
+Mat rgb;
+cvtColor(bgr, rgb, COLOR_BGR2RGB);
+
+// RGB to BGR  
+cvtColor(rgb, bgr, COLOR_RGB2BGR);
+```
+
+### Grayscale
+
+**Use case**: Simplify processing, reduce computation
+
+```cpp
+// Color to grayscale
+Mat gray;
+cvtColor(img, gray, COLOR_BGR2GRAY);
+
+// Grayscale to color (creates 3 identical channels)
+cvtColor(gray, img, COLOR_GRAY2BGR);
+```
+
+### HSV (Hue-Saturation-Value)
+
+**Use case**: Color-based segmentation, lighting-independent processing
+
+- **Hue**: Color type (0-179 in OpenCV)
+- **Saturation**: Color intensity (0-255)
+- **Value**: Brightness (0-255)
+
+```cpp
+Mat hsv;
+cvtColor(img, hsv, COLOR_BGR2HSV);
+
+// Color range detection
+Mat mask;
+inRange(hsv, Scalar(0, 100, 100), Scalar(10, 255, 255), mask);
+```
+
+### LAB (L*a*b*)
+
+**Use case**: Perceptually uniform, skin detection
+
+- **L**: Lightness (0-100)
+- **a**: Green-Red axis
+- **b**: Blue-Yellow axis
+
+```cpp
+Mat lab;
+cvtColor(img, lab, COLOR_BGR2Lab);
+
+// Useful for color-based operations
+vector<Mat> channels;
+split(lab, channels);
+Mat L = channels[0];  // Lightness only
+```
+
+### YCrCb
+
+**Use case**: Video compression, skin detection
+
+- **Y**: Luminance
+- **Cr**: Red-difference  
+- **Cb**: Blue-difference
+
+```cpp
+Mat ycrcb;
+cvtColor(img, ycrcb, COLOR_BGR2YCrCb);
+```
+
+## Color Conversion
+
+### Basic Conversion
+
+```cpp
+// Function signature
+void cvtColor(InputArray src, OutputArray dst, int code);
+
+// Examples
+cvtColor(bgr, gray, COLOR_BGR2GRAY);
+cvtColor(bgr, hsv, COLOR_BGR2HSV);
+cvtColor(hsv, bgr, COLOR_HSV2BGR);
+```
+
+### Common Conversion Codes
+
+| From | To | Code |
+|------|-----|------|
+| BGR | Gray | `COLOR_BGR2GRAY` |
+| BGR | RGB | `COLOR_BGR2RGB` |
+| BGR | HSV | `COLOR_BGR2HSV` |
+| BGR | LAB | `COLOR_BGR2Lab` |
+| BGR | YCrCb | `COLOR_BGR2YCrCb` |
+| HSV | BGR | `COLOR_HSV2BGR` |
+| Gray | BGR | `COLOR_GRAY2BGR` |
+
+## Practical Examples
+
+### Color Detection
+
+```cpp
+// Detect red objects
+Mat hsv, mask;
+cvtColor(img, hsv, COLOR_BGR2HSV);
+
+// Red is at both ends of hue range
+Mat mask1, mask2;
+inRange(hsv, Scalar(0, 100, 100), Scalar(10, 255, 255), mask1);
+inRange(hsv, Scalar(170, 100, 100), Scalar(180, 255, 255), mask2);
+mask = mask1 | mask2;
+```
+
+### Lighting Normalization
+
+```cpp
+// Separate intensity from color
+Mat lab;
+cvtColor(img, lab, COLOR_BGR2Lab);
+
+vector<Mat> channels;
+split(lab, channels);
+
+// Normalize L channel
+equalizeHist(channels[0], channels[0]);
+
+merge(channels, lab);
+cvtColor(lab, img, COLOR_Lab2BGR);
+```
+
+### Skin Detection
+
+```cpp
+Mat ycrcb;
+cvtColor(img, ycrcb, COLOR_BGR2YCrCb);
+
+// Skin color range in YCrCb
+Mat skinMask;
+inRange(ycrcb, 
+        Scalar(0, 133, 77), 
+        Scalar(255, 173, 127), 
+        skinMask);
+```
+
+## Color Space Selection
+
+<CardGroup cols={2}>
+<Card title="HSV" icon="palette">
+- Color-based segmentation
+- Lighting-independent tracking
+- Hue provides rotation invariance
+</Card>
+
+<Card title="LAB" icon="eye">
+- Perceptually uniform
+- Separate luminance from color
+- Better for color difference calculations
+</Card>
+
+<Card title="YCrCb" icon="video">
+- Video compression
+- Skin detection
+- Chroma subsampling
+</Card>
+
+<Card title="Grayscale" icon="image">
+- Simplest representation
+- Fastest processing
+- Use when color not needed
+</Card>
+</CardGroup>
+
+## Best Practices
+
+### Conversion Tips
+
+1. **Minimize conversions**: Convert once, cache result
+2. **Choose appropriate space**: Match algorithm requirements
+3. **Remember value ranges**: HSV hue is 0-179, not 0-255
+4. **Consider precision**: Use CV_32F for sensitive operations
+
+### Performance
+
+```cpp
+// Avoid repeated conversion in loops
+Mat hsv;
+cvtColor(img, hsv, COLOR_BGR2HSV);  // Convert once
+
+for(int i = 0; i < 1000; i++) {
+    // Use hsv directly
+    processImage(hsv);
+}
+```
+
+## See Also
+
+- [Image Basics](/concepts/image-basics) - Working with images
+- [ImgProc Module](/modules/imgproc) - Image processing functions
+- [cvtColor Reference](https://docs.opencv.org/master/d8/d01/group__imgproc__color__conversions.html)

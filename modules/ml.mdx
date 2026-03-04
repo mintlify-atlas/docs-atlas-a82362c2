@@ -1,0 +1,379 @@
+---
+title: "Machine Learning Module"
+description: "Statistical classification, regression, and clustering algorithms in OpenCV"
+---
+
+## Overview
+
+The ML (Machine Learning) module provides classical machine learning algorithms for:
+- Classification
+- Regression
+- Clustering
+- Statistical modeling
+
+<Note>
+This module implements **traditional ML algorithms**. For deep learning, see the [DNN Module](/modules/dnn).
+</Note>
+
+## Key Concepts
+
+### StatModel Base Class
+
+All ML algorithms inherit from `StatModel`:
+
+```cpp
+class StatModel : public Algorithm {
+public:
+    // Train the model
+    virtual bool train(const Ptr<TrainData>& trainData, int flags=0);
+    
+    // Predict on new data
+    virtual float predict(InputArray samples, 
+                         OutputArray results=noArray(), 
+                         int flags=0) const = 0;
+    
+    // Calculate error
+    virtual float calcError(const Ptr<TrainData>& data, 
+                           bool test, 
+                           OutputArray resp) const;
+};
+```
+
+### TrainData Class
+
+Encapsulates training data:
+
+```cpp
+Ptr<TrainData> data = TrainData::create(
+    samples,        // Training samples (CV_32F)
+    ROW_SAMPLE,     // Each row is a sample  
+    responses       // Response values
+);
+```
+
+## Classification Algorithms
+
+### Support Vector Machines (SVM)
+
+```cpp
+// Create SVM
+Ptr<SVM> svm = SVM::create();
+svm->setType(SVM::C_SVC);
+svm->setKernel(SVM::LINEAR);
+svm->setC(1.0);
+
+// Train
+Ptr<TrainData> data = TrainData::create(samples, ROW_SAMPLE, labels);
+svm->train(data);
+
+// Predict
+float response = svm->predict(testSample);
+```
+
+**SVM Types**:
+- `C_SVC`: C-Support Vector Classification
+- `NU_SVC`: Nu-Support Vector Classification
+- `ONE_CLASS`: One-class SVM
+- `EPS_SVR`: Epsilon-Support Vector Regression
+- `NU_SVR`: Nu-Support Vector Regression
+
+**Kernel Types**:
+- `LINEAR`: Linear kernel
+- `POLY`: Polynomial kernel
+- `RBF`: Radial Basis Function (Gaussian)
+- `SIGMOID`: Sigmoid kernel
+
+### K-Nearest Neighbors (KNN)
+
+```cpp
+Ptr<KNearest> knn = KNearest::create();
+knn->setDefaultK(3);
+knn->setIsClassifier(true);
+knn->setAlgorithmType(KNearest::BRUTE_FORCE);
+
+// Train
+knn->train(data);
+
+// Find k nearest neighbors
+Mat results, neighborResponses, dists;
+knn->findNearest(testSample, 5, results, 
+                 neighborResponses, dists);
+```
+
+### Decision Trees
+
+```cpp
+Ptr<DTrees> dtree = DTrees::create();
+dtree->setMaxDepth(10);
+dtree->setMinSampleCount(2);
+dtree->setUseSurrogates(false);
+
+// Train
+dtree->train(data);
+
+// Predict
+float prediction = dtree->predict(testSample);
+
+// Get tree structure
+std::vector<Node> nodes = dtree->getNodes();
+```
+
+### Random Forest
+
+```cpp
+Ptr<RTrees> rtrees = RTrees::create();
+rtrees->setMaxDepth(10);
+rtrees->setMinSampleCount(2);
+rtrees->setActiveVarCount(4);  // Features per split
+rtrees->setTermCriteria(
+    TermCriteria(TermCriteria::MAX_ITER, 100, 0)
+);
+
+// Train
+rtrees->train(data);
+
+// Predict
+float response = rtrees->predict(testSample);
+
+// Variable importance
+Mat varImportance = rtrees->getVarImportance();
+```
+
+### Naive Bayes
+
+```cpp
+Ptr<NormalBayesClassifier> bayes = 
+    NormalBayesClassifier::create();
+
+// Train
+bayes->train(data);
+
+// Predict with probabilities
+Mat outputs, probs;
+bayes->predictProb(testSamples, outputs, probs);
+```
+
+### Logistic Regression
+
+```cpp
+Ptr<LogisticRegression> lr = LogisticRegression::create();
+lr->setLearningRate(0.001);
+lr->setIterations(1000);
+lr->setRegularization(LogisticRegression::REG_L2);
+lr->setTrainMethod(LogisticRegression::BATCH);
+
+// Train
+lr->train(data);
+
+// Predict
+Mat predictions;
+lr->predict(testSamples, predictions);
+```
+
+## Neural Networks
+
+### ANN_MLP (Multi-Layer Perceptron)
+
+```cpp
+Ptr<ANN_MLP> ann = ANN_MLP::create();
+
+// Define network structure
+Mat layers = (Mat_<int>(1, 4) << 784, 128, 64, 10);
+ann->setLayerSizes(layers);
+
+// Set parameters
+ann->setActivationFunction(ANN_MLP::SIGMOID_SYM);
+ann->setTrainMethod(ANN_MLP::BACKPROP);
+ann->setBackpropWeightScale(0.1);
+ann->setBackpropMomentumScale(0.1);
+
+// Set termination criteria
+TermCriteria criteria(
+    TermCriteria::MAX_ITER + TermCriteria::EPS,
+    1000,  // Max iterations
+    0.01   // Min error
+);
+ann->setTermCriteria(criteria);
+
+// Train
+ann->train(data);
+
+// Predict
+Mat output;
+ann->predict(testSample, output);
+```
+
+## Clustering
+
+### K-Means
+
+```cpp
+// K-Means clustering
+Mat labels, centers;
+int K = 3;
+
+kmeans(
+    data,           // Input samples
+    K,              // Number of clusters
+    labels,         // Output labels
+    TermCriteria(TermCriteria::EPS + TermCriteria::MAX_ITER, 
+                 100, 0.01),
+    3,              // Attempts
+    KMEANS_PP_CENTERS,  // Initialization method
+    centers         // Output centers
+);
+
+// Visualize clusters
+for(int i = 0; i < data.rows; i++) {
+    int cluster = labels.at<int>(i);
+    circle(img, Point(data.at<float>(i,0), 
+                     data.at<float>(i,1)), 
+           5, clusterColors[cluster], -1);
+}
+```
+
+### EM (Expectation Maximization)
+
+```cpp
+Ptr<EM> em = EM::create();
+em->setClustersNumber(3);
+em->setCovarianceMatrixType(EM::COV_MAT_DIAGONAL);
+
+// Train
+em->trainEM(samples);
+
+// Predict cluster
+Vec2d probs;
+int cluster = em->predict2(sample, probs)[1];
+```
+
+## Complete Example: SVM Classification
+
+```cpp
+#include <opencv2/ml.hpp>
+#include <opencv2/core.hpp>
+
+using namespace cv;
+using namespace cv::ml;
+
+int main() {
+    // Generate training data
+    int numSamples = 100;
+    Mat samples(numSamples, 2, CV_32F);
+    Mat labels(numSamples, 1, CV_32S);
+    
+    // Class 1
+    for(int i = 0; i < numSamples/2; i++) {
+        samples.at<float>(i, 0) = randn(2.0, 1.0);
+        samples.at<float>(i, 1) = randn(2.0, 1.0);
+        labels.at<int>(i) = 0;
+    }
+    
+    // Class 2  
+    for(int i = numSamples/2; i < numSamples; i++) {
+        samples.at<float>(i, 0) = randn(6.0, 1.0);
+        samples.at<float>(i, 1) = randn(6.0, 1.0);
+        labels.at<int>(i) = 1;
+    }
+    
+    // Create and train SVM
+    Ptr<SVM> svm = SVM::create();
+    svm->setType(SVM::C_SVC);
+    svm->setKernel(SVM::RBF);
+    svm->setGamma(0.5);
+    svm->setC(1.0);
+    
+    Ptr<TrainData> data = TrainData::create(
+        samples, ROW_SAMPLE, labels
+    );
+    
+    svm->train(data);
+    
+    // Test
+    Mat testSample = (Mat_<float>(1, 2) << 3.0, 3.0);
+    float response = svm->predict(testSample);
+    
+    std::cout << "Predicted class: " << response << std::endl;
+    
+    // Save model
+    svm->save("svm_model.xml");
+    
+    return 0;
+}
+```
+
+## Model Persistence
+
+### Save Model
+
+```cpp
+// Save to file
+svm->save("model.xml");
+svm->save("model.yml");
+```
+
+### Load Model
+
+```cpp
+// Load from file  
+Ptr<SVM> svm = SVM::load("model.xml");
+
+// Use loaded model
+float prediction = svm->predict(sample);
+```
+
+## Cross-Validation
+
+```cpp
+// Split data
+Ptr<TrainData> data = TrainData::create(
+    samples, ROW_SAMPLE, responses
+);
+
+data->setTrainTestSplitRatio(0.8, true);
+
+// Train on training set
+Ptr<SVM> svm = SVM::create();
+svm->train(data->getTrainSamples());
+
+// Evaluate on test set
+float error = svm->calcError(data, true, noArray());
+std::cout << "Test error: " << error << "%\n";
+```
+
+## Algorithm Selection Guide
+
+| Algorithm | Type | Pros | Cons | Best For |
+|-----------|------|------|------|----------|
+| **SVM** | Classification/Regression | Effective in high dimensions | Slow on large datasets | Small to medium data |
+| **KNN** | Classification/Regression | Simple, no training | Slow prediction, memory intensive | Small datasets |
+| **Random Forest** | Classification/Regression | Robust, handles non-linear | Can overfit | General purpose |
+| **Naive Bayes** | Classification | Fast, simple | Assumes independence | Text classification |
+| **ANN_MLP** | Classification/Regression | Powerful | Needs tuning | Complex patterns |
+| **K-Means** | Clustering | Fast, simple | Needs K specified | Data segmentation |
+
+## Best Practices
+
+<CardGroup cols={2}>
+<Card title="Normalize Features" icon="scale-balanced">
+Scale features to similar ranges for better performance
+</Card>
+
+<Card title="Cross-Validate" icon="shuffle">
+Use train/test split to avoid overfitting
+</Card>
+
+<Card title="Tune Parameters" icon="sliders">
+Use grid search for optimal hyperparameters
+</Card>
+
+<Card title="Save Models" icon="floppy-disk">
+Persist trained models for reuse
+</Card>
+</CardGroup>
+
+## See Also
+
+- [DNN Module](/modules/dnn) - Deep learning
+- [Core Module](/modules/core) - Matrix operations
+- [ML Tutorial](https://docs.opencv.org/master/d1/d73/tutorial_introduction_to_svm.html)

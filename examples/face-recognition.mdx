@@ -1,0 +1,402 @@
+---
+title: Face Detection and Recognition
+description: Complete guide to face detection using Haar Cascades and deep learning models with facial landmark detection and recognition
+---
+
+## Overview
+
+OpenCV provides multiple approaches for face detection and recognition:
+
+- **Haar Cascade Classifiers**: Fast, CPU-friendly classical method
+- **DNN-based Detection**: Modern deep learning approach with YuNet
+- **Face Recognition**: Feature extraction and matching with SFace
+- **Facial Landmarks**: Detect eyes, nose, and mouth positions
+
+## Haar Cascade Face Detection
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import numpy as np
+    from video import create_capture
+    from common import clock, draw_str
+
+    def detect(img, cascade):
+        """Detect faces in image using cascade classifier"""
+        rects = cascade.detectMultiScale(img, 
+                                        scaleFactor=1.3, 
+                                        minNeighbors=4, 
+                                        minSize=(30, 30),
+                                        flags=cv.CASCADE_SCALE_IMAGE)
+        if len(rects) == 0:
+            return []
+        rects[:,2:] += rects[:,:2]
+        return rects
+
+    def draw_rects(img, rects, color):
+        """Draw rectangles around detected faces"""
+        for x1, y1, x2, y2 in rects:
+            cv.rectangle(img, (x1, y1), (x2, y2), color, 2)
+
+    # Load cascade classifiers
+    cascade_fn = "haarcascades/haarcascade_frontalface_alt.xml"
+    nested_fn = "haarcascades/haarcascade_eye.xml"
+    
+    cascade = cv.CascadeClassifier(cv.samples.findFile(cascade_fn))
+    nested = cv.CascadeClassifier(cv.samples.findFile(nested_fn))
+
+    # Initialize video capture
+    cam = create_capture(0, fallback='synth:bg={}:noise=0.05'.format(
+        cv.samples.findFile('lena.jpg')))
+
+    while True:
+        _ret, img = cam.read()
+        gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+        gray = cv.equalizeHist(gray)
+
+        t = clock()
+        rects = detect(gray, cascade)
+        vis = img.copy()
+        draw_rects(vis, rects, (0, 255, 0))
+        
+        # Detect eyes within face regions
+        if not nested.empty():
+            for x1, y1, x2, y2 in rects:
+                roi = gray[y1:y2, x1:x2]
+                vis_roi = vis[y1:y2, x1:x2]
+                subrects = detect(roi.copy(), nested)
+                draw_rects(vis_roi, subrects, (255, 0, 0))
+        
+        dt = clock() - t
+        draw_str(vis, (20, 20), 'time: %.1f ms' % (dt*1000))
+        cv.imshow('facedetect', vis)
+
+        if cv.waitKey(5) == 27:
+            break
+
+    cv.destroyAllWindows()
+    ```
+  </Tab>
+  <Tab title="C++">
+    ```cpp
+    #include "opencv2/objdetect.hpp"
+    #include "opencv2/highgui.hpp"
+    #include "opencv2/imgproc.hpp"
+    #include "opencv2/videoio.hpp"
+    #include <iostream>
+
+    using namespace std;
+    using namespace cv;
+
+    void detectAndDraw(Mat& img, CascadeClassifier& cascade,
+                       CascadeClassifier& nestedCascade,
+                       double scale, bool tryflip)
+    {
+        vector<Rect> faces, faces2;
+        const static Scalar colors[] = {
+            Scalar(255,0,0), Scalar(255,128,0),
+            Scalar(255,255,0), Scalar(0,255,0),
+            Scalar(0,128,255), Scalar(0,255,255),
+            Scalar(0,0,255), Scalar(255,0,255)
+        };
+        Mat gray, smallImg;
+
+        cvtColor(img, gray, COLOR_BGR2GRAY);
+        double fx = 1 / scale;
+        resize(gray, smallImg, Size(), fx, fx, INTER_LINEAR_EXACT);
+        equalizeHist(smallImg, smallImg);
+
+        double t = (double)getTickCount();
+        cascade.detectMultiScale(smallImg, faces,
+            1.1, 2, 0 | CASCADE_SCALE_IMAGE,
+            Size(30, 30));
+        
+        if(tryflip) {
+            flip(smallImg, smallImg, 1);
+            cascade.detectMultiScale(smallImg, faces2,
+                1.1, 2, 0 | CASCADE_SCALE_IMAGE,
+                Size(30, 30));
+            for(vector<Rect>::const_iterator r = faces2.begin(); 
+                r != faces2.end(); ++r) {
+                faces.push_back(Rect(smallImg.cols - r->x - r->width, 
+                                    r->y, r->width, r->height));
+            }
+        }
+        
+        t = (double)getTickCount() - t;
+        printf("detection time = %g ms\n", t*1000/getTickFrequency());
+        
+        for(size_t i = 0; i < faces.size(); i++) {
+            Rect r = faces[i];
+            Mat smallImgROI;
+            vector<Rect> nestedObjects;
+            Point center;
+            Scalar color = colors[i%8];
+            int radius;
+
+            double aspect_ratio = (double)r.width/r.height;
+            if(0.75 < aspect_ratio && aspect_ratio < 1.3) {
+                center.x = cvRound((r.x + r.width*0.5)*scale);
+                center.y = cvRound((r.y + r.height*0.5)*scale);
+                radius = cvRound((r.width + r.height)*0.25*scale);
+                circle(img, center, radius, color, 3, 8, 0);
+            } else {
+                rectangle(img, Point(cvRound(r.x*scale), cvRound(r.y*scale)),
+                         Point(cvRound((r.x + r.width-1)*scale), 
+                               cvRound((r.y + r.height-1)*scale)),
+                         color, 3, 8, 0);
+            }
+            
+            if(nestedCascade.empty())
+                continue;
+            smallImgROI = smallImg(r);
+            nestedCascade.detectMultiScale(smallImgROI, nestedObjects,
+                1.1, 2, 0 | CASCADE_SCALE_IMAGE, Size(30, 30));
+            
+            for(size_t j = 0; j < nestedObjects.size(); j++) {
+                Rect nr = nestedObjects[j];
+                center.x = cvRound((r.x + nr.x + nr.width*0.5)*scale);
+                center.y = cvRound((r.y + nr.y + nr.height*0.5)*scale);
+                radius = cvRound((nr.width + nr.height)*0.25*scale);
+                circle(img, center, radius, color, 3, 8, 0);
+            }
+        }
+        imshow("result", img);
+    }
+
+    int main(int argc, const char** argv)
+    {
+        VideoCapture capture;
+        Mat frame;
+        CascadeClassifier cascade, nestedCascade;
+        double scale = 1.0;
+
+        string cascadeName = "data/haarcascades/haarcascade_frontalface_alt.xml";
+        string nestedCascadeName = "data/haarcascades/haarcascade_eye_tree_eyeglasses.xml";
+        
+        if(!cascade.load(samples::findFile(cascadeName))) {
+            cerr << "ERROR: Could not load classifier cascade" << endl;
+            return -1;
+        }
+        
+        if(!nestedCascade.load(samples::findFileOrKeep(nestedCascadeName)))
+            cerr << "WARNING: Could not load nested cascade" << endl;
+
+        if(!capture.open(0)) {
+            cout << "Capture from camera didn't work" << endl;
+            return 1;
+        }
+
+        cout << "Video capturing has been started ..." << endl;
+        for(;;) {
+            capture >> frame;
+            if(frame.empty())
+                break;
+
+            Mat frame1 = frame.clone();
+            detectAndDraw(frame1, cascade, nestedCascade, scale, false);
+
+            char c = (char)waitKey(10);
+            if(c == 27 || c == 'q' || c == 'Q')
+                break;
+        }
+        return 0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## DNN-based Face Detection with YuNet
+
+Modern deep learning approach using the YuNet model for accurate face detection with facial landmarks.
+
+```python
+import cv2 as cv
+import numpy as np
+
+# Initialize YuNet face detector
+detector = cv.FaceDetectorYN.create(
+    'face_detection_yunet_2021dec.onnx',
+    "",
+    (320, 320),
+    score_threshold=0.9,
+    nms_threshold=0.3,
+    top_k=5000
+)
+
+def visualize(input, faces, fps, thickness=2):
+    """Draw detected faces with landmarks"""
+    if faces[1] is not None:
+        for idx, face in enumerate(faces[1]):
+            coords = face[:-1].astype(np.int32)
+            # Draw bounding box
+            cv.rectangle(input, 
+                        (coords[0], coords[1]), 
+                        (coords[0]+coords[2], coords[1]+coords[3]), 
+                        (0, 255, 0), thickness)
+            # Draw facial landmarks
+            cv.circle(input, (coords[4], coords[5]), 2, (255, 0, 0), thickness)  # right eye
+            cv.circle(input, (coords[6], coords[7]), 2, (0, 0, 255), thickness)  # left eye
+            cv.circle(input, (coords[8], coords[9]), 2, (0, 255, 0), thickness)  # nose
+            cv.circle(input, (coords[10], coords[11]), 2, (255, 0, 255), thickness)  # right mouth
+            cv.circle(input, (coords[12], coords[13]), 2, (0, 255, 255), thickness)  # left mouth
+    cv.putText(input, f'FPS: {fps:.2f}', (1, 16), 
+              cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+# Video capture
+cap = cv.VideoCapture(0)
+frameWidth = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
+frameHeight = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
+detector.setInputSize([frameWidth, frameHeight])
+
+tm = cv.TickMeter()
+while True:
+    hasFrame, frame = cap.read()
+    if not hasFrame:
+        break
+
+    # Detect faces
+    tm.start()
+    faces = detector.detect(frame)
+    tm.stop()
+
+    # Draw results
+    visualize(frame, faces, tm.getFPS())
+    cv.imshow('Face Detection', frame)
+
+    if cv.waitKey(1) == 27:
+        break
+
+cap.release()
+cv.destroyAllWindows()
+```
+
+## Face Recognition with SFace
+
+Compare faces and determine if they belong to the same person.
+
+```python
+import cv2 as cv
+
+# Initialize detector and recognizer
+detector = cv.FaceDetectorYN.create(
+    'face_detection_yunet_2021dec.onnx',
+    "", (320, 320), 0.9, 0.3, 5000
+)
+
+recognizer = cv.FaceRecognizerSF.create(
+    'face_recognition_sface_2021dec.onnx', ""
+)
+
+# Load two images
+img1 = cv.imread('person1.jpg')
+img2 = cv.imread('person2.jpg')
+
+# Detect faces
+detector.setInputSize((img1.shape[1], img1.shape[0]))
+faces1 = detector.detect(img1)
+
+detector.setInputSize((img2.shape[1], img2.shape[0]))
+faces2 = detector.detect(img2)
+
+if faces1[1] is None or faces2[1] is None:
+    print("No face detected")
+else:
+    # Align and extract features
+    face1_align = recognizer.alignCrop(img1, faces1[1][0])
+    face2_align = recognizer.alignCrop(img2, faces2[1][0])
+    
+    face1_feature = recognizer.feature(face1_align)
+    face2_feature = recognizer.feature(face2_align)
+    
+    # Compare faces
+    cosine_score = recognizer.match(
+        face1_feature, face2_feature, 
+        cv.FaceRecognizerSF_FR_COSINE
+    )
+    
+    l2_score = recognizer.match(
+        face1_feature, face2_feature, 
+        cv.FaceRecognizerSF_FR_NORM_L2
+    )
+    
+    # Thresholds
+    cosine_threshold = 0.363
+    l2_threshold = 1.128
+    
+    if cosine_score >= cosine_threshold:
+        print(f"Same person (Cosine: {cosine_score:.3f})")
+    else:
+        print(f"Different person (Cosine: {cosine_score:.3f})")
+    
+    if l2_score <= l2_threshold:
+        print(f"Same person (L2: {l2_score:.3f})")
+    else:
+        print(f"Different person (L2: {l2_score:.3f})")
+```
+
+## Key Parameters
+
+### Haar Cascade Detection
+
+| Parameter | Description | Typical Value |
+|-----------|-------------|---------------|
+| `scaleFactor` | Image scale reduction between scans | 1.1 - 1.3 |
+| `minNeighbors` | Minimum neighbors for detection | 3 - 6 |
+| `minSize` | Minimum object size | (30, 30) |
+| `maxSize` | Maximum object size | Image size |
+
+### YuNet Detection
+
+| Parameter | Description | Typical Value |
+|-----------|-------------|---------------|
+| `score_threshold` | Confidence threshold | 0.6 - 0.9 |
+| `nms_threshold` | Non-maximum suppression | 0.3 - 0.5 |
+| `top_k` | Max detections before NMS | 5000 |
+
+<Note>
+**Model Downloads**: YuNet and SFace models can be downloaded from the [OpenCV Zoo](https://github.com/opencv/opencv_zoo):
+- [YuNet Face Detection](https://github.com/opencv/opencv_zoo/tree/master/models/face_detection_yunet)
+- [SFace Recognition](https://github.com/opencv/opencv_zoo/tree/master/models/face_recognition_sface)
+</Note>
+
+## Performance Tips
+
+<Steps>
+  <Step title="Optimize Image Scale">
+    Reduce input image size for faster processing:
+    ```python
+    fx = 0.5  # 50% scale
+    small = cv.resize(gray, None, fx=fx, fy=fx)
+    ```
+  </Step>
+  
+  <Step title="Use Histogram Equalization">
+    Improve detection under varying lighting:
+    ```python
+    gray = cv.equalizeHist(gray)
+    ```
+  </Step>
+  
+  <Step title="Cascade Parameters">
+    Tune `minNeighbors` to balance speed vs accuracy:
+    - Lower values = faster, more false positives
+    - Higher values = slower, fewer false positives
+  </Step>
+  
+  <Step title="ROI Processing">
+    Detect nested features only within face regions to improve performance
+  </Step>
+</Steps>
+
+<Warning>
+**Privacy Considerations**: Face recognition technology should be used responsibly. Always obtain consent when processing personal biometric data and comply with relevant privacy regulations.
+</Warning>
+
+## Next Steps
+
+- Explore [Object Detection](/modules/objdetect) for other detection methods
+- Learn about [DNN Module](/modules/dnn) for deep learning models
+- Check [Video I/O](/api/videoio) for camera handling
+- See [Image Processing](/modules/imgproc) for preprocessing techniques

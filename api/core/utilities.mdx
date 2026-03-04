@@ -1,0 +1,962 @@
+---
+title: "Utility Functions"
+description: "Statistical functions, reduction operations, and utility helpers for array processing"
+---
+
+## Statistical Functions
+
+### sum
+
+```cpp
+Scalar sum(InputArray src)
+```
+
+Calculates the sum of array elements.
+
+<ParamField path="src" type="InputArray">
+  Input array (1 to 4 channels)
+</ParamField>
+
+<ResponseField name="return" type="Scalar">
+  Sum of all array elements for each channel
+</ResponseField>
+
+**Example:**
+```cpp
+Mat img(100, 100, CV_8UC3);
+Scalar total = sum(img); // Returns sum for each channel
+double blueSum = total[0];
+double greenSum = total[1];
+double redSum = total[2];
+```
+
+### mean
+
+```cpp
+Scalar mean(InputArray src, InputArray mask = noArray())
+```
+
+Calculates the mean value of array elements.
+
+<ParamField path="src" type="InputArray">
+  Input array (1 to 4 channels)
+</ParamField>
+
+<ParamField path="mask" type="InputArray">
+  Optional operation mask (8-bit single channel)
+</ParamField>
+
+<ResponseField name="return" type="Scalar">
+  Mean value for each channel
+</ResponseField>
+
+**Example:**
+```cpp
+Mat img;
+Scalar avgColor = mean(img); // Average color
+
+Mat mask;
+Scalar avgInRegion = mean(img, mask); // Average within masked region
+```
+
+### meanStdDev
+
+```cpp
+void meanStdDev(InputArray src, OutputArray mean, OutputArray stddev,
+                InputArray mask = noArray())
+```
+
+Calculates mean and standard deviation of array elements.
+
+<ParamField path="src" type="InputArray">
+  Input array (1 to 4 channels)
+</ParamField>
+
+<ParamField path="mean" type="OutputArray">
+  Output parameter: calculated mean value
+</ParamField>
+
+<ParamField path="stddev" type="OutputArray">
+  Output parameter: calculated standard deviation
+</ParamField>
+
+<ParamField path="mask" type="InputArray">
+  Optional operation mask
+</ParamField>
+
+**Example:**
+```cpp
+Mat img;
+Mat mean, stddev;
+meanStdDev(img, mean, stddev);
+
+std::cout << "Mean: " << mean << std::endl;
+std::cout << "Std Dev: " << stddev << std::endl;
+```
+
+### minMaxLoc
+
+```cpp
+void minMaxLoc(InputArray src, double* minVal, double* maxVal = 0,
+               Point* minLoc = 0, Point* maxLoc = 0, InputArray mask = noArray())
+```
+
+Finds the global minimum and maximum in an array.
+
+<ParamField path="src" type="InputArray">
+  Input single-channel array
+</ParamField>
+
+<ParamField path="minVal" type="double*">
+  Pointer to returned minimum value (can be NULL)
+</ParamField>
+
+<ParamField path="maxVal" type="double*">
+  Pointer to returned maximum value (can be NULL)
+</ParamField>
+
+<ParamField path="minLoc" type="Point*">
+  Pointer to returned minimum location (can be NULL)
+</ParamField>
+
+<ParamField path="maxLoc" type="Point*">
+  Pointer to returned maximum location (can be NULL)
+</ParamField>
+
+<ParamField path="mask" type="InputArray">
+  Optional mask to select a sub-array
+</ParamField>
+
+**Example:**
+```cpp
+Mat img;
+double minVal, maxVal;
+Point minLoc, maxLoc;
+
+minMaxLoc(img, &minVal, &maxVal, &minLoc, &maxLoc);
+
+std::cout << "Min: " << minVal << " at " << minLoc << std::endl;
+std::cout << "Max: " << maxVal << " at " << maxLoc << std::endl;
+```
+
+### norm
+
+```cpp
+double norm(InputArray src1, int normType = NORM_L2, InputArray mask = noArray())
+double norm(InputArray src1, InputArray src2, int normType = NORM_L2,
+            InputArray mask = noArray())
+```
+
+Calculates an absolute array norm, absolute difference norm, or relative difference norm.
+
+<ParamField path="src1" type="InputArray">
+  First input array
+</ParamField>
+
+<ParamField path="src2" type="InputArray">
+  Second input array (for difference norms)
+</ParamField>
+
+<ParamField path="normType" type="int">
+  Type of norm: NORM_INF, NORM_L1, NORM_L2, NORM_L2SQR, NORM_HAMMING, NORM_HAMMING2
+</ParamField>
+
+<ParamField path="mask" type="InputArray">
+  Optional operation mask
+</ParamField>
+
+<ResponseField name="return" type="double">
+  Calculated norm value
+</ResponseField>
+
+**Norm Types:**
+- `NORM_INF`: max(|x_i|)
+- `NORM_L1`: Σ|x_i|
+- `NORM_L2`: √(Σx_i²)
+- `NORM_L2SQR`: Σx_i²
+
+**Example:**
+```cpp
+Mat vec1, vec2;
+double l2norm = norm(vec1, NORM_L2);
+double diff = norm(vec1, vec2, NORM_L2); // Euclidean distance
+```
+
+### normalize
+
+```cpp
+void normalize(InputArray src, InputOutputArray dst, double alpha = 1, double beta = 0,
+               int norm_type = NORM_L2, int dtype = -1, InputArray mask = noArray())
+```
+
+Normalizes the norm or value range of an array.
+
+<ParamField path="src" type="InputArray">
+  Input array
+</ParamField>
+
+<ParamField path="dst" type="InputOutputArray">
+  Output array (same size as src)
+</ParamField>
+
+<ParamField path="alpha" type="double">
+  Norm value to normalize to or lower range boundary in range normalization
+</ParamField>
+
+<ParamField path="beta" type="double">
+  Upper range boundary in range normalization (not used for norm normalization)
+</ParamField>
+
+<ParamField path="norm_type" type="int">
+  Normalization type: NORM_INF, NORM_L1, NORM_L2, or NORM_MINMAX
+</ParamField>
+
+<ParamField path="dtype" type="int">
+  Optional depth of output array
+</ParamField>
+
+<ParamField path="mask" type="InputArray">
+  Optional operation mask
+</ParamField>
+
+**Example:**
+```cpp
+Mat src, dst;
+
+// Normalize to range [0, 255]
+normalize(src, dst, 0, 255, NORM_MINMAX, CV_8U);
+
+// Normalize to unit norm
+normalize(src, dst, 1.0, 0, NORM_L2);
+```
+
+### countNonZero
+
+```cpp
+int countNonZero(InputArray src)
+```
+
+Counts non-zero array elements.
+
+<ParamField path="src" type="InputArray">
+  Single-channel array
+</ParamField>
+
+<ResponseField name="return" type="int">
+  Number of non-zero elements
+</ResponseField>
+
+**Example:**
+```cpp
+Mat binary;
+threshold(img, binary, 128, 255, THRESH_BINARY);
+int whitePixels = countNonZero(binary);
+```
+
+### hasNonZero
+
+```cpp
+bool hasNonZero(InputArray src)
+```
+
+Checks if there are any non-zero elements in array.
+
+<ResponseField name="return" type="bool">
+  True if at least one non-zero element exists
+</ResponseField>
+
+**Example:**
+```cpp
+Mat mask;
+if (hasNonZero(mask)) {
+    // Process masked region
+}
+```
+
+### findNonZero
+
+```cpp
+void findNonZero(InputArray src, OutputArray idx)
+```
+
+Returns the list of locations of non-zero pixels.
+
+<ParamField path="src" type="InputArray">
+  Single-channel array (8-bit or floating-point)
+</ParamField>
+
+<ParamField path="idx" type="OutputArray">
+  Output array of Point locations (N×1 or 1×N)
+</ParamField>
+
+**Example:**
+```cpp
+Mat binary;
+threshold(img, binary, 128, 255, THRESH_BINARY);
+
+std::vector<Point> locations;
+findNonZero(binary, locations);
+
+for(const Point& pt : locations) {
+    // Process each non-zero pixel location
+}
+```
+
+## Reduction Operations
+
+### reduce
+
+```cpp
+void reduce(InputArray src, OutputArray dst, int dim, int rtype, int dtype = -1)
+```
+
+Reduces a matrix to a vector by applying an operation along a specified dimension.
+
+<ParamField path="src" type="InputArray">
+  Input array
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Output vector
+</ParamField>
+
+<ParamField path="dim" type="int">
+  Dimension to reduce: 0 (reduce to single row), 1 (reduce to single column)
+</ParamField>
+
+<ParamField path="rtype" type="int">
+  Reduction operation: REDUCE_SUM, REDUCE_AVG, REDUCE_MAX, REDUCE_MIN, REDUCE_SUM2
+</ParamField>
+
+<ParamField path="dtype" type="int">
+  Optional depth of output array
+</ParamField>
+
+**Operations:**
+- `REDUCE_SUM`: Sum of all rows/columns
+- `REDUCE_AVG`: Mean of all rows/columns
+- `REDUCE_MAX`: Maximum of all rows/columns
+- `REDUCE_MIN`: Minimum of all rows/columns
+- `REDUCE_SUM2`: Sum of squared values
+
+**Example:**
+```cpp
+Mat matrix(100, 100, CV_32F);
+Mat columnSums, rowMeans;
+
+reduce(matrix, columnSums, 0, REDUCE_SUM); // Sum each column
+reduce(matrix, rowMeans, 1, REDUCE_AVG);   // Mean of each row
+```
+
+### reduceArgMin
+
+```cpp
+void reduceArgMin(InputArray src, OutputArray dst, int axis, bool lastIndex = false)
+```
+
+Finds indices of minimum elements along specified axis.
+
+<ParamField path="src" type="InputArray">
+  Input array
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Output array of indices
+</ParamField>
+
+<ParamField path="axis" type="int">
+  Dimension to reduce along
+</ParamField>
+
+<ParamField path="lastIndex" type="bool">
+  Whether to return last index in case of multiple minimum values
+</ParamField>
+
+**Example:**
+```cpp
+Mat data, minIndices;
+reduceArgMin(data, minIndices, 1); // Index of min in each row
+```
+
+### reduceArgMax
+
+```cpp
+void reduceArgMax(InputArray src, OutputArray dst, int axis, bool lastIndex = false)
+```
+
+Finds indices of maximum elements along specified axis.
+
+**Example:**
+```cpp
+Mat data, maxIndices;
+reduceArgMax(data, maxIndices, 0); // Index of max in each column
+```
+
+## Sorting
+
+### sort
+
+```cpp
+void sort(InputArray src, OutputArray dst, int flags)
+```
+
+Sorts each matrix row or column in ascending or descending order.
+
+<ParamField path="src" type="InputArray">
+  Input single-channel array
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Output array (same size and type as src)
+</ParamField>
+
+<ParamField path="flags" type="int">
+  Operation flags: SORT_EVERY_ROW, SORT_EVERY_COLUMN, SORT_ASCENDING, SORT_DESCENDING
+</ParamField>
+
+**Example:**
+```cpp
+Mat data, sorted;
+sort(data, sorted, SORT_EVERY_ROW | SORT_ASCENDING);
+```
+
+### sortIdx
+
+```cpp
+void sortIdx(InputArray src, OutputArray dst, int flags)
+```
+
+Sorts each matrix row or column and returns sorted indices instead of values.
+
+<ParamField path="dst" type="OutputArray">
+  Output integer array of sorted indices
+</ParamField>
+
+**Example:**
+```cpp
+Mat values, indices;
+sortIdx(values, indices, SORT_EVERY_ROW | SORT_DESCENDING);
+```
+
+## Linear Algebra
+
+### determinant
+
+```cpp
+double determinant(InputArray mtx)
+```
+
+Returns the determinant of a square matrix.
+
+<ParamField path="mtx" type="InputArray">
+  Input matrix (must be square)
+</ParamField>
+
+<ResponseField name="return" type="double">
+  Determinant value
+</ResponseField>
+
+**Example:**
+```cpp
+Mat A(3, 3, CV_64F);
+double det = determinant(A);
+```
+
+### trace
+
+```cpp
+Scalar trace(InputArray mtx)
+```
+
+Returns the trace (sum of diagonal elements) of a matrix.
+
+<ParamField path="mtx" type="InputArray">
+  Input matrix
+</ParamField>
+
+<ResponseField name="return" type="Scalar">
+  Trace of the matrix
+</ResponseField>
+
+**Formula:**
+```
+trace(A) = Σ A[i,i]
+```
+
+**Example:**
+```cpp
+Mat A;
+Scalar tr = trace(A);
+```
+
+### invert
+
+```cpp
+double invert(InputArray src, OutputArray dst, int flags = DECOMP_LU)
+```
+
+Finds the inverse or pseudo-inverse of a matrix.
+
+<ParamField path="src" type="InputArray">
+  Input floating-point matrix
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Output matrix of the same size and type as src
+</ParamField>
+
+<ParamField path="flags" type="int">
+  Inversion method: DECOMP_LU, DECOMP_SVD, DECOMP_CHOLESKY
+</ParamField>
+
+<ResponseField name="return" type="double">
+  Reciprocal condition number (for SVD) or 0 if singular
+</ResponseField>
+
+**Decomposition Methods:**
+- `DECOMP_LU`: LU decomposition (fastest for well-conditioned matrices)
+- `DECOMP_SVD`: Singular value decomposition (works for singular matrices)
+- `DECOMP_CHOLESKY`: Cholesky decomposition (for symmetric positive-definite matrices)
+
+**Example:**
+```cpp
+Mat A, invA;
+double rcond = invert(A, invA, DECOMP_SVD);
+if (rcond > 1e-6) {
+    // Matrix is well-conditioned
+}
+```
+
+### solve
+
+```cpp
+bool solve(InputArray src1, InputArray src2, OutputArray dst, int flags = DECOMP_LU)
+```
+
+Solves one or more linear systems or least-squares problems.
+
+<ParamField path="src1" type="InputArray">
+  Coefficient matrix (A in Ax=b)
+</ParamField>
+
+<ParamField path="src2" type="InputArray">
+  Right-hand side matrix (b in Ax=b)
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Output solution (x in Ax=b)
+</ParamField>
+
+<ParamField path="flags" type="int">
+  Solution method: DECOMP_LU, DECOMP_SVD, DECOMP_CHOLESKY, DECOMP_QR, DECOMP_NORMAL
+</ParamField>
+
+<ResponseField name="return" type="bool">
+  True if solution exists
+</ResponseField>
+
+**Example:**
+```cpp
+Mat A, b, x;
+// Solve Ax = b
+if (solve(A, b, x, DECOMP_LU)) {
+    std::cout << "Solution: " << x << std::endl;
+}
+```
+
+### eigen
+
+```cpp
+bool eigen(InputArray src, OutputArray eigenvalues, OutputArray eigenvectors = noArray())
+```
+
+Calculates eigenvalues and eigenvectors of a symmetric matrix.
+
+<ParamField path="src" type="InputArray">
+  Input symmetric square matrix
+</ParamField>
+
+<ParamField path="eigenvalues" type="OutputArray">
+  Output vector of eigenvalues (in descending order)
+</ParamField>
+
+<ParamField path="eigenvectors" type="OutputArray">
+  Output matrix of eigenvectors (one per row)
+</ParamField>
+
+<ResponseField name="return" type="bool">
+  True if successful
+</ResponseField>
+
+**Example:**
+```cpp
+Mat covar, eigenvalues, eigenvectors;
+calcCovarMatrix(samples, covar, mean, COVAR_NORMAL | COVAR_ROWS);
+eigen(covar, eigenvalues, eigenvectors);
+
+// First eigenvector (principal component)
+Mat pc1 = eigenvectors.row(0);
+```
+
+<Note>
+This function is optimized for symmetric matrices. For general matrices, use eigenNonSymmetric().
+</Note>
+
+### calcCovarMatrix
+
+```cpp
+void calcCovarMatrix(InputArray samples, OutputArray covar, InputOutputArray mean,
+                     int flags, int ctype = CV_64F)
+```
+
+Calculates covariance matrix of a set of vectors.
+
+<ParamField path="samples" type="InputArray">
+  Input samples (each row or column is a sample)
+</ParamField>
+
+<ParamField path="covar" type="OutputArray">
+  Output covariance matrix
+</ParamField>
+
+<ParamField path="mean" type="InputOutputArray">
+  Input or output mean vector
+</ParamField>
+
+<ParamField path="flags" type="int">
+  Operation flags: COVAR_SCRAMBLED, COVAR_NORMAL, COVAR_USE_AVG, COVAR_SCALE, COVAR_ROWS, COVAR_COLS
+</ParamField>
+
+<ParamField path="ctype" type="int">
+  Type of output matrices (CV_32F or CV_64F)
+</ParamField>
+
+**Example:**
+```cpp
+Mat samples(1000, 5, CV_32F); // 1000 samples, 5 dimensions
+Mat covar, mean;
+
+calcCovarMatrix(samples, covar, mean, 
+                COVAR_NORMAL | COVAR_ROWS | COVAR_SCALE, CV_32F);
+```
+
+## Timing and Profiling
+
+### getTickCount
+
+```cpp
+int64 getTickCount()
+```
+
+Returns the number of ticks since a certain event (e.g., machine startup).
+
+<ResponseField name="return" type="int64">
+  Current tick count
+</ResponseField>
+
+**Example:**
+```cpp
+int64 t1 = getTickCount();
+// ... perform operation ...
+int64 t2 = getTickCount();
+double time = (t2 - t1) / getTickFrequency();
+std::cout << "Time: " << time << " seconds" << std::endl;
+```
+
+### getTickFrequency
+
+```cpp
+double getTickFrequency()
+```
+
+Returns the number of ticks per second.
+
+<ResponseField name="return" type="double">
+  Tick frequency in Hz
+</ResponseField>
+
+### TickMeter
+
+```cpp
+class TickMeter {
+public:
+    void start();
+    void stop();
+    void reset();
+    double getTimeSec() const;
+    double getTimeMilli() const;
+    double getTimeMicro() const;
+    int64 getCounter() const;
+    double getFPS() const;
+};
+```
+
+A class to measure passing time and calculate performance metrics.
+
+**Example:**
+```cpp
+cv::TickMeter tm;
+tm.start();
+// ... perform operation ...
+tm.stop();
+
+std::cout << "Time: " << tm.getTimeMilli() << " ms" << std::endl;
+std::cout << "FPS: " << tm.getFPS() << std::endl;
+```
+
+## System Information
+
+### getNumberOfCPUs
+
+```cpp
+int getNumberOfCPUs()
+```
+
+Returns the number of logical CPUs available for the process.
+
+### setNumThreads
+
+```cpp
+void setNumThreads(int nthreads)
+```
+
+Sets the number of threads used by OpenCV for parallel regions.
+
+<ParamField path="nthreads" type="int">
+  Number of threads. Use 0 or negative values to reset to default
+</ParamField>
+
+### getNumThreads
+
+```cpp
+int getNumThreads()
+```
+
+Returns the number of threads used by OpenCV for parallel regions.
+
+### getBuildInformation
+
+```cpp
+String getBuildInformation()
+```
+
+Returns full configuration time cmake output including version, compiler, enabled modules, etc.
+
+**Example:**
+```cpp
+std::cout << getBuildInformation() << std::endl;
+```
+
+### getVersionString
+
+```cpp
+String getVersionString()
+```
+
+Returns library version string (e.g., "4.8.0").
+
+### getCPUFeaturesLine
+
+```cpp
+std::string getCPUFeaturesLine()
+```
+
+Returns a string containing CPU features enabled during compilation.
+
+**Example output:**
+```
+SSE SSE2 SSE3 *SSE4.1 *SSE4.2 *AVX *AVX2
+```
+
+- No marker: baseline features
+- `*`: features enabled in dispatcher
+- `?`: features enabled but not available in hardware
+
+## Utility Functions
+
+### setUseOptimized
+
+```cpp
+void setUseOptimized(bool onoff)
+```
+
+Enables or disables optimized code (SSE, AVX, etc.).
+
+<ParamField path="onoff" type="bool">
+  True to enable optimizations, false to disable
+</ParamField>
+
+### useOptimized
+
+```cpp
+bool useOptimized()
+```
+
+Returns the status of optimized code usage.
+
+### checkRange
+
+```cpp
+bool checkRange(InputArray a, bool quiet = true, Point* pos = 0,
+                double minVal = -DBL_MAX, double maxVal = DBL_MAX)
+```
+
+Checks every element of an input array for invalid values.
+
+<ParamField path="a" type="InputArray">
+  Input array
+</ParamField>
+
+<ParamField path="quiet" type="bool">
+  If true, doesn't throw exceptions on invalid values
+</ParamField>
+
+<ParamField path="pos" type="Point*">
+  Optional output parameter for position of first invalid value
+</ParamField>
+
+<ParamField path="minVal" type="double">
+  Minimum valid value (inclusive)
+</ParamField>
+
+<ParamField path="maxVal" type="double">
+  Maximum valid value (inclusive)
+</ParamField>
+
+<ResponseField name="return" type="bool">
+  True if all elements are within range and not NaN/Inf
+</ResponseField>
+
+**Example:**
+```cpp
+Mat result;
+// ... computation ...
+if (!checkRange(result)) {
+    std::cerr << "Invalid values detected (NaN or Inf)" << std::endl;
+}
+```
+
+### patchNaNs
+
+```cpp
+void patchNaNs(InputOutputArray a, double val = 0)
+```
+
+Replaces all NaN values in an array with specified value.
+
+<ParamField path="a" type="InputOutputArray">
+  Input/output floating-point array
+</ParamField>
+
+<ParamField path="val" type="double">
+  Value to replace NaNs with
+</ParamField>
+
+**Example:**
+```cpp
+Mat data;
+// ... computation that might produce NaNs ...
+patchNaNs(data, 0.0); // Replace NaNs with zeros
+```
+
+### LUT
+
+```cpp
+void LUT(InputArray src, InputArray lut, OutputArray dst)
+```
+
+Performs a look-up table transform of an array.
+
+<ParamField path="src" type="InputArray">
+  Input array (8-bit elements)
+</ParamField>
+
+<ParamField path="lut" type="InputArray">
+  Look-up table (256 elements)
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Output array (same size as src)
+</ParamField>
+
+**Example:**
+```cpp
+// Create a gamma correction LUT
+Mat lut(1, 256, CV_8U);
+for(int i = 0; i < 256; i++)
+    lut.at<uchar>(i) = saturate_cast<uchar>(pow(i / 255.0, 0.5) * 255.0);
+
+Mat img, corrected;
+LUT(img, lut, corrected); // Apply gamma correction
+```
+
+### convertScaleAbs
+
+```cpp
+void convertScaleAbs(InputArray src, OutputArray dst, double alpha = 1, double beta = 0)
+```
+
+Scales, calculates absolute values, and converts to 8-bit unsigned type.
+
+<ParamField path="src" type="InputArray">
+  Input array
+</ParamField>
+
+<ParamField path="dst" type="OutputArray">
+  Output array (CV_8U type)
+</ParamField>
+
+<ParamField path="alpha" type="double">
+  Scale factor
+</ParamField>
+
+<ParamField path="beta" type="double">
+  Delta added to scaled values
+</ParamField>
+
+**Formula:**
+```
+dst(I) = saturate_cast<uchar>(|src(I) · alpha + beta|)
+```
+
+**Example:**
+```cpp
+Mat gradient_x, abs_gradient;
+Sobel(img, gradient_x, CV_16S, 1, 0);
+convertScaleAbs(gradient_x, abs_gradient);
+```
+
+### PSNR
+
+```cpp
+double PSNR(InputArray src1, InputArray src2, double R = 255.0)
+```
+
+Computes Peak Signal-to-Noise Ratio (PSNR) between two images.
+
+<ParamField path="src1" type="InputArray">
+  First input array
+</ParamField>
+
+<ParamField path="src2" type="InputArray">
+  Second input array (same size and type as src1)
+</ParamField>
+
+<ParamField path="R" type="double">
+  Maximum pixel value (255.0 for 8-bit images)
+</ParamField>
+
+<ResponseField name="return" type="double">
+  PSNR value in decibels (dB)
+</ResponseField>
+
+**Example:**
+```cpp
+Mat original, compressed;
+double psnr = PSNR(original, compressed);
+std::cout << "PSNR: " << psnr << " dB" << std::endl;
+```
+
+<Note>
+Higher PSNR values indicate better quality. Typical values range from 20 to 50 dB, with 30-50 dB being good quality.
+</Note>

@@ -1,0 +1,708 @@
+---
+title: QR Code and Barcode Detection
+description: API reference for QR code and barcode detection and decoding
+---
+
+# QR Code and Barcode Detection
+
+API reference for detecting and decoding QR codes, barcodes, and other graphical codes.
+
+## GraphicalCodeDetector
+
+Base class for graphical code detection and decoding.
+
+### Methods
+
+#### detect
+
+Detects graphical code in image and returns the quadrangle containing the code.
+
+```cpp
+bool detect(InputArray img, OutputArray points) const
+```
+
+<ParamField path="img" type="InputArray">
+  Grayscale or color (BGR) image containing (or not) graphical code
+</ParamField>
+
+<ParamField path="points" type="OutputArray">
+  Output vector of vertices of the minimum-area quadrangle containing the code
+</ParamField>
+
+**Returns:** `true` if a code is detected
+
+#### decode
+
+Decodes graphical code once it's found by the detect() method.
+
+```cpp
+std::string decode(
+    InputArray img,
+    InputArray points,
+    OutputArray straight_code = noArray()
+) const
+```
+
+<ParamField path="img" type="InputArray">
+  Grayscale or color (BGR) image containing graphical code
+</ParamField>
+
+<ParamField path="points" type="InputArray">
+  Quadrangle vertices found by detect() method
+</ParamField>
+
+<ParamField path="straight_code" type="OutputArray" optional>
+  Optional output image containing binarized code
+</ParamField>
+
+**Returns:** UTF8-encoded output string or empty string if the code cannot be decoded
+
+#### detectAndDecode
+
+Both detects and decodes graphical code.
+
+```cpp
+std::string detectAndDecode(
+    InputArray img,
+    OutputArray points = noArray(),
+    OutputArray straight_code = noArray()
+) const
+```
+
+<ParamField path="img" type="InputArray">
+  Grayscale or color (BGR) image containing graphical code
+</ParamField>
+
+<ParamField path="points" type="OutputArray" optional>
+  Optional output array of vertices of the found graphical code quadrangle
+</ParamField>
+
+<ParamField path="straight_code" type="OutputArray" optional>
+  Optional output image containing binarized code
+</ParamField>
+
+**Returns:** Decoded string or empty string if not found
+
+#### detectMulti
+
+Detects multiple graphical codes in image.
+
+```cpp
+bool detectMulti(InputArray img, OutputArray points) const
+```
+
+<ParamField path="img" type="InputArray">
+  Grayscale or color (BGR) image
+</ParamField>
+
+<ParamField path="points" type="OutputArray">
+  Output vector of vector of vertices of the minimum-area quadrangles containing the codes
+</ParamField>
+
+**Returns:** `true` if at least one code is detected
+
+#### decodeMulti
+
+Decodes multiple graphical codes.
+
+```cpp
+bool decodeMulti(
+    InputArray img,
+    InputArray points,
+    std::vector<std::string>& decoded_info,
+    OutputArrayOfArrays straight_code = noArray()
+) const
+```
+
+<ParamField path="img" type="InputArray">
+  Grayscale or color (BGR) image containing graphical codes
+</ParamField>
+
+<ParamField path="points" type="InputArray">
+  Vector of quadrangle vertices found by detect() method
+</ParamField>
+
+<ParamField path="decoded_info" type="std::vector<std::string>&">
+  UTF8-encoded output vector of strings or empty vector if codes cannot be decoded
+</ParamField>
+
+<ParamField path="straight_code" type="OutputArrayOfArrays" optional>
+  Optional output vector of images containing binarized codes
+</ParamField>
+
+**Returns:** `true` if at least one code is decoded
+
+#### detectAndDecodeMulti
+
+Both detects and decodes multiple graphical codes.
+
+```cpp
+bool detectAndDecodeMulti(
+    InputArray img,
+    std::vector<std::string>& decoded_info,
+    OutputArray points = noArray(),
+    OutputArrayOfArrays straight_code = noArray()
+) const
+```
+
+<ParamField path="decoded_info" type="std::vector<std::string>&">
+  UTF8-encoded output vector of strings or empty vector if codes cannot be decoded
+</ParamField>
+
+<Note>
+If there are QR codes encoded with Structured Append mode and all are detected and decoded correctly, the method writes the full message to the position corresponding to the 0-th code in the sequence. The rest of the QR codes from the same sequence have empty strings.
+</Note>
+
+---
+
+## QRCodeDetector
+
+QR code detector and decoder.
+
+### Constructor
+
+```cpp
+cv::QRCodeDetector::QRCodeDetector()
+```
+
+### Methods
+
+#### setEpsX
+
+Sets the epsilon used during horizontal scan of QR code stop marker detection.
+
+```cpp
+QRCodeDetector& setEpsX(double epsX)
+```
+
+<ParamField path="epsX" type="double">
+  Epsilon neighborhood for determining the horizontal pattern of the scheme 1:1:3:1:1 according to QR code standard
+</ParamField>
+
+**Returns:** Reference to this QRCodeDetector
+
+#### setEpsY
+
+Sets the epsilon used during vertical scan of QR code stop marker detection.
+
+```cpp
+QRCodeDetector& setEpsY(double epsY)
+```
+
+<ParamField path="epsY" type="double">
+  Epsilon neighborhood for determining the vertical pattern of the scheme 1:1:3:1:1 according to QR code standard
+</ParamField>
+
+**Returns:** Reference to this QRCodeDetector
+
+#### setUseAlignmentMarkers
+
+Enables or disables use of alignment markers to improve corner position.
+
+```cpp
+QRCodeDetector& setUseAlignmentMarkers(bool useAlignmentMarkers)
+```
+
+<ParamField path="useAlignmentMarkers" type="bool">
+  Flag to enable alignment markers (enabled by default)
+</ParamField>
+
+**Returns:** Reference to this QRCodeDetector
+
+#### decodeCurved
+
+Decodes QR code on a curved surface once found by detect().
+
+```cpp
+std::string decodeCurved(
+    InputArray img,
+    InputArray points,
+    OutputArray straight_qrcode = noArray()
+)
+```
+
+<ParamField path="img" type="InputArray">
+  Grayscale or color (BGR) image containing QR code
+</ParamField>
+
+<ParamField path="points" type="InputArray">
+  Quadrangle vertices found by detect() method
+</ParamField>
+
+<ParamField path="straight_qrcode" type="OutputArray" optional>
+  Optional output image containing rectified and binarized QR code
+</ParamField>
+
+**Returns:** UTF8-encoded output string or empty string if the code cannot be decoded
+
+#### detectAndDecodeCurved
+
+Both detects and decodes QR code on a curved surface.
+
+```cpp
+std::string detectAndDecodeCurved(
+    InputArray img,
+    OutputArray points = noArray(),
+    OutputArray straight_qrcode = noArray()
+)
+```
+
+#### getEncoding
+
+Returns the encoding type for the decoded info from the latest decode call.
+
+```cpp
+QRCodeEncoder::ECIEncodings getEncoding(int codeIdx = 0)
+```
+
+<ParamField path="codeIdx" type="int" default="0">
+  Index of the previously decoded QR code. For single code detection, use 0.
+</ParamField>
+
+**Returns:** Encoding type (e.g., ECI_UTF8, ECI_SHIFT_JIS)
+
+### Example Usage
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/objdetect.hpp>
+    #include <opencv2/imgproc.hpp>
+    #include <iostream>
+    
+    // Create QR code detector
+    cv::QRCodeDetector detector;
+    
+    // Detect and decode QR code
+    std::vector<cv::Point> points;
+    std::string decoded_info = detector.detectAndDecode(image, points);
+    
+    if (!decoded_info.empty()) {
+        std::cout << "QR Code decoded: " << decoded_info << std::endl;
+        
+        // Draw quadrangle around QR code
+        for (size_t i = 0; i < points.size(); i++) {
+            cv::line(image, points[i], points[(i+1) % points.size()], 
+                    cv::Scalar(0, 255, 0), 3);
+        }
+    } else {
+        std::cout << "QR Code not detected" << std::endl;
+    }
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    import cv2
+    
+    # Create QR code detector
+    detector = cv2.QRCodeDetector()
+    
+    # Detect and decode QR code
+    decoded_info, points, _ = detector.detectAndDecode(image)
+    
+    if decoded_info:
+        print(f"QR Code decoded: {decoded_info}")
+        
+        # Draw quadrangle around QR code
+        if points is not None:
+            points = points.astype(int)
+            for i in range(len(points)):
+                cv2.line(image, tuple(points[i][0]), 
+                        tuple(points[(i+1) % len(points)][0]),
+                        (0, 255, 0), 3)
+    else:
+        print("QR Code not detected")
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## QRCodeEncoder
+
+QR code encoder for generating QR codes.
+
+### Constructor
+
+Use the static `create()` method.
+
+```cpp
+static Ptr<QRCodeEncoder> create(
+    const QRCodeEncoder::Params& parameters = QRCodeEncoder::Params()
+)
+```
+
+### Enums
+
+#### EncodeMode
+
+```cpp
+enum EncodeMode {
+    MODE_AUTO = -1,
+    MODE_NUMERIC = 1,
+    MODE_ALPHANUMERIC = 2,
+    MODE_BYTE = 4,
+    MODE_ECI = 7,
+    MODE_KANJI = 8,
+    MODE_STRUCTURED_APPEND = 3
+}
+```
+
+#### CorrectionLevel
+
+```cpp
+enum CorrectionLevel {
+    CORRECT_LEVEL_L = 0,  // ~7% error correction
+    CORRECT_LEVEL_M = 1,  // ~15% error correction
+    CORRECT_LEVEL_Q = 2,  // ~25% error correction
+    CORRECT_LEVEL_H = 3   // ~30% error correction
+}
+```
+
+#### ECIEncodings
+
+```cpp
+enum ECIEncodings {
+    ECI_SHIFT_JIS = 20,
+    ECI_UTF8 = 26
+}
+```
+
+### Params Structure
+
+```cpp
+struct Params {
+    int version;                          // QR code version
+    CorrectionLevel correction_level;     // Error correction level
+    EncodeMode mode;                      // Encoding mode
+    int structure_number;                 // Number of QR codes in Structured Append
+}
+```
+
+### Methods
+
+#### encode
+
+Generates QR code from input string.
+
+```cpp
+void encode(const String& encoded_info, OutputArray qrcode)
+```
+
+<ParamField path="encoded_info" type="String">
+  Input string to encode
+</ParamField>
+
+<ParamField path="qrcode" type="OutputArray">
+  Generated QR code image
+</ParamField>
+
+#### encodeStructuredAppend
+
+Generates QR code in Structured Append mode, splitting the message over multiple QR codes.
+
+```cpp
+void encodeStructuredAppend(
+    const String& encoded_info,
+    OutputArrayOfArrays qrcodes
+)
+```
+
+<ParamField path="encoded_info" type="String">
+  Input string to encode
+</ParamField>
+
+<ParamField path="qrcodes" type="OutputArrayOfArrays">
+  Vector of generated QR code images
+</ParamField>
+
+### Example Usage
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/objdetect.hpp>
+    #include <opencv2/imgcodecs.hpp>
+    
+    // Create encoder with parameters
+    cv::QRCodeEncoder::Params params;
+    params.version = 5;  // or -1 for automatic
+    params.correction_level = cv::QRCodeEncoder::CORRECT_LEVEL_M;
+    params.mode = cv::QRCodeEncoder::MODE_BYTE;
+    
+    auto encoder = cv::QRCodeEncoder::create(params);
+    
+    // Generate QR code
+    cv::Mat qrcode;
+    encoder->encode("https://opencv.org", qrcode);
+    
+    // Save or display
+    cv::imwrite("qrcode.png", qrcode);
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    import cv2
+    
+    # Create encoder with parameters
+    params = cv2.QRCodeEncoder_Params()
+    params.version = 5  # or -1 for automatic
+    params.correction_level = cv2.QRCodeEncoder_CORRECT_LEVEL_M
+    params.mode = cv2.QRCodeEncoder_MODE_BYTE
+    
+    encoder = cv2.QRCodeEncoder.create(params)
+    
+    # Generate QR code
+    qrcode = encoder.encode("https://opencv.org")
+    
+    # Save or display
+    cv2.imwrite("qrcode.png", qrcode)
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## BarcodeDetector
+
+Barcode detector and decoder. Inherits from GraphicalCodeDetector.
+
+### Constructor
+
+```cpp
+cv::barcode::BarcodeDetector::BarcodeDetector()
+
+cv::barcode::BarcodeDetector::BarcodeDetector(
+    const std::string& prototxt_path,
+    const std::string& model_path
+)
+```
+
+<ParamField path="prototxt_path" type="std::string">
+  Prototxt file path for the super resolution model (optional)
+</ParamField>
+
+<ParamField path="model_path" type="std::string">
+  Model file path for the super resolution model (optional)
+</ParamField>
+
+### Methods
+
+#### decodeWithType
+
+Decodes barcode in image once found by detect().
+
+```cpp
+bool decodeWithType(
+    InputArray img,
+    InputArray points,
+    std::vector<std::string>& decoded_info,
+    std::vector<std::string>& decoded_type
+) const
+```
+
+<ParamField path="img" type="InputArray">
+  Grayscale or color (BGR) image containing barcode
+</ParamField>
+
+<ParamField path="points" type="InputArray">
+  Vector of rotated rectangle vertices found by detect(). Order: bottomLeft, topLeft, topRight, bottomRight.
+</ParamField>
+
+<ParamField path="decoded_info" type="std::vector<std::string>&">
+  UTF8-encoded output vector of strings or empty if codes cannot be decoded
+</ParamField>
+
+<ParamField path="decoded_type" type="std::vector<std::string>&">
+  Vector of strings specifying the type of barcodes (e.g., "EAN_13", "CODE_128")
+</ParamField>
+
+**Returns:** `true` if at least one valid barcode is found
+
+#### detectAndDecodeWithType
+
+Both detects and decodes barcode.
+
+```cpp
+bool detectAndDecodeWithType(
+    InputArray img,
+    std::vector<std::string>& decoded_info,
+    std::vector<std::string>& decoded_type,
+    OutputArray points = noArray()
+) const
+```
+
+<ParamField path="img" type="InputArray">
+  Grayscale or color (BGR) image containing barcode
+</ParamField>
+
+<ParamField path="decoded_info" type="std::vector<std::string>&">
+  UTF8-encoded output vector of strings
+</ParamField>
+
+<ParamField path="decoded_type" type="std::vector<std::string>&">
+  Vector of strings specifying the barcode types
+</ParamField>
+
+<ParamField path="points" type="OutputArray" optional>
+  Optional output vector of vertices of the found barcode rectangle
+</ParamField>
+
+**Returns:** `true` if at least one valid barcode is found
+
+#### setDownsamplingThreshold
+
+Sets detector downsampling threshold.
+
+```cpp
+BarcodeDetector& setDownsamplingThreshold(double thresh)
+```
+
+<ParamField path="thresh" type="double">
+  Downsampling limit to apply (default 512). The detect method resizes the input image to this limit if the smallest dimension is greater than the threshold.
+</ParamField>
+
+**Returns:** Reference to this BarcodeDetector
+
+#### getDownsamplingThreshold
+
+Gets detector downsampling threshold.
+
+```cpp
+double getDownsamplingThreshold() const
+```
+
+**Returns:** Current downsampling threshold
+
+#### setDetectorScales
+
+Sets detector box filter sizes.
+
+```cpp
+BarcodeDetector& setDetectorScales(const std::vector<float>& sizes)
+```
+
+<ParamField path="sizes" type="std::vector<float>">
+  Box filter sizes relative to minimum dimension of the image (default [0.01, 0.03, 0.06, 0.08])
+</ParamField>
+
+<Note>
+Filter sizes directly correlate with the expected line widths for a barcode. If the downsampling limit is increased, filter sizes need to be adjusted inversely.
+</Note>
+
+**Returns:** Reference to this BarcodeDetector
+
+#### getDetectorScales
+
+Gets detector box filter sizes.
+
+```cpp
+void getDetectorScales(std::vector<float>& sizes) const
+```
+
+<ParamField path="sizes" type="std::vector<float>&">
+  Output parameter for returning the sizes
+</ParamField>
+
+#### setGradientThreshold
+
+Sets detector gradient magnitude threshold.
+
+```cpp
+BarcodeDetector& setGradientThreshold(double thresh)
+```
+
+<ParamField path="thresh" type="double">
+  Gradient magnitude threshold (default 64). Values between 16 and 1024 generally work.
+</ParamField>
+
+**Returns:** Reference to this BarcodeDetector
+
+#### getGradientThreshold
+
+Gets detector gradient magnitude threshold.
+
+```cpp
+double getGradientThreshold() const
+```
+
+**Returns:** Current gradient threshold
+
+### Example Usage
+
+<Tabs>
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/objdetect/barcode.hpp>
+    #include <opencv2/imgproc.hpp>
+    #include <iostream>
+    
+    // Create barcode detector
+    cv::barcode::BarcodeDetector detector;
+    
+    // Optionally adjust parameters
+    detector.setDownsamplingThreshold(800);
+    detector.setGradientThreshold(64);
+    
+    // Detect and decode barcodes
+    std::vector<std::string> decoded_info;
+    std::vector<std::string> decoded_type;
+    std::vector<cv::Point> points;
+    
+    bool found = detector.detectAndDecodeWithType(
+        image, decoded_info, decoded_type, points
+    );
+    
+    if (found) {
+        for (size_t i = 0; i < decoded_info.size(); i++) {
+            std::cout << "Barcode " << i << ": "
+                     << decoded_info[i] << " (Type: "
+                     << decoded_type[i] << ")" << std::endl;
+        }
+    } else {
+        std::cout << "No barcodes detected" << std::endl;
+    }
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    import cv2
+    
+    # Create barcode detector
+    detector = cv2.barcode.BarcodeDetector()
+    
+    # Optionally adjust parameters
+    detector.setDownsamplingThreshold(800)
+    detector.setGradientThreshold(64)
+    
+    # Detect and decode barcodes
+    retval, decoded_info, decoded_type, points = \
+        detector.detectAndDecodeWithType(image)
+    
+    if retval:
+        for i, (info, type_) in enumerate(zip(decoded_info, decoded_type)):
+            print(f"Barcode {i}: {info} (Type: {type_})")
+    else:
+        print("No barcodes detected")
+    ```
+  </Tab>
+</Tabs>
+
+## Supported Barcode Types
+
+The BarcodeDetector supports various 1D and 2D barcode formats:
+
+- EAN-8, EAN-13
+- UPC-A, UPC-E
+- Code 39, Code 93, Code 128
+- ITF (Interleaved 2 of 5)
+- Codabar
+- QR Code
+- DataMatrix
+- PDF417
+
+## See Also
+
+- [Cascade Classifier](/api/objdetect/cascade)
+- [Face Detection](/api/objdetect/face)
+- [ArUco Detection](/api/objdetect/aruco)

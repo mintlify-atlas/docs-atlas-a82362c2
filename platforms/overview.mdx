@@ -1,0 +1,181 @@
+---
+title: Platform Support Overview
+description: OpenCV platform support matrix, system requirements, and architecture compatibility
+---
+
+OpenCV is designed to be cross-platform and runs on a wide variety of operating systems and architectures. This page provides an overview of supported platforms and their requirements.
+
+## Supported Platforms
+
+OpenCV supports the following major platforms:
+
+<CardGroup cols={2}>
+  <Card title="Linux" icon="linux" href="/platforms/linux">
+    Native support for x86, x86_64, ARM, and other architectures
+  </Card>
+  <Card title="Windows" icon="windows" href="/platforms/windows">
+    Full support via Visual Studio and MinGW toolchains
+  </Card>
+  <Card title="macOS" icon="apple" href="/platforms/macos">
+    Universal binaries for Intel and Apple Silicon
+  </Card>
+  <Card title="Android" icon="android" href="/platforms/android">
+    AAR packages and NDK integration
+  </Card>
+  <Card title="iOS" icon="mobile" href="/platforms/ios">
+    XCFramework with Objective-C and Swift support
+  </Card>
+</CardGroup>
+
+## Architecture Support Matrix
+
+OpenCV supports a wide range of processor architectures across different platforms:
+
+| Platform | Architectures | Build System |
+|----------|--------------|-------------|
+| **Linux** | x86, x86_64, ARM (v7, v8), RISC-V, PowerPC, MIPS | CMake + Make/Ninja |
+| **Windows** | x86, x86_64, ARM64 | CMake + Visual Studio/Ninja |
+| **macOS** | x86_64, arm64 (Apple Silicon) | CMake + Xcode |
+| **Android** | armeabi-v7a, arm64-v8a, x86, x86_64 | CMake + Gradle/NDK |
+| **iOS** | armv7, arm64, i386, x86_64 (simulator) | CMake + Xcode |
+
+## Minimum Requirements
+
+### Build Tools
+
+<Tabs>
+  <Tab title="Linux">
+    - GCC 5.x+ or Clang 3.4+
+    - CMake 3.5.1+
+    - Make or Ninja
+    - Git (optional)
+  </Tab>
+  <Tab title="Windows">
+    - Visual Studio 2015+ (MSVC 14.0+)
+    - CMake 3.5.1+
+    - Git (optional)
+  </Tab>
+  <Tab title="macOS">
+    - Xcode 12.2+ with Command Line Tools
+    - CMake 3.19.0+
+    - Python 3.6+
+  </Tab>
+  <Tab title="Android">
+    - Android Studio or Android SDK/NDK
+    - CMake 3.6+
+    - Python 3.6+ (for build scripts)
+    - Gradle 6.0+
+  </Tab>
+  <Tab title="iOS">
+    - Xcode 12.2+ with Command Line Tools
+    - CMake 3.19.0+
+    - Python 3.6+
+  </Tab>
+</Tabs>
+
+### Runtime Requirements
+
+<Note>
+Minimum OS versions for running OpenCV applications:
+
+- **Linux**: Kernel 2.6.32+ (older kernels may work with reduced functionality)
+- **Windows**: Windows 7 SP1 or later
+- **macOS**: macOS 10.12 (Sierra) or later
+- **Android**: API Level 21 (Android 5.0 Lollipop) or later
+- **iOS**: iOS 9.0 or later
+</Note>
+
+## Cross-Compilation Support
+
+OpenCV provides toolchain files for cross-compilation:
+
+```bash
+# ARM Linux cross-compilation example
+cmake -DCMAKE_TOOLCHAIN_FILE=platforms/linux/arm-gnueabi.toolchain.cmake \
+      -DCMAKE_BUILD_TYPE=Release \
+      ..
+```
+
+### Available Toolchains
+
+The `platforms/` directory contains toolchain files for:
+
+- **ARM**: `arm-gnueabi.toolchain.cmake`, `aarch64-gnu.toolchain.cmake`
+- **RISC-V**: `riscv64-gcc.toolchain.cmake`, `riscv64-clang.toolchain.cmake`
+- **MIPS**: `mips32r5el-gnu.toolchain.cmake`, `mips64r6el-gnu.toolchain.cmake`
+- **PowerPC**: `ppc64-gnu.toolchain.cmake`, `ppc64le-gnu.toolchain.cmake`
+
+## Hardware Acceleration
+
+OpenCV leverages platform-specific acceleration technologies:
+
+| Platform | Acceleration Technologies |
+|----------|---------------------------|
+| **All Platforms** | SSE2/3/4, AVX, AVX2, AVX-512, NEON |
+| **Linux** | OpenCL, CUDA, TBB, OpenMP, VA-API |
+| **Windows** | OpenCL, CUDA, TBB, OpenMP, DirectX |
+| **macOS** | OpenCL, TBB, Accelerate Framework |
+| **Android** | OpenCL, Vulkan, NNAPI, FastCV (Qualcomm) |
+| **iOS** | Accelerate Framework, Metal, Core ML |
+
+<Warning>
+GPU acceleration (CUDA, OpenCL) requires compatible hardware and additional setup. Not all modules support all acceleration technologies.
+</Warning>
+
+## Binary Distributions
+
+Pre-built binaries are available for common configurations:
+
+- **Windows**: Installer packages for Visual Studio 2015-2022 (x86, x64)
+- **Android**: AAR packages via Maven Central
+- **iOS**: Pre-built frameworks available in releases
+- **Python**: `pip install opencv-python` for major platforms
+
+<Tip>
+Building from source gives you more control over enabled features and optimizations for your specific hardware.
+</Tip>
+
+## Platform-Specific Considerations
+
+### Mobile Platforms
+
+<Info>
+For iOS and Android:
+- Framework/AAR sizes can be large (~50-100MB). Consider using modular builds to reduce size.
+- Some modules are not available on mobile (e.g., highgui video capture)
+- Use `--without` flag when building to exclude unnecessary modules
+</Info>
+
+### Embedded Systems
+
+For resource-constrained embedded Linux systems:
+
+```bash
+# Minimal build for embedded systems
+cmake -DBUILD_SHARED_LIBS=OFF \
+      -DBUILD_TESTS=OFF \
+      -DBUILD_PERF_TESTS=OFF \
+      -DBUILD_EXAMPLES=OFF \
+      -DWITH_GTK=OFF \
+      -DWITH_QT=OFF \
+      ..
+```
+
+## Getting Started
+
+Select your platform to view detailed installation and build instructions:
+
+<CardGroup cols={2}>
+  <Card title="Linux Installation" href="/platforms/linux" />
+  <Card title="Windows Installation" href="/platforms/windows" />
+  <Card title="macOS Installation" href="/platforms/macos" />
+  <Card title="Android Development" href="/platforms/android" />
+  <Card title="iOS Development" href="/platforms/ios" />
+</CardGroup>
+
+## Additional Resources
+
+- [General Installation Tutorial](https://docs.opencv.org/4.x/df/d65/tutorial_table_of_content_introduction.html)
+- [CMake Configuration Reference](https://docs.opencv.org/4.x/db/d05/tutorial_config_reference.html)
+- [GitHub Repository](https://github.com/opencv/opencv)
+- [Release Downloads](https://opencv.org/releases/)

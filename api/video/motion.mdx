@@ -1,0 +1,293 @@
+---
+title: Motion Analysis Functions
+description: Core motion analysis algorithms including CamShift, MeanShift, and ECC image alignment
+---
+
+The motion analysis module provides fundamental algorithms for tracking object motion, estimating transformations between images, and computing similarity measures.
+
+## CamShift
+
+Finds an object center, size, and orientation using the CAMSHIFT algorithm.
+
+```cpp
+RotatedRect CamShift(
+    InputArray probImage,
+    Rect& window,
+    TermCriteria criteria
+);
+```
+
+<ParamField path="probImage" type="InputArray" required>
+  Back projection of the object histogram. See `calcBackProject` for details.
+</ParamField>
+
+<ParamField path="window" type="Rect&" required>
+  Initial search window. The function updates this parameter with the new window position.
+</ParamField>
+
+<ParamField path="criteria" type="TermCriteria" required>
+  Stop criteria for the underlying meanShift algorithm.
+</ParamField>
+
+**Returns:** `RotatedRect` structure that includes the object position, size, and orientation.
+
+<Note>
+The function implements the CAMSHIFT object tracking algorithm. It first finds an object center using `meanShift`, then adjusts the window size and finds the optimal rotation. The next position of the search window can be obtained with `RotatedRect::boundingRect()`.
+</Note>
+
+### Example
+
+```cpp
+Mat hsv, backproj;
+cvtColor(frame, hsv, COLOR_BGR2HSV);
+calcBackProject(&hsv, 1, channels, hist, backproj, ranges);
+
+Rect trackWindow = Rect(x, y, w, h);
+TermCriteria criteria(TermCriteria::EPS | TermCriteria::COUNT, 10, 1);
+RotatedRect trackBox = CamShift(backproj, trackWindow, criteria);
+```
+
+## meanShift
+
+Finds an object on a back projection image using iterative search.
+
+```cpp
+int meanShift(
+    InputArray probImage,
+    Rect& window,
+    TermCriteria criteria
+);
+```
+
+<ParamField path="probImage" type="InputArray" required>
+  Back projection of the object histogram. See `calcBackProject` for details.
+</ParamField>
+
+<ParamField path="window" type="Rect&" required>
+  Initial search window. Updated with the final window position.
+</ParamField>
+
+<ParamField path="criteria" type="TermCriteria" required>
+  Stop criteria for the iterative search algorithm.
+</ParamField>
+
+**Returns:** Number of iterations the algorithm took to converge.
+
+The function implements the iterative object search algorithm. It computes the mass center in the window of the back projection image and shifts the search window center to the mass center. The procedure repeats until the specified number of iterations is reached or the window center shifts by less than the epsilon threshold.
+
+<Note>
+Unlike `CamShift`, the search window size and orientation do not change during the search. For better results, pre-filter the back projection to remove noise using techniques like morphological operations or connected components analysis.
+</Note>
+
+### Example
+
+```cpp
+Mat hsv, backproj;
+cvtColor(frame, hsv, COLOR_BGR2HSV);
+calcBackProject(&hsv, 1, channels, hist, backproj, ranges);
+
+Rect trackWindow = Rect(x, y, w, h);
+TermCriteria criteria(TermCriteria::EPS | TermCriteria::COUNT, 10, 1);
+int iterations = meanShift(backproj, trackWindow, criteria);
+```
+
+## computeECC
+
+Computes the Enhanced Correlation Coefficient (ECC) value between two images.
+
+```cpp
+double computeECC(
+    InputArray templateImage,
+    InputArray inputImage,
+    InputArray inputMask = noArray()
+);
+```
+
+<ParamField path="templateImage" type="InputArray" required>
+  Input template image; must have 1 or 3 channels and be of type CV_8U, CV_16U, CV_32F, or CV_64F.
+</ParamField>
+
+<ParamField path="inputImage" type="InputArray" required>
+  Input image to be compared with the template; must have the same type and number of channels as templateImage.
+</ParamField>
+
+<ParamField path="inputMask" type="InputArray">
+  Optional single-channel mask to specify the valid region of interest.
+</ParamField>
+
+**Returns:** The ECC similarity coefficient in the range [-1, 1], where 1 indicates perfect similarity, 0 indicates no correlation, and -1 indicates perfect negative correlation.
+
+The Enhanced Correlation Coefficient (ECC) is a normalized measure of similarity between two images. For single-channel images:
+
+$$
+\mathrm{ECC}(I, T) = \frac{\sum_{x} (I(x) - \mu_I)(T(x) - \mu_T)}
+{\sqrt{\sum_{x} (I(x) - \mu_I)^2} \cdot \sqrt{\sum_{x} (T(x) - \mu_T)^2}}
+$$
+
+## findTransformECC
+
+Finds the geometric transform (warp) between two images in terms of the ECC criterion.
+
+```cpp
+double findTransformECC(
+    InputArray templateImage,
+    InputArray inputImage,
+    InputOutputArray warpMatrix,
+    int motionType = MOTION_AFFINE,
+    TermCriteria criteria = TermCriteria(TermCriteria::COUNT+TermCriteria::EPS, 50, 0.001),
+    InputArray inputMask = noArray()
+);
+```
+
+<ParamField path="templateImage" type="InputArray" required>
+  Template image; 1 or 3 channels, CV_8U, CV_16U, CV_32F, or CV_64F type.
+</ParamField>
+
+<ParamField path="inputImage" type="InputArray" required>
+  Input image to be warped; same type as templateImage.
+</ParamField>
+
+<ParamField path="warpMatrix" type="InputOutputArray" required>
+  Floating-point 2×3 or 3×3 mapping matrix (warp). Should be initialized with a rough alignment estimate.
+</ParamField>
+
+<ParamField path="motionType" type="int">
+  Type of motion model. Default: `MOTION_AFFINE`
+</ParamField>
+
+<ParamField path="criteria" type="TermCriteria">
+  Termination criteria of the ECC algorithm.
+</ParamField>
+
+<ParamField path="inputMask" type="InputArray">
+  Optional mask indicating valid values of inputImage.
+</ParamField>
+
+**Returns:** The final enhanced correlation coefficient.
+
+### Motion Type Constants
+
+<Tabs>
+  <Tab title="MOTION_TRANSLATION">
+    Translational motion model. The warpMatrix is 2×3 with the first 2×2 part being the identity matrix.
+    
+    ```cpp
+    // 2 parameters estimated
+    [1  0  tx]
+    [0  1  ty]
+    ```
+  </Tab>
+  
+  <Tab title="MOTION_EUCLIDEAN">
+    Euclidean (rigid) transformation. Rotation and translation only.
+    
+    ```cpp
+    // 3 parameters estimated (rotation angle, tx, ty)
+    [cos(θ)  -sin(θ)  tx]
+    [sin(θ)   cos(θ)  ty]
+    ```
+  </Tab>
+  
+  <Tab title="MOTION_AFFINE">
+    Affine motion model (default). 6 parameters estimated.
+    
+    ```cpp
+    [a11  a12  tx]
+    [a21  a22  ty]
+    ```
+  </Tab>
+  
+  <Tab title="MOTION_HOMOGRAPHY">
+    Homography as motion model. 8 parameters estimated. The warpMatrix is 3×3.
+    
+    ```cpp
+    [h11  h12  h13]
+    [h21  h22  h23]
+    [h31  h32  h33]
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+The function implements an area-based alignment that builds on intensity similarities. If images undergo strong displacements or rotations, provide a rough initial transformation. Use the identity matrix if no prior information is available.
+</Note>
+
+### Example
+
+```cpp
+Mat warpMatrix = Mat::eye(2, 3, CV_32F);
+TermCriteria criteria(TermCriteria::COUNT+TermCriteria::EPS, 50, 0.001);
+
+double ecc = findTransformECC(
+    templateImage,
+    inputImage,
+    warpMatrix,
+    MOTION_AFFINE,
+    criteria
+);
+
+Mat aligned;
+warpAffine(inputImage, aligned, warpMatrix, templateImage.size(), 
+           INTER_LINEAR + WARP_INVERSE_MAP);
+```
+
+## findTransformECCWithMask
+
+Extended version of `findTransformECC` that supports validity masks for both template and input images.
+
+```cpp
+double findTransformECCWithMask(
+    InputArray templateImage,
+    InputArray inputImage,
+    InputArray templateMask,
+    InputArray inputMask,
+    InputOutputArray warpMatrix,
+    int motionType = MOTION_AFFINE,
+    TermCriteria criteria = TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, 50, 1e-6),
+    int gaussFiltSize = 5
+);
+```
+
+<ParamField path="templateMask" type="InputArray" required>
+  Single-channel 8-bit mask for templateImage indicating valid pixels. Must have the same size as templateImage.
+</ParamField>
+
+<ParamField path="inputMask" type="InputArray" required>
+  Single-channel 8-bit mask for inputImage indicating valid pixels before warping. Must have the same size as inputImage.
+</ParamField>
+
+<ParamField path="gaussFiltSize" type="int">
+  Size of the Gaussian blur filter used for smoothing images and masks before computing alignment. Default: 5
+</ParamField>
+
+The ECC is evaluated only over pixels that are valid in both images. On each iteration, inputMask is warped into the template frame and combined with templateMask.
+
+## estimateRigidTransform (Deprecated)
+
+Computes an optimal affine transformation between two 2D point sets.
+
+```cpp
+Mat estimateRigidTransform(
+    InputArray src,
+    InputArray dst,
+    bool fullAffine
+);
+```
+
+<Note type="warning">
+This function is deprecated. Use `cv::estimateAffine2D` or `cv::estimateAffinePartial2D` instead. If using with images, extract points using `cv::calcOpticalFlowPyrLK` first, then use the estimation functions.
+</Note>
+
+<ParamField path="src" type="InputArray" required>
+  First input 2D point set stored in std::vector or Mat, or an image stored in Mat.
+</ParamField>
+
+<ParamField path="dst" type="InputArray" required>
+  Second input 2D point set of the same size and type as src, or another image.
+</ParamField>
+
+<ParamField path="fullAffine" type="bool" required>
+  If true, finds an optimal affine transformation with no restrictions (6 DOF). If false, limits transformations to translation, rotation, and uniform scaling (4 DOF).
+</ParamField>
+
+**Returns:** 2×3 floating-point matrix representing the affine transform [A|b].

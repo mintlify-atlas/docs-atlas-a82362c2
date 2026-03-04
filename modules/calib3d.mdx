@@ -1,0 +1,594 @@
+---
+title: Camera Calibration and 3D Reconstruction
+description: Camera calibration, stereo vision, 3D reconstruction, and pose estimation algorithms
+---
+
+The Camera Calibration and 3D Reconstruction (calib3d) module provides algorithms for camera calibration, stereo vision, 3D reconstruction, and geometric transformations for computer vision applications.
+
+## Overview
+
+From opencv2/calib3d.hpp:54-277, detailed mathematical background:
+
+> The functions in this section use a pinhole camera model with lens distortion for camera calibration, stereo calibration and rectification, 3D reconstruction from stereo, and pose estimation.
+
+<CardGroup cols={2}>
+  <Card title="Camera Calibration" icon="camera">
+    Determine intrinsic and extrinsic camera parameters
+  </Card>
+  <Card title="Stereo Vision" icon="glasses">
+    Calibrate stereo camera pairs and rectify images
+  </Card>
+  <Card title="3D Reconstruction" icon="cube">
+    Reconstruct 3D points from multiple views
+  </Card>
+  <Card title="Pose Estimation" icon="compass">
+    Estimate object position and orientation
+  </Card>
+</CardGroup>
+
+## Pinhole Camera Model
+
+From calib3d.hpp:64-72, the fundamental projection equation:
+
+\[ s \begin{bmatrix} u \\ v \\ 1 \end{bmatrix} = \mathbf{A} \begin{bmatrix} \mathbf{R} | \mathbf{t} \end{bmatrix} \begin{bmatrix} X_w \\ Y_w \\ Z_w \\ 1 \end{bmatrix} \]
+
+Where:
+- **A** - Camera intrinsic matrix (focal length, principal point)
+- **R** - Rotation matrix (3x3)
+- **t** - Translation vector (3x1)
+- **(X_w, Y_w, Z_w)** - 3D world coordinates
+- **(u, v)** - 2D image coordinates
+
+### Camera Intrinsic Matrix
+
+From calib3d.hpp:79-83:
+
+\[ \mathbf{A} = \begin{bmatrix} f_x & 0 & c_x \\ 0 & f_y & c_y \\ 0 & 0 & 1 \end{bmatrix} \]
+
+- **f_x, f_y** - Focal lengths in pixel units
+- **c_x, c_y** - Principal point (optical center)
+
+## Lens Distortion
+
+From calib3d.hpp:225-264, real lenses have distortion:
+
+### Distortion Coefficients
+
+```cpp
+// Distortion vector (OpenCV format)
+vector<double> distCoeffs = {
+    k1, k2, p1, p2, k3,  // Standard 5 parameters
+    k4, k5, k6,          // Optional: radial distortion
+    s1, s2, s3, s4       // Optional: thin prism
+};
+```
+
+- **k1, k2, k3, k4, k5, k6** - Radial distortion coefficients
+- **p1, p2** - Tangential distortion coefficients
+- **s1, s2, s3, s4** - Thin prism distortion coefficients
+
+### Distortion Model
+
+From calib3d.hpp:228-244:
+
+$$x'' = x' \frac{1 + k_1 r^2 + k_2 r^4 + k_3 r^6}{1 + k_4 r^2 + k_5 r^4 + k_6 r^6} + 2p_1 x'y' + p_2(r^2 + 2x'^2)$$
+
+$$y'' = y' \frac{1 + k_1 r^2 + k_2 r^4 + k_3 r^6}{1 + k_4 r^2 + k_5 r^4 + k_6 r^6} + p_1(r^2 + 2y'^2) + 2p_2 x'y'$$
+
+Where \( r^2 = x'^2 + y'^2 \)
+
+## Camera Calibration
+
+Example from samples/cpp/calibration.cpp:
+
+### Chessboard Calibration
+
+```cpp
+#include <opencv2/calib3d.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
+
+using namespace cv;
+using namespace std;
+
+int main() {
+    // Calibration pattern size (inner corners)
+    Size boardSize(9, 6);  // 9x6 chessboard
+    float squareSize = 25.0;  // mm
+    
+    // Collect calibration images
+    vector<vector<Point2f>> imagePoints;
+    vector<vector<Point3f>> objectPoints;
+    
+    VideoCapture cap(0);
+    Mat frame, gray;
+    
+    cout << "Press SPACE to capture, ESC to finish\n";
+    
+    while (cap.read(frame)) {
+        cvtColor(frame, gray, COLOR_BGR2GRAY);
+        
+        // Find chessboard corners
+        vector<Point2f> corners;
+        bool found = findChessboardCorners(
+            gray, boardSize, corners,
+            CALIB_CB_ADAPTIVE_THRESH |
+            CALIB_CB_NORMALIZE_IMAGE |
+            CALIB_CB_FAST_CHECK
+        );
+        
+        if (found) {
+            // Refine corner positions
+            cornerSubPix(gray, corners, Size(11, 11),
+                        Size(-1, -1),
+                        TermCriteria(TermCriteria::EPS +
+                                    TermCriteria::MAX_ITER,
+                                    30, 0.1));
+            
+            // Draw corners
+            drawChessboardCorners(frame, boardSize,
+                                corners, found);
+        }
+        
+        imshow("Calibration", frame);
+        
+        int key = waitKey(30);
+        if (key == ' ' && found) {
+            // Capture image
+            imagePoints.push_back(corners);
+            
+            // Generate 3D object points
+            vector<Point3f> obj;
+            for (int i = 0; i < boardSize.height; i++) {
+                for (int j = 0; j < boardSize.width; j++) {
+                    obj.push_back(Point3f(
+                        j * squareSize,
+                        i * squareSize,
+                        0
+                    ));
+                }
+            }
+            objectPoints.push_back(obj);
+            
+            cout << "Captured " << imagePoints.size()
+                 << " images\n";
+        }
+        else if (key == 27) break;  // ESC
+    }
+    
+    // Calibrate camera
+    if (imagePoints.size() >= 10) {
+        Mat cameraMatrix, distCoeffs;
+        vector<Mat> rvecs, tvecs;
+        
+        double rms = calibrateCamera(
+            objectPoints,
+            imagePoints,
+            gray.size(),
+            cameraMatrix,
+            distCoeffs,
+            rvecs,
+            tvecs
+        );
+        
+        cout << "\nCalibration complete!\n";
+        cout << "RMS error: " << rms << "\n";
+        cout << "Camera matrix:\n" << cameraMatrix << "\n";
+        cout << "Distortion coefficients:\n"
+             << distCoeffs << "\n";
+        
+        // Save calibration
+        FileStorage fs("calibration.yml", FileStorage::WRITE);
+        fs << "camera_matrix" << cameraMatrix;
+        fs << "distortion_coefficients" << distCoeffs;
+        fs << "image_width" << gray.cols;
+        fs << "image_height" << gray.rows;
+        fs << "rms_error" << rms;
+        fs.release();
+        
+        cout << "Saved to calibration.yml\n";
+    }
+    else {
+        cout << "Not enough images for calibration\n";
+    }
+    
+    return 0;
+}
+```
+
+### Calibration Flags
+
+```cpp
+// Calibration flags
+int flags = 0;
+flags |= CALIB_FIX_ASPECT_RATIO;    // Fix fx/fy ratio
+flags |= CALIB_ZERO_TANGENT_DIST;   // Assume p1=p2=0
+flags |= CALIB_FIX_PRINCIPAL_POINT; // Fix cx, cy at center
+flags |= CALIB_FIX_K1;              // Fix k1=0
+flags |= CALIB_FIX_K2;              // Fix k2=0
+flags |= CALIB_FIX_K3;              // Fix k3=0
+flags |= CALIB_RATIONAL_MODEL;      // Enable k4, k5, k6
+
+calibrateCamera(objectPoints, imagePoints, imageSize,
+               cameraMatrix, distCoeffs, rvecs, tvecs, flags);
+```
+
+## Undistortion
+
+### Undistort Images
+
+```cpp
+// Load calibration
+FileStorage fs("calibration.yml", FileStorage::READ);
+Mat cameraMatrix, distCoeffs;
+fs["camera_matrix"] >> cameraMatrix;
+fs["distortion_coefficients"] >> distCoeffs;
+
+// Undistort image
+Mat img = imread("distorted.jpg");
+Mat undistorted;
+undistort(img, undistorted, cameraMatrix, distCoeffs);
+
+// Or get optimal camera matrix
+Mat newCameraMatrix = getOptimalNewCameraMatrix(
+    cameraMatrix, distCoeffs, img.size(), 1.0);
+
+undistort(img, undistorted, cameraMatrix,
+         distCoeffs, newCameraMatrix);
+```
+
+### Remap for Efficiency
+
+```cpp
+// Compute undistortion maps once
+Mat map1, map2;
+initUndistortRectifyMap(
+    cameraMatrix, distCoeffs,
+    Mat(),  // No rectification
+    newCameraMatrix,
+    imageSize,
+    CV_16SC2,
+    map1, map2
+);
+
+// Apply to multiple images efficiently
+for (const auto& img : images) {
+    Mat undistorted;
+    remap(img, undistorted, map1, map2, INTER_LINEAR);
+}
+```
+
+## Stereo Calibration
+
+### Calibrate Stereo Pair
+
+```cpp
+// Collect image points from both cameras
+vector<vector<Point2f>> leftPoints, rightPoints;
+vector<vector<Point3f>> objectPoints;
+// ... collect points from stereo pairs ...
+
+// Individual camera matrices and distortion
+Mat K1, K2, D1, D2;
+Mat R, T, E, F;  // Stereo parameters
+
+// Stereo calibration
+double rms = stereoCalibrate(
+    objectPoints,
+    leftPoints,
+    rightPoints,
+    K1, D1,  // Left camera
+    K2, D2,  // Right camera
+    imageSize,
+    R,       // Rotation between cameras
+    T,       // Translation between cameras
+    E,       // Essential matrix
+    F,       // Fundamental matrix
+    CALIB_FIX_INTRINSIC  // Use pre-calibrated cameras
+);
+
+cout << "Stereo calibration RMS: " << rms << endl;
+cout << "Baseline: " << norm(T) << " mm\n";
+```
+
+### Stereo Rectification
+
+```cpp
+// Compute rectification transforms
+Mat R1, R2, P1, P2, Q;
+Rect validRoi[2];
+
+stereoRectify(
+    K1, D1,  // Left camera
+    K2, D2,  // Right camera
+    imageSize,
+    R, T,    // Stereo parameters
+    R1, R2,  // Output: rectification rotations
+    P1, P2,  // Output: projection matrices
+    Q,       // Output: disparity-to-depth mapping
+    CALIB_ZERO_DISPARITY,
+    1.0,     // Alpha (0=crop, 1=all pixels)
+    imageSize,
+    &validRoi[0],
+    &validRoi[1]
+);
+
+// Create rectification maps
+Mat map1L, map2L, map1R, map2R;
+
+initUndistortRectifyMap(K1, D1, R1, P1, imageSize,
+                        CV_16SC2, map1L, map2L);
+initUndistortRectifyMap(K2, D2, R2, P2, imageSize,
+                        CV_16SC2, map1R, map2R);
+
+// Rectify stereo pair
+Mat leftImg, rightImg;
+Mat rectLeft, rectRight;
+
+remap(leftImg, rectLeft, map1L, map2L, INTER_LINEAR);
+remap(rightImg, rectRight, map1R, map2R, INTER_LINEAR);
+
+// Now rectLeft and rectRight have aligned epipolar lines
+```
+
+## Disparity and Depth
+
+### Stereo Matching
+
+```cpp
+#include <opencv2/calib3d.hpp>
+#include <opencv2/imgproc.hpp>
+
+// Create stereo matcher
+Ptr<StereoBM> stereo = StereoBM::create(16*5, 21);
+
+// Or use StereoSGBM for better quality
+Ptr<StereoSGBM> stereo = StereoSGBM::create(
+    0,        // minDisparity
+    16*5,     // numDisparities (must be divisible by 16)
+    21,       // blockSize
+    8*21*21,  // P1
+    32*21*21, // P2
+    1,        // disp12MaxDiff
+    63,       // preFilterCap
+    10,       // uniquenessRatio
+    100,      // speckleWindowSize
+    32,       // speckleRange
+    StereoSGBM::MODE_SGBM_3WAY
+);
+
+// Compute disparity
+Mat disparity;
+stereo->compute(rectLeft, rectRight, disparity);
+
+// Normalize for visualization
+Mat disp8;
+disparity.convertTo(disp8, CV_8U, 255.0/(16*5*16));
+imshow("Disparity", disp8);
+```
+
+### Reconstruct 3D Points
+
+```cpp
+// Compute 3D points from disparity
+Mat points3D;
+reprojectImageTo3D(disparity, points3D, Q);
+
+// Access 3D coordinates
+for (int y = 0; y < points3D.rows; y++) {
+    for (int x = 0; x < points3D.cols; x++) {
+        Vec3f point = points3D.at<Vec3f>(y, x);
+        float X = point[0];
+        float Y = point[1];
+        float Z = point[2];
+        
+        // Filter invalid points
+        if (abs(Z) < 10000) {
+            // Valid 3D point
+        }
+    }
+}
+```
+
+## Pose Estimation
+
+### solvePnP - Estimate Camera Pose
+
+```cpp
+// Known 3D object points
+vector<Point3f> objectPoints = {
+    Point3f(0, 0, 0),
+    Point3f(100, 0, 0),
+    Point3f(100, 100, 0),
+    Point3f(0, 100, 0)
+};
+
+// Corresponding 2D image points
+vector<Point2f> imagePoints = {
+    Point2f(234, 456),
+    Point2f(567, 445),
+    Point2f(589, 234),
+    Point2f(245, 267)
+};
+
+// Camera calibration
+Mat cameraMatrix, distCoeffs;
+// ... load calibration ...
+
+// Solve for pose
+Mat rvec, tvec;
+bool success = solvePnP(
+    objectPoints,
+    imagePoints,
+    cameraMatrix,
+    distCoeffs,
+    rvec,  // Output: rotation vector
+    tvec,  // Output: translation vector
+    false, // useExtrinsicGuess
+    SOLVEPNP_ITERATIVE  // Method
+);
+
+if (success) {
+    cout << "Rotation: " << rvec.t() << "\n";
+    cout << "Translation: " << tvec.t() << "\n";
+    
+    // Convert rotation vector to matrix
+    Mat R;
+    Rodrigues(rvec, R);
+}
+```
+
+### PnP Methods
+
+```cpp
+enum SolvePnPMethod {
+    SOLVEPNP_ITERATIVE,  // Iterative method
+    SOLVEPNP_EPNP,       // Efficient PnP
+    SOLVEPNP_P3P,        // 3-point algorithm
+    SOLVEPNP_DLS,        // Direct Least Squares
+    SOLVEPNP_UPNP,       // Unified PnP
+    SOLVEPNP_AP3P,       // Alternative P3P
+    SOLVEPNP_IPPE,       // Infinitesimal Plane-based Pose
+    SOLVEPNP_IPPE_SQUARE // IPPE for square markers
+};
+```
+
+### Draw 3D Axes
+
+```cpp
+void drawAxes(Mat& img, const Mat& cameraMatrix,
+              const Mat& distCoeffs,
+              const Mat& rvec, const Mat& tvec,
+              float length) {
+    // 3D axis points
+    vector<Point3f> axisPoints = {
+        Point3f(0, 0, 0),      // Origin
+        Point3f(length, 0, 0), // X axis
+        Point3f(0, length, 0), // Y axis
+        Point3f(0, 0, length)  // Z axis
+    };
+    
+    // Project to 2D
+    vector<Point2f> imagePoints;
+    projectPoints(axisPoints, rvec, tvec,
+                 cameraMatrix, distCoeffs, imagePoints);
+    
+    // Draw axes
+    line(img, imagePoints[0], imagePoints[1],
+         Scalar(0, 0, 255), 3);  // X - Red
+    line(img, imagePoints[0], imagePoints[2],
+         Scalar(0, 255, 0), 3);  // Y - Green
+    line(img, imagePoints[0], imagePoints[3],
+         Scalar(255, 0, 0), 3);  // Z - Blue
+}
+```
+
+## Homography
+
+### Find Homography
+
+```cpp
+// Match points between two images
+vector<Point2f> srcPoints, dstPoints;
+// ... find corresponding points ...
+
+// Compute homography
+Mat H = findHomography(srcPoints, dstPoints, RANSAC, 3.0);
+
+// Warp image
+Mat warped;
+warpPerspective(srcImage, warped, H, dstImage.size());
+```
+
+### Decompose Homography
+
+```cpp
+// Decompose into rotation and translation
+vector<Mat> rotations, translations, normals;
+int solutions = decomposeHomographyMat(
+    H, cameraMatrix,
+    rotations, translations, normals
+);
+
+cout << "Found " << solutions << " solutions\n";
+```
+
+## Triangulation
+
+```cpp
+// Points from two calibrated cameras
+vector<Point2f> points1, points2;
+Mat P1, P2;  // Projection matrices
+
+// Triangulate points
+Mat points4D;
+triangulatePoints(P1, P2, points1, points2, points4D);
+
+// Convert from homogeneous coordinates
+vector<Point3f> points3D;
+for (int i = 0; i < points4D.cols; i++) {
+    float w = points4D.at<float>(3, i);
+    Point3f pt(
+        points4D.at<float>(0, i) / w,
+        points4D.at<float>(1, i) / w,
+        points4D.at<float>(2, i) / w
+    );
+    points3D.push_back(pt);
+}
+```
+
+## Best Practices
+
+<Note>
+**Calibration Quality:**
+- Use at least 10-20 images from different angles
+- Cover the entire image area with calibration pattern
+- RMS error should be < 1 pixel for good calibration
+- Check reprojection errors for outliers
+</Note>
+
+<Note>
+**Calibration Pattern:**
+- Chessboard is most common and reliable
+- Ensure pattern is perfectly flat
+- Use high-quality printing
+- Good lighting without glare
+</Note>
+
+<Note>
+**Stereo Vision:**
+- Baseline (distance between cameras) affects depth range
+- Larger baseline = better depth accuracy at distance
+- Cameras should be well-aligned (< 5° rotation)
+- Synchronized capture for moving scenes
+</Note>
+
+<Note>
+**Performance:**
+```cpp
+// Cache undistortion maps
+Mat map1, map2;
+initUndistortRectifyMap(K, D, Mat(), K, size,
+                        CV_16SC2, map1, map2);
+
+// Reuse for all images
+for (auto& img : images) {
+    remap(img, undistorted, map1, map2, INTER_LINEAR);
+}
+```
+</Note>
+
+## Related Modules
+
+- [Features 2D](/modules/features2d) - Feature detection for matching
+- [Image Processing](/modules/imgproc) - Image transformations
+- [Video Analysis](/modules/video) - Optical flow for tracking
+
+## Source Reference
+
+Main header: `~/workspace/source/modules/calib3d/include/opencv2/calib3d.hpp`
+
+Examples:
+- `samples/cpp/calibration.cpp` - Camera calibration
+- `samples/cpp/stereo_calib.cpp` - Stereo calibration
+- `samples/cpp/stereo_match.cpp` - Stereo matching

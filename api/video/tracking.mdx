@@ -1,0 +1,367 @@
+---
+title: Object Tracking
+description: Object tracking algorithms including Tracker classes, KalmanFilter, and modern deep learning-based trackers
+---
+
+The tracking module provides various algorithms for tracking objects across video frames, from classical methods like Kalman filtering to modern deep learning-based approaches.
+
+## Tracker Base Class
+
+Base abstract class for long-term object trackers.
+
+```cpp
+class Tracker {
+public:
+    virtual void init(InputArray image, const Rect& boundingBox) = 0;
+    virtual bool update(InputArray image, Rect& boundingBox) = 0;
+};
+```
+
+### init
+
+Initialize the tracker with a known bounding box that surrounds the target.
+
+```cpp
+virtual void init(
+    InputArray image,
+    const Rect& boundingBox
+);
+```
+
+<ParamField path="image" type="InputArray" required>
+  The initial frame containing the object to track.
+</ParamField>
+
+<ParamField path="boundingBox" type="const Rect&" required>
+  The initial bounding box surrounding the target object.
+</ParamField>
+
+### update
+
+Update the tracker and find the new most likely bounding box for the target.
+
+```cpp
+virtual bool update(
+    InputArray image,
+    Rect& boundingBox
+);
+```
+
+<ParamField path="image" type="InputArray" required>
+  The current frame to process.
+</ParamField>
+
+<ParamField path="boundingBox" type="Rect&" required>
+  Output parameter for the new target location. Updated only if the function returns true.
+</ParamField>
+
+**Returns:** `true` if the target was located, `false` if the tracker cannot locate the target. Note that `false` does not necessarily mean the tracker has failed—the target may be temporarily out of view.
+
+## KalmanFilter
+
+Implements a standard Kalman filter for state estimation.
+
+```cpp
+class KalmanFilter {
+public:
+    KalmanFilter();
+    KalmanFilter(int dynamParams, int measureParams, int controlParams = 0, int type = CV_32F);
+    
+    void init(int dynamParams, int measureParams, int controlParams = 0, int type = CV_32F);
+    const Mat& predict(const Mat& control = Mat());
+    const Mat& correct(const Mat& measurement);
+    
+    // State vectors and matrices
+    Mat statePre;           // Predicted state (x'(k))
+    Mat statePost;          // Corrected state (x(k))
+    Mat transitionMatrix;   // State transition matrix (A)
+    Mat controlMatrix;      // Control matrix (B)
+    Mat measurementMatrix;  // Measurement matrix (H)
+    Mat processNoiseCov;    // Process noise covariance (Q)
+    Mat measurementNoiseCov;// Measurement noise covariance (R)
+    Mat errorCovPre;        // Priori error covariance (P'(k))
+    Mat gain;               // Kalman gain (K(k))
+    Mat errorCovPost;       // Posteriori error covariance (P(k))
+};
+```
+
+### Constructor
+
+```cpp
+KalmanFilter(
+    int dynamParams,
+    int measureParams,
+    int controlParams = 0,
+    int type = CV_32F
+);
+```
+
+<ParamField path="dynamParams" type="int" required>
+  Dimensionality of the state vector.
+</ParamField>
+
+<ParamField path="measureParams" type="int" required>
+  Dimensionality of the measurement vector.
+</ParamField>
+
+<ParamField path="controlParams" type="int">
+  Dimensionality of the control vector. Default: 0 (no control).
+</ParamField>
+
+<ParamField path="type" type="int">
+  Type of the created matrices. Should be CV_32F or CV_64F. Default: CV_32F.
+</ParamField>
+
+### predict
+
+Computes a predicted state.
+
+```cpp
+const Mat& predict(const Mat& control = Mat());
+```
+
+<ParamField path="control" type="const Mat&">
+  Optional input control vector.
+</ParamField>
+
+**Returns:** Reference to the predicted state vector.
+
+### correct
+
+Updates the predicted state from the measurement.
+
+```cpp
+const Mat& correct(const Mat& measurement);
+```
+
+<ParamField path="measurement" type="const Mat&" required>
+  The measured system parameters.
+</ParamField>
+
+**Returns:** Reference to the corrected state vector.
+
+<Note>
+The Kalman filter operates in two steps: prediction (using the system model) and correction (using measurements). The filter maintains estimates of the state and its uncertainty through covariance matrices.
+</Note>
+
+### Example
+
+```cpp
+// Create Kalman filter: 4D state (x, y, dx, dy), 2D measurement (x, y)
+KalmanFilter kf(4, 2, 0);
+
+// Initialize state transition matrix (constant velocity model)
+kf.transitionMatrix = (Mat_<float>(4, 4) << 
+    1, 0, 1, 0,
+    0, 1, 0, 1,
+    0, 0, 1, 0,
+    0, 0, 0, 1);
+
+// Initialize measurement matrix
+kf.measurementMatrix = (Mat_<float>(2, 4) << 
+    1, 0, 0, 0,
+    0, 1, 0, 0);
+
+// Set process and measurement noise
+setIdentity(kf.processNoiseCov, Scalar::all(1e-5));
+setIdentity(kf.measurementNoiseCov, Scalar::all(1e-1));
+
+// Tracking loop
+while (true) {
+    Mat prediction = kf.predict();
+    Mat measurement = getMeasurement(); // Your measurement function
+    Mat estimated = kf.correct(measurement);
+}
+```
+
+## TrackerMIL
+
+Multiple Instance Learning (MIL) tracker that trains a classifier online to separate object from background.
+
+```cpp
+class TrackerMIL : public Tracker {
+public:
+    struct Params {
+        float samplerInitInRadius;      // Radius for positive samples during init
+        int samplerInitMaxNegNum;       // # negative samples during init
+        float samplerSearchWinSize;     // Search window size
+        float samplerTrackInRadius;     // Radius for positive samples during tracking
+        int samplerTrackMaxPosNum;      // # positive samples during tracking
+        int samplerTrackMaxNegNum;      // # negative samples during tracking
+        int featureSetNumFeatures;      // # features
+    };
+    
+    static Ptr<TrackerMIL> create(const Params& parameters = Params());
+};
+```
+
+<Note>
+MIL avoids the drift problem for robust tracking. The implementation is based on "Visual Tracking with Online Multiple Instance Learning" by Babenko et al.
+</Note>
+
+### Example
+
+```cpp
+Ptr<TrackerMIL> tracker = TrackerMIL::create();
+Rect bbox = selectROI(frame); // User selects initial bounding box
+tracker->init(frame, bbox);
+
+while (true) {
+    cap >> frame;
+    if (tracker->update(frame, bbox)) {
+        rectangle(frame, bbox, Scalar(0, 255, 0), 2);
+    }
+    imshow("Tracking", frame);
+}
+```
+
+## TrackerGOTURN
+
+Generic Object Tracking Using Regression Networks - a CNN-based tracker trained offline.
+
+```cpp
+class TrackerGOTURN : public Tracker {
+public:
+    struct Params {
+        std::string modelTxt;  // Path to .prototxt file
+        std::string modelBin;  // Path to .caffemodel file
+    };
+    
+    static Ptr<TrackerGOTURN> create(const Params& parameters = Params());
+};
+```
+
+<Note>
+GOTURN is much faster than online-training CNN trackers due to its offline training approach. It handles viewpoint changes, lighting changes, and deformations well, but does not handle occlusions. Requires pre-trained models (goturn.prototxt and goturn.caffemodel).
+</Note>
+
+### Example
+
+```cpp
+TrackerGOTURN::Params params;
+params.modelTxt = "goturn.prototxt";
+params.modelBin = "goturn.caffemodel";
+
+Ptr<TrackerGOTURN> tracker = TrackerGOTURN::create(params);
+Rect bbox = selectROI(frame);
+tracker->init(frame, bbox);
+
+while (true) {
+    cap >> frame;
+    if (tracker->update(frame, bbox)) {
+        rectangle(frame, bbox, Scalar(255, 0, 0), 2);
+    }
+    imshow("GOTURN Tracking", frame);
+}
+```
+
+## TrackerDaSiamRPN
+
+Deep learning-based tracker using Siamese Region Proposal Networks.
+
+```cpp
+class TrackerDaSiamRPN : public Tracker {
+public:
+    struct Params {
+        std::string model;       // SiamRPN model path
+        std::string kernel_cls1; // CLS kernel path
+        std::string kernel_r1;   // R1 kernel path
+        int backend;             // DNN backend
+        int target;              // DNN target device
+    };
+    
+    static Ptr<TrackerDaSiamRPN> create(const Params& parameters = Params());
+    virtual float getTrackingScore() = 0;
+};
+```
+
+<ParamField path="getTrackingScore()" type="float">
+  Returns the tracking confidence score for the current frame.
+</ParamField>
+
+## TrackerNano
+
+Super lightweight DNN-based tracker with model size of only 1.9 MB.
+
+```cpp
+class TrackerNano : public Tracker {
+public:
+    struct Params {
+        std::string backbone;  // Backbone model for feature extraction
+        std::string neckhead;  // Neckhead model for localization
+        int backend;           // DNN backend
+        int target;            // DNN target device
+    };
+    
+    static Ptr<TrackerNano> create(const Params& parameters = Params());
+    virtual float getTrackingScore() = 0;
+};
+```
+
+<Note>
+Nano tracker is extremely lightweight and fast due to its special model structure. Requires two models: one for feature extraction (backbone) and another for localization (neckhead).
+</Note>
+
+## TrackerVit
+
+Vision Transformer (ViT) based tracker, extremely lightweight at approximately 767KB.
+
+```cpp
+class TrackerVit : public Tracker {
+public:
+    struct Params {
+        std::string net;                    // Model path
+        int backend;                        // DNN backend
+        int target;                         // DNN target device
+        Scalar meanvalue;                   // Mean for preprocessing
+        Scalar stdvalue;                    // Std for preprocessing
+        float tracking_score_threshold;     // Score threshold
+    };
+    
+    static Ptr<TrackerVit> create(const Params& parameters = Params());
+    virtual float getTrackingScore() = 0;
+};
+```
+
+<ParamField path="meanvalue" type="Scalar">
+  Mean values for image preprocessing. Default: (0.485, 0.456, 0.406)
+</ParamField>
+
+<ParamField path="stdvalue" type="Scalar">
+  Standard deviation values for image preprocessing. Default: (0.229, 0.224, 0.225)
+</ParamField>
+
+<ParamField path="tracking_score_threshold" type="float">
+  Minimum confidence threshold for tracking. Default: 0.20
+</ParamField>
+
+## Comparison of Trackers
+
+<Tabs>
+  <Tab title="Classical">
+    **MIL (Multiple Instance Learning)**
+    - Pros: Robust, handles appearance changes
+    - Cons: Slower than modern methods
+    - Use case: General purpose tracking
+  </Tab>
+  
+  <Tab title="Deep Learning (Medium)">
+    **GOTURN**
+    - Pros: Fast, no online training
+    - Cons: Doesn't handle occlusions
+    - Model size: ~500MB
+    - Use case: Real-time tracking without occlusions
+  </Tab>
+  
+  <Tab title="Deep Learning (Fast)">
+    **Nano, Vit**
+    - Pros: Extremely lightweight, very fast
+    - Model size: 1-2MB
+    - Use case: Embedded systems, mobile devices
+    
+    **DaSiamRPN**
+    - Pros: High accuracy, robust
+    - Cons: Larger model size
+    - Use case: High-accuracy tracking
+  </Tab>
+</Tabs>

@@ -1,0 +1,474 @@
+---
+title: Panorama Stitching
+description: Create seamless panoramas from multiple images using feature matching, homography estimation, and image blending
+---
+
+## Overview
+
+OpenCV's Stitcher API provides a complete pipeline for creating panoramas:
+
+- **Feature Detection**: Find distinctive points in images
+- **Feature Matching**: Establish correspondences between images
+- **Homography Estimation**: Calculate geometric transformations
+- **Image Warping**: Transform images to common coordinate system
+- **Seam Finding**: Minimize visible boundaries
+- **Blending**: Create smooth transitions between images
+
+## Basic Stitching
+
+Simple panorama creation with minimal code.
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+    import sys
+    import numpy as np
+
+    def stitch_images(image_paths, mode='panorama', output='result.jpg'):
+        """
+        Stitch multiple images into a panorama
+        
+        Args:
+            image_paths: List of image file paths
+            mode: 'panorama' or 'scans'
+            output: Output filename
+        """
+        # Read input images
+        imgs = []
+        for img_path in image_paths:
+            img = cv.imread(cv.samples.findFile(img_path))
+            if img is None:
+                print(f"Can't read image {img_path}")
+                return False
+            imgs.append(img)
+        
+        print(f"Stitching {len(imgs)} images...")
+        
+        # Create stitcher
+        if mode == 'panorama':
+            stitcher = cv.Stitcher.create(cv.Stitcher_PANORAMA)
+        else:
+            stitcher = cv.Stitcher.create(cv.Stitcher_SCANS)
+        
+        # Perform stitching
+        status, pano = stitcher.stitch(imgs)
+        
+        if status != cv.Stitcher_OK:
+            print(f"Can't stitch images, error code = {status}")
+            print("Error codes:")
+            print("  ERR_NEED_MORE_IMGS = 1")
+            print("  ERR_HOMOGRAPHY_EST_FAIL = 2")
+            print("  ERR_CAMERA_PARAMS_ADJUST_FAIL = 3")
+            return False
+        
+        # Save result
+        cv.imwrite(output, pano)
+        print(f"Stitching completed successfully!")
+        print(f"Result saved to {output}")
+        print(f"Panorama size: {pano.shape[1]} x {pano.shape[0]}")
+        
+        return True
+
+    # Example usage
+    if __name__ == '__main__':
+        image_files = [
+            'images/panorama1.jpg',
+            'images/panorama2.jpg',
+            'images/panorama3.jpg'
+        ]
+        
+        stitch_images(image_files, mode='panorama', output='panorama.jpg')
+    ```
+  </Tab>
+  
+  <Tab title="C++">
+    ```cpp
+    #include "opencv2/imgcodecs.hpp"
+    #include "opencv2/highgui.hpp"
+    #include "opencv2/stitching.hpp"
+    #include <iostream>
+
+    using namespace std;
+    using namespace cv;
+
+    int main(int argc, char* argv[])
+    {
+        vector<Mat> imgs;
+        Stitcher::Mode mode = Stitcher::PANORAMA;
+        string result_name = "result.jpg";
+        
+        // Parse command line arguments
+        for (int i = 1; i < argc; ++i) {
+            if (string(argv[i]) == "--mode") {
+                if (string(argv[i + 1]) == "panorama")
+                    mode = Stitcher::PANORAMA;
+                else if (string(argv[i + 1]) == "scans")
+                    mode = Stitcher::SCANS;
+                i++;
+            }
+            else if (string(argv[i]) == "--output") {
+                result_name = argv[i + 1];
+                i++;
+            }
+            else {
+                // Read image
+                Mat img = imread(samples::findFile(argv[i]));
+                if (img.empty()) {
+                    cout << "Can't read image '" << argv[i] << "'\n";
+                    return EXIT_FAILURE;
+                }
+                imgs.push_back(img);
+            }
+        }
+        
+        if (imgs.size() < 2) {
+            cout << "Need at least 2 images\n";
+            return EXIT_FAILURE;
+        }
+        
+        // Create stitcher and perform stitching
+        Mat pano;
+        Ptr<Stitcher> stitcher = Stitcher::create(mode);
+        Stitcher::Status status = stitcher->stitch(imgs, pano);
+        
+        if (status != Stitcher::OK) {
+            cout << "Can't stitch images, error code = " << int(status) << endl;
+            return EXIT_FAILURE;
+        }
+        
+        // Save result
+        imwrite(result_name, pano);
+        cout << "Stitching completed successfully\n";
+        cout << result_name << " saved!" << endl;
+        
+        return EXIT_SUCCESS;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Advanced Stitching Configuration
+
+Customize the stitching pipeline for better control.
+
+```python
+import cv2 as cv
+import numpy as np
+
+def advanced_stitching(image_paths, output='panorama.jpg'):
+    """
+    Advanced panorama stitching with custom parameters
+    """
+    # Read images
+    imgs = []
+    for path in image_paths:
+        img = cv.imread(path)
+        if img is None:
+            raise ValueError(f"Cannot read {path}")
+        imgs.append(img)
+    
+    # Create stitcher with custom settings
+    stitcher = cv.Stitcher.create(cv.Stitcher_PANORAMA)
+    
+    # Configure feature finder
+    # Options: ORB, AKAZE, SIFT, SURF
+    finder = cv.ORB.create()
+    stitcher.setFeaturesFinder(cv.detail.OrbFeaturesFinder())
+    
+    # Configure matcher
+    # Best results with large number of features
+    stitcher.setFeaturesMatcher(
+        cv.detail_BestOf2NearestMatcher(False, 0.3)
+    )
+    
+    # Set bundle adjuster
+    # Options: reproj, ray, affine, no
+    stitcher.setBundleAdjuster(
+        cv.detail_BundleAdjusterRay()
+    )
+    
+    # Set warper type
+    # Options: spherical, cylindrical, plane, fisheye
+    stitcher.setWarper(
+        cv.PyRotationWarper('spherical', 1.0)
+    )
+    
+    # Set seam finder
+    # Options: no, voronoi, gc_color, gc_colorgrad, dp_color, dp_colorgrad
+    stitcher.setSeamFinder(
+        cv.detail.SeamFinder_createDefault(cv.detail.SeamFinder_VORONOI_SEAM)
+    )
+    
+    # Set blender
+    # Options: no, feather, multiband
+    stitcher.setBlender(
+        cv.detail.Blender_createDefault(cv.detail.Blender_MULTI_BAND)
+    )
+    
+    # Set composition resolution
+    stitcher.setCompositingResol(1.0)  # Use -1 for original resolution
+    
+    # Set confidence threshold for feature matching
+    stitcher.setPanoConfidenceThresh(1.0)
+    
+    # Perform stitching
+    print("Stitching...")
+    status, pano = stitcher.stitch(imgs)
+    
+    if status == cv.Stitcher_OK:
+        cv.imwrite(output, pano)
+        print(f"Success! Saved to {output}")
+        return pano
+    else:
+        error_messages = {
+            cv.Stitcher_ERR_NEED_MORE_IMGS: "Need more images",
+            cv.Stitcher_ERR_HOMOGRAPHY_EST_FAIL: "Homography estimation failed",
+            cv.Stitcher_ERR_CAMERA_PARAMS_ADJUST_FAIL: "Camera parameters adjustment failed"
+        }
+        print(f"Error: {error_messages.get(status, 'Unknown error')}")
+        return None
+
+# Usage
+image_files = ['img1.jpg', 'img2.jpg', 'img3.jpg', 'img4.jpg']
+panorama = advanced_stitching(image_files)
+```
+
+## Panorama with Rotating Camera
+
+Specialized approach for images taken with a rotating camera around its optical center.
+
+```python
+import cv2 as cv
+import numpy as np
+
+def rotating_camera_panorama(image_paths):
+    """
+    Stitch images from rotating camera using homography
+    Assumes camera rotates around optical center
+    """
+    # Read images
+    imgs = [cv.imread(path) for path in image_paths]
+    
+    if len(imgs) < 2:
+        raise ValueError("Need at least 2 images")
+    
+    # Initialize with first image
+    panorama = imgs[0]
+    
+    # Feature detector and matcher
+    detector = cv.SIFT_create()
+    matcher = cv.BFMatcher(cv.NORM_L2)
+    
+    for i in range(1, len(imgs)):
+        print(f"Stitching image {i+1}/{len(imgs)}...")
+        
+        # Detect features
+        kp1, des1 = detector.detectAndCompute(panorama, None)
+        kp2, des2 = detector.detectAndCompute(imgs[i], None)
+        
+        # Match features
+        matches = matcher.knnMatch(des1, des2, k=2)
+        
+        # Apply ratio test
+        good_matches = []
+        for m, n in matches:
+            if m.distance < 0.7 * n.distance:
+                good_matches.append(m)
+        
+        if len(good_matches) < 10:
+            print(f"Not enough matches for image {i}")
+            continue
+        
+        # Extract matched keypoints
+        src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches])
+        dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches])
+        
+        # Find homography
+        H, mask = cv.findHomography(dst_pts, src_pts, cv.RANSAC, 5.0)
+        
+        # Warp image
+        h1, w1 = panorama.shape[:2]
+        h2, w2 = imgs[i].shape[:2]
+        
+        # Transform corners to find output size
+        corners = np.float32([[0, 0], [w2, 0], [w2, h2], [0, h2]]).reshape(-1, 1, 2)
+        corners_transformed = cv.perspectiveTransform(corners, H)
+        
+        # Combine with panorama corners
+        all_corners = np.concatenate([
+            np.float32([[0, 0], [w1, 0], [w1, h1], [0, h1]]).reshape(-1, 1, 2),
+            corners_transformed
+        ])
+        
+        [x_min, y_min] = np.int32(all_corners.min(axis=0).ravel() - 0.5)
+        [x_max, y_max] = np.int32(all_corners.max(axis=0).ravel() + 0.5)
+        
+        # Translation for positive coordinates
+        translation = np.array([
+            [1, 0, -x_min],
+            [0, 1, -y_min],
+            [0, 0, 1]
+        ])
+        
+        # Warp images
+        output_size = (x_max - x_min, y_max - y_min)
+        panorama_warped = cv.warpPerspective(
+            panorama, translation, output_size
+        )
+        img_warped = cv.warpPerspective(
+            imgs[i], translation.dot(H), output_size
+        )
+        
+        # Blend images
+        mask1 = (panorama_warped > 0).astype(np.uint8) * 255
+        mask2 = (img_warped > 0).astype(np.uint8) * 255
+        overlap = cv.bitwise_and(mask1, mask2)
+        
+        # Simple alpha blending in overlap region
+        panorama = np.where(overlap[..., None] > 0,
+                           panorama_warped * 0.5 + img_warped * 0.5,
+                           panorama_warped + img_warped).astype(np.uint8)
+    
+    return panorama
+
+# Usage
+images = ['rotate1.jpg', 'rotate2.jpg', 'rotate3.jpg']
+pano = rotating_camera_panorama(images)
+cv.imwrite('rotating_panorama.jpg', pano)
+```
+
+## Stitching Modes
+
+### Panorama Mode
+
+Optimized for photo panoramas with rotation around camera center.
+
+```python
+stitcher = cv.Stitcher.create(cv.Stitcher_PANORAMA)
+```
+
+**Best for:**
+- Landscape photography
+- 360° panoramas
+- Handheld camera rotation
+
+### Scans Mode
+
+Optimized for scanning documents or materials under affine transformation.
+
+```python
+stitcher = cv.Stitcher.create(cv.Stitcher_SCANS)
+```
+
+**Best for:**
+- Document scanning
+- Flat surface imaging
+- Parallel camera motion
+
+## Configuration Options
+
+| Component | Options | Description |
+|-----------|---------|-------------|
+| **Feature Finder** | ORB, AKAZE, SIFT, SURF | Detect distinctive points |
+| **Matcher** | BestOf2Nearest, Affine | Match features between images |
+| **Bundle Adjuster** | Reproj, Ray, Affine | Refine camera parameters |
+| **Warper** | Spherical, Cylindrical, Plane, Fisheye | Project images to common surface |
+| **Seam Finder** | Voronoi, Graph Cut, DP | Find optimal seam location |
+| **Blender** | Feather, Multiband | Blend images at seams |
+
+## Troubleshooting
+
+<Steps>
+  <Step title="ERR_NEED_MORE_IMGS">
+    Not enough images or too little overlap
+    
+    **Solutions:**
+    - Add more images
+    - Increase overlap between images (aim for 30-50%)
+    - Reduce `setPanoConfidenceThresh()` value
+  </Step>
+  
+  <Step title="ERR_HOMOGRAPHY_EST_FAIL">
+    Cannot find valid geometric transformation
+    
+    **Solutions:**
+    - Ensure sufficient texture in images
+    - Check image quality and focus
+    - Try different feature detector (SIFT instead of ORB)
+    - Increase number of features detected
+  </Step>
+  
+  <Step title="ERR_CAMERA_PARAMS_ADJUST_FAIL">
+    Bundle adjustment failed
+    
+    **Solutions:**
+    - Check for extreme distortion
+    - Try different bundle adjuster
+    - Reduce number of images
+    - Use SCANS mode for planar scenes
+  </Step>
+  
+  <Step title="Visible Seams">
+    Obvious boundaries between images
+    
+    **Solutions:**
+    - Use multiband blending: `Blender_MULTI_BAND`
+    - Try different seam finder: `SeamFinder_DP_COLOR`
+    - Ensure consistent exposure across images
+    - Avoid moving objects in overlap regions
+  </Step>
+</Steps>
+
+## Best Practices
+
+<Note>
+**Image Capture Tips:**
+- Overlap images by 30-50%
+- Keep camera level and rotate around optical center
+- Use consistent exposure settings
+- Avoid moving objects in scene
+- Capture in good lighting conditions
+- Use tripod for best results
+- Take images in sequence (left to right or top to bottom)
+</Note>
+
+<Warning>
+**Performance**: Stitching high-resolution images is computationally intensive. Consider:
+- Reducing image resolution before stitching
+- Using ORB instead of SIFT for faster processing
+- Limiting number of features detected
+- Processing in batches for large panoramas
+</Warning>
+
+## Performance Optimization
+
+```python
+def fast_stitching(images, scale=0.5):
+    """
+    Fast stitching with downscaled images
+    """
+    # Downscale images
+    small_imgs = []
+    for img in images:
+        small = cv.resize(img, None, fx=scale, fy=scale)
+        small_imgs.append(small)
+    
+    # Stitch downscaled images
+    stitcher = cv.Stitcher.create(cv.Stitcher_PANORAMA)
+    stitcher.setFeaturesFinder(cv.detail.OrbFeaturesFinder())
+    status, pano = stitcher.stitch(small_imgs)
+    
+    if status == cv.Stitcher_OK:
+        # Optionally upscale result
+        pano_large = cv.resize(pano, None, fx=1/scale, fy=1/scale)
+        return pano_large
+    return None
+```
+
+## Next Steps
+
+- Learn about [Feature Detection](/modules/features2d) for custom pipelines
+- Explore [Camera Calibration](/examples/pose-estimation) for better results
+- Check [Homography](/api/calib3d/homography) for geometric transformations
+- See [Image Blending](/tutorials/blending) for seamless compositing
