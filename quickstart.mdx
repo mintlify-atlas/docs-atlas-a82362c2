@@ -1,0 +1,429 @@
+---
+title: "Quickstart Guide"
+description: "Get started with OpenCV in minutes - from installation to your first working computer vision application"
+---
+
+## Prerequisites
+
+Before starting, ensure you have OpenCV installed. See the [Installation Guide](/installation) if you haven't already set up OpenCV.
+
+## Your First OpenCV Program
+
+Let's create a simple program to load and display an image.
+
+<Steps>
+  <Step title="Create your project">
+    Create a new directory for your project:
+
+    ```bash
+    mkdir opencv-quickstart
+    cd opencv-quickstart
+    ```
+  </Step>
+
+  <Step title="Write your first program">
+    Create a file and load an image:
+
+    <Tabs>
+      <Tab title="Python">
+        Create `display_image.py`:
+
+        ```python
+        import cv2 as cv
+        import sys
+
+        # Load an image
+        img = cv.imread('image.jpg')
+
+        # Check if image was loaded successfully
+        if img is None:
+            sys.exit("Could not read the image.")
+
+        # Display the image
+        cv.imshow("Display window", img)
+        k = cv.waitKey(0)
+
+        # Save if 's' key is pressed
+        if k == ord("s"):
+            cv.imwrite("output.png", img)
+        ```
+
+        <Note>
+        Make sure you have an image file named `image.jpg` in the same directory, or use `cv.samples.findFile("starry_night.jpg")` to use a built-in sample image.
+        </Note>
+      </Tab>
+
+      <Tab title="C++">
+        Create `display_image.cpp`:
+
+        ```cpp
+        #include <opencv2/opencv.hpp>
+        #include <iostream>
+
+        int main() {
+            // Load an image
+            cv::Mat img = cv::imread("image.jpg");
+            
+            // Check if image was loaded successfully
+            if (img.empty()) {
+                std::cout << "Could not read the image" << std::endl;
+                return 1;
+            }
+            
+            // Display the image
+            cv::imshow("Display window", img);
+            int k = cv::waitKey(0);
+            
+            // Save if 's' key is pressed
+            if (k == 's') {
+                cv::imwrite("output.png", img);
+            }
+            
+            return 0;
+        }
+        ```
+      </Tab>
+
+      <Tab title="Java">
+        Create `DisplayImage.java`:
+
+        ```java
+        import org.opencv.core.Core;
+        import org.opencv.core.Mat;
+        import org.opencv.highgui.HighGui;
+        import org.opencv.imgcodecs.Imgcodecs;
+
+        public class DisplayImage {
+            public static void main(String[] args) {
+                // Load OpenCV native library
+                System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+                
+                // Load an image
+                Mat img = Imgcodecs.imread("image.jpg");
+                
+                // Check if image was loaded
+                if (img.empty()) {
+                    System.out.println("Could not read the image");
+                    return;
+                }
+                
+                // Display the image
+                HighGui.imshow("Display window", img);
+                HighGui.waitKey(0);
+            }
+        }
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Run your program">
+    Execute your program:
+
+    <Tabs>
+      <Tab title="Python">
+        ```bash
+        python display_image.py
+        ```
+      </Tab>
+
+      <Tab title="C++">
+        Compile and run:
+
+        ```bash
+        # Using g++
+        g++ display_image.cpp -o display_image `pkg-config --cflags --libs opencv4`
+        ./display_image
+
+        # Using CMake (recommended)
+        # Create CMakeLists.txt first
+        cmake .
+        make
+        ./display_image
+        ```
+      </Tab>
+
+      <Tab title="Java">
+        ```bash
+        javac -cp ".:/path/to/opencv-VERSION.jar" DisplayImage.java
+        java -cp ".:/path/to/opencv-VERSION.jar" -Djava.library.path=/path/to/opencv/lib DisplayImage
+        ```
+      </Tab>
+    </Tabs>
+
+    A window will appear displaying your image. Press any key to close it, or press 's' to save the image.
+  </Step>
+</Steps>
+
+## Basic Image Processing
+
+Now let's do some actual image processing:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    # Read the image
+    img = cv.imread('image.jpg')
+
+    # Convert to grayscale
+    gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+
+    # Apply Gaussian blur
+    blurred = cv.GaussianBlur(gray, (5, 5), 0)
+
+    # Detect edges using Canny
+    edges = cv.Canny(blurred, 50, 150)
+
+    # Display all results
+    cv.imshow('Original', img)
+    cv.imshow('Grayscale', gray)
+    cv.imshow('Edges', edges)
+    
+    cv.waitKey(0)
+    cv.destroyAllWindows()
+    ```
+  </Tab>
+
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+
+    int main() {
+        // Read the image
+        cv::Mat img = cv::imread("image.jpg");
+        cv::Mat gray, blurred, edges;
+        
+        // Convert to grayscale
+        cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
+        
+        // Apply Gaussian blur
+        cv::GaussianBlur(gray, blurred, cv::Size(5, 5), 0);
+        
+        // Detect edges using Canny
+        cv::Canny(blurred, edges, 50, 150);
+        
+        // Display all results
+        cv::imshow("Original", img);
+        cv::imshow("Grayscale", gray);
+        cv::imshow("Edges", edges);
+        
+        cv::waitKey(0);
+        cv::destroyAllWindows();
+        
+        return 0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Working with Video
+
+Process video from a file or webcam:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import cv2 as cv
+
+    # Open webcam (0 = default camera)
+    cap = cv.VideoCapture(0)
+
+    # Or open a video file
+    # cap = cv.VideoCapture('video.mp4')
+
+    while True:
+        # Read frame
+        ret, frame = cap.read()
+        
+        if not ret:
+            break
+        
+        # Convert to grayscale
+        gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+        
+        # Display
+        cv.imshow('Webcam', gray)
+        
+        # Break on 'q' key
+        if cv.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv.destroyAllWindows()
+    ```
+  </Tab>
+
+  <Tab title="C++">
+    ```cpp
+    #include <opencv2/opencv.hpp>
+
+    int main() {
+        // Open webcam
+        cv::VideoCapture cap(0);
+        
+        // Or open a video file
+        // cv::VideoCapture cap("video.mp4");
+        
+        if (!cap.isOpened()) {
+            std::cout << "Error opening video stream" << std::endl;
+            return -1;
+        }
+        
+        cv::Mat frame, gray;
+        
+        while (true) {
+            // Read frame
+            cap >> frame;
+            
+            if (frame.empty())
+                break;
+            
+            // Convert to grayscale
+            cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+            
+            // Display
+            cv::imshow("Webcam", gray);
+            
+            // Break on 'q' key
+            if (cv::waitKey(1) == 'q')
+                break;
+        }
+        
+        cap.release();
+        cv::destroyAllWindows();
+        
+        return 0;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Common Operations
+
+Here are some frequently used OpenCV operations:
+
+### Reading and Writing
+
+```python
+# Read image
+img = cv.imread('input.jpg')
+
+# Save image
+cv.imwrite('output.jpg', img)
+
+# Read video
+cap = cv.VideoCapture('video.mp4')
+
+# Write video
+fourcc = cv.VideoWriter_fourcc(*'XVID')
+out = cv.VideoWriter('output.avi', fourcc, 20.0, (640, 480))
+```
+
+### Image Transformations
+
+```python
+# Resize
+resized = cv.resize(img, (640, 480))
+
+# Rotate
+(h, w) = img.shape[:2]
+center = (w // 2, h // 2)
+M = cv.getRotationMatrix2D(center, 45, 1.0)
+rotated = cv.warpAffine(img, M, (w, h))
+
+# Flip
+flipped = cv.flip(img, 1)  # 1 = horizontal, 0 = vertical, -1 = both
+```
+
+### Drawing
+
+```python
+# Draw line
+cv.line(img, (0, 0), (100, 100), (255, 0, 0), 2)
+
+# Draw circle
+cv.circle(img, (50, 50), 25, (0, 255, 0), -1)
+
+# Draw rectangle
+cv.rectangle(img, (10, 10), (100, 100), (0, 0, 255), 2)
+
+# Put text
+cv.putText(img, 'Hello OpenCV', (10, 30), 
+           cv.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+```
+
+## Next Steps
+
+Now that you've created your first OpenCV program, explore more features:
+
+<CardGroup cols={2}>
+  <Card title="Image Processing" icon="image" href="/tutorials/image-operations">
+    Learn about filtering, transformations, and color spaces
+  </Card>
+
+  <Card title="Object Detection" icon="crosshairs" href="/tutorials/object-detection">
+    Detect objects, faces, and features in images
+  </Card>
+
+  <Card title="Video Analysis" icon="video" href="/tutorials/video-processing">
+    Process video streams and track objects
+  </Card>
+
+  <Card title="API Reference" icon="code" href="/api/core/mat">
+    Explore the complete OpenCV API
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<Accordion title="ImportError: No module named 'cv2'">
+  Make sure OpenCV is installed:
+  
+  ```bash
+  pip install opencv-python
+  ```
+  
+  Verify installation:
+  
+  ```python
+  import cv2 as cv
+  print(cv.__version__)
+  ```
+</Accordion>
+
+<Accordion title="error: (-215) !_src.empty()">
+  This means the image couldn't be loaded. Check:
+  - The file path is correct
+  - The image file exists
+  - You have read permissions
+  - The image format is supported
+</Accordion>
+
+<Accordion title="Qt platform plugin error">
+  For headless environments, use a different backend:
+  
+  ```bash
+  export QT_QPA_PLATFORM=offscreen
+  ```
+  
+  Or save images instead of displaying them.
+</Accordion>
+
+<Accordion title="Webcam not working">
+  Try different camera indices:
+  
+  ```python
+  cap = cv.VideoCapture(0)  # Try 0, 1, 2, etc.
+  ```
+  
+  On Linux, ensure you have camera permissions.
+</Accordion>
+
+## Resources
+
+- [OpenCV Tutorials](/tutorials/image-operations) - Step-by-step guides
+- [API Documentation](/api/core/mat) - Complete API reference
+- [Examples](/examples/read-display) - Working code samples
+- [GitHub Repository](https://github.com/opencv/opencv) - Source code and issues
