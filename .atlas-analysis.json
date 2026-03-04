@@ -1,0 +1,225 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "OpenCV",
+  "projectDescription": "Open Source Computer Vision Library for image processing, computer vision, and machine learning applications.",
+  "theme": "aspen",
+  "primaryColor": "#138af8",
+  "lightColor": "#f82b43",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/matrices",
+              "concepts/image-basics",
+              "concepts/color-spaces",
+              "concepts/memory-management"
+            ]
+          },
+          {
+            "group": "Modules",
+            "pages": [
+              "modules/overview",
+              "modules/core",
+              "modules/imgproc",
+              "modules/imgcodecs",
+              "modules/videoio",
+              "modules/highgui",
+              "modules/video",
+              "modules/calib3d",
+              "modules/features2d",
+              "modules/objdetect",
+              "modules/dnn",
+              "modules/ml",
+              "modules/photo",
+              "modules/stitching",
+              "modules/gapi"
+            ]
+          },
+          {
+            "group": "Tutorials",
+            "pages": [
+              "tutorials/image-operations",
+              "tutorials/video-processing",
+              "tutorials/feature-detection",
+              "tutorials/object-detection",
+              "tutorials/face-detection",
+              "tutorials/deep-learning",
+              "tutorials/camera-calibration"
+            ]
+          },
+          {
+            "group": "Language Bindings",
+            "pages": [
+              "bindings/cpp",
+              "bindings/python",
+              "bindings/java",
+              "bindings/javascript"
+            ]
+          },
+          {
+            "group": "Platform Support",
+            "pages": [
+              "platforms/overview",
+              "platforms/linux",
+              "platforms/windows",
+              "platforms/macos",
+              "platforms/android",
+              "platforms/ios"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core",
+            "pages": [
+              "api/core/mat",
+              "api/core/operations",
+              "api/core/utilities"
+            ]
+          },
+          {
+            "group": "Image Processing",
+            "pages": [
+              "api/imgproc/filtering",
+              "api/imgproc/geometric",
+              "api/imgproc/color-conversion",
+              "api/imgproc/drawing",
+              "api/imgproc/feature-detection"
+            ]
+          },
+          {
+            "group": "Video Analysis",
+            "pages": [
+              "api/video/motion",
+              "api/video/tracking",
+              "api/video/optical-flow"
+            ]
+          },
+          {
+            "group": "Camera Calibration",
+            "pages": [
+              "api/calib3d/calibration",
+              "api/calib3d/pose-estimation",
+              "api/calib3d/stereo"
+            ]
+          },
+          {
+            "group": "Object Detection",
+            "pages": [
+              "api/objdetect/cascade",
+              "api/objdetect/face",
+              "api/objdetect/aruco",
+              "api/objdetect/qrcode"
+            ]
+          },
+          {
+            "group": "Deep Learning",
+            "pages": [
+              "api/dnn/network",
+              "api/dnn/layers",
+              "api/dnn/inference"
+            ]
+          },
+          {
+            "group": "Machine Learning",
+            "pages": [
+              "api/ml/classification",
+              "api/ml/clustering",
+              "api/ml/regression"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Examples",
+        "groups": [
+          {
+            "group": "Basic Operations",
+            "pages": [
+              "examples/read-display",
+              "examples/image-transformations",
+              "examples/color-spaces"
+            ]
+          },
+          {
+            "group": "Advanced Applications",
+            "pages": [
+              "examples/face-recognition",
+              "examples/object-tracking",
+              "examples/panorama-stitching",
+              "examples/pose-estimation"
+            ]
+          },
+          {
+            "group": "Deep Learning",
+            "pages": [
+              "examples/image-classification",
+              "examples/object-detection-dnn",
+              "examples/semantic-segmentation"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Image and video I/O operations",
+    "Core matrix operations and data structures",
+    "Image processing and filtering",
+    "Feature detection and description",
+    "Object detection and recognition",
+    "Deep neural network inference",
+    "Camera calibration and 3D reconstruction",
+    "Video analysis and motion tracking",
+    "Machine learning algorithms",
+    "Multi-platform support (Linux, Windows, macOS, Android, iOS)",
+    "Multiple language bindings (C++, Python, Java, JavaScript)"
+  ],
+  "publicApiSurface": [
+    "cv::Mat",
+    "cv::imread",
+    "cv::imwrite",
+    "cv::VideoCapture",
+    "cv::VideoWriter",
+    "cv::cvtColor",
+    "cv::resize",
+    "cv::filter2D",
+    "cv::GaussianBlur",
+    "cv::Canny",
+    "cv::HoughLines",
+    "cv::findContours",
+    "cv::drawContours",
+    "cv::goodFeaturesToTrack",
+    "cv::SIFT",
+    "cv::ORB",
+    "cv::CascadeClassifier",
+    "cv::dnn::Net",
+    "cv::dnn::readNet",
+    "cv::dnn::blobFromImage",
+    "cv::calibrateCamera",
+    "cv::findChessboardCorners",
+    "cv::solvePnP",
+    "cv::KalmanFilter",
+    "cv::BackgroundSubtractor",
+    "cv::calcOpticalFlowPyrLK",
+    "cv::ml::SVM",
+    "cv::ml::KNearest",
+    "cv::Stitcher"
+  ]
+}
